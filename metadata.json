@@ -1,0 +1,6 @@
+{
+  "name": "OmniGeo by Maodo",
+  "description": "High-performance geospatial data processing workbench for batch format conversion, CRS transformation, visual validation, and GIS handoffs by Maodo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
