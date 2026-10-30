@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { SpatialDataset } from '../types/gis';
 import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers } from '../core/formatParsers';
+import { parseGeoPackage } from '../core/geoPackageParser';
 import { useI18n } from '../core/i18n';
 
 interface BatchWorkspaceProps {
@@ -57,6 +58,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
+  const [fileProcessingError, setFileProcessingError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filter datasets
@@ -76,14 +78,17 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
   // Handle uploaded files
   const handleFiles = async (files: FileList | File[]) => {
+    if (files.length === 0) return;
     setIsProcessingFiles(true);
+    setFileProcessingError(null);
     const newDatasets: SpatialDataset[] = [];
+    const fileErrors: string[] = [];
+    const fileList = Array.from(files);
 
     // Group files by base name to match Shapefile sidecars (.shp, .shx, .dbf, .prj)
     const sidecarGroups: Record<string, { [ext: string]: File }> = {};
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (const file of fileList) {
       const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
       const baseName = file.name.slice(0, file.name.lastIndexOf('.'));
 
@@ -94,16 +99,20 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     }
 
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
         const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
         const baseName = file.name.slice(0, file.name.lastIndexOf('.'));
 
         if (['.shx', '.dbf', '.prj', '.cpg', '.sbn', '.sbx'].includes(ext)) {
-          continue; // Processed together with .shp
+          if (!sidecarGroups[baseName]?.['.shp']) {
+            fileErrors.push(`${file.name}: select the matching .shp file to import this sidecar.`);
+          }
+          continue;
         }
 
-        if (ext === '.shp') {
+        try {
+          if (ext === '.shp') {
           const group = sidecarGroups[baseName] || {};
           const shpFile = file;
           const shxFile = group['.shx'];
@@ -140,30 +149,39 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           }
 
           newDatasets.push(dataset);
-        } else if (ext === '.zip') {
-          const buf = await file.arrayBuffer();
-          try {
+          } else if (ext === '.zip') {
+            const buf = await file.arrayBuffer();
             const dataset = await parseShapefileZipOrBuffers(buf, file.name, file.size);
             newDatasets.push(dataset);
-          } catch {
-            // Not a shapefile zip
-          }
-        } else if (ext === '.geojson' || ext === '.json') {
-          const text = await file.text();
-          try {
+          } else if (ext === '.geojson' || ext === '.json') {
+            const text = await file.text();
             const dataset = parseGeoJSON(text, file.name, file.size);
             newDatasets.push(dataset);
-          } catch {
-            // Unparseable
+          } else if (ext === '.gpkg') {
+            const datasets = await parseGeoPackage(await file.arrayBuffer(), file.name, file.size);
+            newDatasets.push(...datasets);
+          } else if (ext === '.csv') {
+            const text = await file.text();
+            const dataset = parseCSV(text, file.name, file.size);
+            newDatasets.push(dataset);
+          } else if (ext === '.kml') {
+            const text = await file.text();
+            const dataset = parseKML(text, file.name, file.size);
+            newDatasets.push(dataset);
+          } else if (ext === '.kmz') {
+            const JSZip = (await import('jszip')).default;
+            const archive = await JSZip.loadAsync(await file.arrayBuffer());
+            const kmlFile = Object.values(archive.files).find(
+              entry => !entry.dir && entry.name.toLowerCase().endsWith('.kml'),
+            );
+            if (!kmlFile) throw new Error('The KMZ archive does not contain a KML file.');
+            newDatasets.push(parseKML(await kmlFile.async('text'), file.name, file.size));
+          } else {
+            throw new Error('This file format is not supported.');
           }
-        } else if (ext === '.csv') {
-          const text = await file.text();
-          const dataset = parseCSV(text, file.name, file.size);
-          newDatasets.push(dataset);
-        } else if (ext === '.kml') {
-          const text = await file.text();
-          const dataset = parseKML(text, file.name, file.size);
-          newDatasets.push(dataset);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          fileErrors.push(`${file.name}: ${message}`);
         }
       }
 
@@ -172,6 +190,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         if (!selectedDatasetId && newDatasets[0]) {
           setSelectedDatasetId(newDatasets[0].id);
         }
+      }
+      if (fileErrors.length > 0) {
+        setFileProcessingError(fileErrors.join('\n'));
       }
     } finally {
       setIsProcessingFiles(false);
@@ -310,7 +331,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             multiple
             accept=".shp,.shx,.dbf,.prj,.cpg,.geojson,.json,.kml,.kmz,.csv,.gpkg,.zip"
             className="hidden"
-            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+            onChange={(e) => {
+              const files = Array.from(e.currentTarget.files ?? []);
+              e.currentTarget.value = '';
+              void handleFiles(files);
+            }}
           />
 
           <button
@@ -318,7 +343,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-amber-600 hover:bg-amber-500 text-stone-950 shadow-sm shadow-amber-950/40 transition-all"
           >
             <FolderPlus className="w-3.5 h-3.5" />
-            <span>{t.workspace.addFiles}</span>
+            <span>{isProcessingFiles ? t.common.loading : t.workspace.addFiles}</span>
           </button>
 
           {datasets.length > 0 && (
@@ -342,6 +367,27 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           )}
         </div>
       </div>
+
+      {fileProcessingError && (
+        <div role="alert" className="mx-5 mt-3 rounded-xl border border-rose-700/60 bg-rose-950/40 px-4 py-3 text-xs text-rose-200">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+              <div>
+                <p className="font-semibold">{t.workspace.uploadErrorTitle}</p>
+                <pre className="mt-1 whitespace-pre-wrap font-sans text-rose-200/90">{fileProcessingError}</pre>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFileProcessingError(null)}
+              className="shrink-0 rounded px-2 py-1 text-rose-200 hover:bg-rose-900/60"
+            >
+              {t.workspace.dismissUploadError}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Drag-and-Drop Area & Table Layout */}
       <div className="flex-1 flex flex-col p-5 overflow-hidden gap-4">

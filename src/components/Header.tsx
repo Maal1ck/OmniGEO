@@ -332,8 +332,8 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <Terminal className="w-4 h-4 text-amber-400 flex-shrink-0" />
                   <div>
-                    <div className="font-semibold text-xs">{t.header.pythonDesktop}</div>
-                    <div className="text-[10px] text-stone-400">{t.header.pythonDesktopDesc}</div>
+                    <div className="font-semibold text-xs">{t.header.desktopApp}</div>
+                    <div className="text-[10px] text-stone-400">{t.header.desktopAppDesc}</div>
                   </div>
                 </button>
               </div>

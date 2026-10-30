@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { BatchSettings, ConsolidationSettings, SupportedFormat } from '../types/gis';
 import { COMMON_CRS_LIST, getCRSByCode } from '../core/crsDefinitions';
+import { useI18n } from '../core/i18n';
 import { CRSModal } from './CRSModal';
 
 interface ConversionLabProps {
@@ -43,6 +44,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
   onOpenSpatialDoctor,
   harmonizerRulesCount,
 }) => {
+  const { t } = useI18n();
   const currentCRS = getCRSByCode(settings.targetCRS) || COMMON_CRS_LIST[0];
 
   const formats: { 
@@ -218,7 +220,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
               className="flex items-center space-x-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors font-medium"
             >
               <Search className="w-3.5 h-3.5" />
-              <span>Browse 20+ EPSG Systems...</span>
+              <span>{t.lab.browseCrs}</span>
             </button>
           </div>
 

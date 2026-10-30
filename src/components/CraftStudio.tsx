@@ -267,14 +267,14 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
       },
     },
     {
-      id: 'python-core-export',
-      title: t.craft.pythonTitle,
+      id: 'desktop-app-export',
+      title: t.craft.desktopTitle,
       category: 'quality',
-      description: t.craft.pythonDesc,
+      description: t.craft.desktopDesc,
       icon: Terminal,
       badge: 'Desktop x64',
       badgeColor: 'bg-stone-900 text-stone-300 border-stone-700',
-      actionLabel: t.craft.pythonBtn,
+      actionLabel: t.craft.desktopBtn,
       onExecute: () => {
         onOpenPythonModal();
       },

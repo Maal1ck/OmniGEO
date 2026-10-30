@@ -313,28 +313,24 @@ export async function parseShapefileZipOrBuffers(
   fileName: string,
   fileSize: number
 ): Promise<SpatialDataset> {
-  const parsed = await (shp as any)(zipBuffer);
-  const geojson = Array.isArray(parsed) ? parsed[0] : parsed;
-
-  // Check for PRJ inside zip if accessible
+  const zip = await JSZip.loadAsync(zipBuffer);
+  const prjFile = Object.values(zip.files).find(f => !f.dir && f.name.toLowerCase().endsWith('.prj'));
   let detectedCRS = getCRSByCode('EPSG:4326');
   let crsStatus: SpatialDataset['crsStatus'] = 'assumed';
+  let shapefileBuffer = zipBuffer;
 
-  try {
-    const zip = await JSZip.loadAsync(zipBuffer);
-    const prjFile = Object.values(zip.files).find(f => f.name.toLowerCase().endsWith('.prj'));
-    if (prjFile) {
-      const prjText = await prjFile.async('text');
-      const fromPrj = detectCRSFromPRJ(prjText);
-      if (fromPrj) {
-        detectedCRS = fromPrj;
-        crsStatus = 'verified';
-      }
+  if (prjFile) {
+    const fromPrj = detectCRSFromPRJ(await prjFile.async('text'));
+    if (fromPrj) {
+      detectedCRS = fromPrj;
+      crsStatus = 'verified';
+      zip.remove(prjFile.name);
+      shapefileBuffer = await zip.generateAsync({ type: 'arraybuffer' });
     }
-  } catch {
-    // Keep assumed WGS84
   }
 
+  const parsed = await (shp as any)(shapefileBuffer);
+  const geojson = Array.isArray(parsed) ? parsed[0] : parsed;
   const bounds = computeGeoJSONBounds(geojson);
   const geometryType = detectGeometryType(geojson);
   const fields = extractSchemaFields(geojson);

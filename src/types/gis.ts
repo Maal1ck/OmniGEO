@@ -16,6 +16,7 @@ export interface CRSInfo {
   area: string; // e.g. "World"
   proj4: string;
   wkt?: string;
+  transformationWarning?: string;
   isGeographic: boolean;
   unit: string;
 }

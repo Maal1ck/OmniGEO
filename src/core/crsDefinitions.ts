@@ -1,5 +1,15 @@
 import proj4 from 'proj4';
+import epsgIndex from './epsgCatalog.json';
 import { CRSInfo } from '../types/gis';
+
+interface EPSGDefinition {
+  code: string;
+  kind: string;
+  name: string;
+  proj4: string | null;
+  unit: string | null;
+  area: string | null;
+}
 
 export const COMMON_CRS_LIST: CRSInfo[] = [
   {
@@ -140,14 +150,59 @@ export const COMMON_CRS_LIST: CRSInfo[] = [
   }
 ];
 
+const epsgCRSList: CRSInfo[] = Object.values(epsgIndex as Record<string, EPSGDefinition>)
+  .flatMap(entry => {
+    if (
+      (entry.kind !== 'CRS-PROJCRS' && entry.kind !== 'CRS-GEOGCRS') ||
+      typeof entry.proj4 !== 'string' ||
+      entry.proj4.length === 0
+    ) return [];
+
+    const gridFiles = [...entry.proj4.matchAll(/\+(?:nadgrids|geoidgrids)=([^\s]+)/g)]
+      .flatMap(([, value]) => value.split(','))
+      .filter(value => value && value !== '@null')
+      .map(value => value.replace(/^@/, ''));
+    const sourceUnit = entry.unit?.toLowerCase()
+      || /\+units=([^\s]+)/i.exec(entry.proj4)?.[1]?.toLowerCase()
+      || '';
+    const unit = sourceUnit.includes('degree')
+      ? 'degrees'
+      : sourceUnit === 'm' || sourceUnit.includes('metre') || sourceUnit.includes('meter')
+        ? 'meters'
+        : sourceUnit.includes('foot') || sourceUnit.includes('feet') || sourceUnit === 'ft' || sourceUnit === 'us-ft'
+          ? 'feet'
+          : entry.unit || 'unknown';
+
+    return [{
+      code: `EPSG:${entry.code}`,
+      name: entry.name,
+      area: entry.area || 'Area not specified',
+      proj4: entry.proj4.replace(/\s+\+(?:nadgrids|geoidgrids)=[^\s]+/g, ''),
+      transformationWarning: gridFiles.length > 0
+        ? `Datum grid file(s) ${[...new Set(gridFiles)].join(', ')} are not bundled; transformations use the available ellipsoid parameters and may be less accurate.`
+        : undefined,
+      isGeographic: entry.kind.includes('GEOGCRS'),
+      unit,
+    }];
+  });
+
+const crsByCode = new Map<string, CRSInfo>();
+for (const crs of [...COMMON_CRS_LIST, ...epsgCRSList]) {
+  crsByCode.set(crs.code.toUpperCase(), crs);
+}
+
+const registeredCRSCodes = new Set<string>();
+
+function registerCRSDefinition(crs: CRSInfo): void {
+  if (registeredCRSCodes.has(crs.code)) return;
+  proj4.defs(crs.code, crs.proj4);
+  registeredCRSCodes.add(crs.code);
+}
+
 // Initialize proj4 definitions
 export function initializeCRS(): void {
   for (const crs of COMMON_CRS_LIST) {
-    try {
-      proj4.defs(crs.code, crs.proj4);
-    } catch {
-      // Ignored if already registered
-    }
+    registerCRSDefinition(crsByCode.get(crs.code.toUpperCase()) || crs);
   }
 }
 
@@ -155,26 +210,62 @@ export function initializeCRS(): void {
 initializeCRS();
 
 export function getCRSByCode(code: string): CRSInfo | null {
-  const normalized = code.trim().toUpperCase();
-  const direct = COMMON_CRS_LIST.find(c => c.code.toUpperCase() === normalized);
-  if (direct) return direct;
-
-  // Try numerical lookup
-  const numOnly = normalized.replace('EPSG:', '');
-  const found = COMMON_CRS_LIST.find(c => c.code.endsWith(`:${numOnly}`));
-  if (found) return found;
-
-  return null;
+  const trimmed = code.trim().toUpperCase();
+  const normalized = /^\d+$/.test(trimmed)
+    ? `EPSG:${trimmed}`
+    : trimmed.replace(/^EPSG\s*:\s*/, 'EPSG:');
+  const crs = crsByCode.get(normalized);
+  if (crs) registerCRSDefinition(crs);
+  return crs || null;
 }
 
 export function searchCRS(query: string): CRSInfo[] {
-  if (!query || !query.trim()) return COMMON_CRS_LIST;
+  if (!query || !query.trim()) {
+    return COMMON_CRS_LIST.map(crs => crsByCode.get(crs.code.toUpperCase()) || crs);
+  }
   const q = query.toLowerCase().trim();
-  return COMMON_CRS_LIST.filter(c => 
-    c.code.toLowerCase().includes(q) ||
-    c.name.toLowerCase().includes(q) ||
-    c.area.toLowerCase().includes(q)
-  );
+  return [...crsByCode.values()]
+    .filter(crs =>
+      crs.code.toLowerCase().includes(q) ||
+      crs.name.toLowerCase().includes(q) ||
+      crs.area.toLowerCase().includes(q),
+    )
+    .sort((a, b) => {
+      const aExact = a.code.toLowerCase() === q;
+      const bExact = b.code.toLowerCase() === q;
+      if (aExact !== bExact) return aExact ? -1 : 1;
+      return a.code.localeCompare(b.code, undefined, { numeric: true });
+    });
+}
+
+function findTopLevelEPSGAuthority(wkt: string): string | null {
+  let depth = 0;
+  let inString = false;
+
+  for (let index = 0; index < wkt.length; index++) {
+    const character = wkt[index];
+    if (character === '"') {
+      if (inString && wkt[index + 1] === '"') {
+        index++;
+      } else {
+        inString = !inString;
+      }
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (depth === 1 && /[a-z]/i.test(character)) {
+      const authority = /^(?:AUTHORITY|ID)\s*\[\s*["']EPSG["']\s*,\s*["']?(\d+)["']?\s*\]/i
+        .exec(wkt.slice(index));
+      if (authority) return authority[1];
+    }
+
+    if (character === '[') depth++;
+    else if (character === ']') depth--;
+  }
+
+  return null;
 }
 
 /**
@@ -184,15 +275,12 @@ export function detectCRSFromPRJ(prjContent: string): CRSInfo | null {
   if (!prjContent) return null;
   const upper = prjContent.toUpperCase();
 
-  if (upper.includes('AUTHORITY["EPSG"') || upper.includes('AUTHORITY["EPSG",')) {
-    const match = upper.match(/AUTHORITY\["EPSG",\s*"?(\d+)"?\]/);
-    if (match && match[1]) {
-      const detected = getCRSByCode(`EPSG:${match[1]}`);
-      if (detected) return detected;
-    }
+  const authorityCode = findTopLevelEPSGAuthority(prjContent);
+  if (authorityCode) {
+    return getCRSByCode(`EPSG:${authorityCode}`);
   }
 
-  if (upper.includes('WGS_1984_WEB_MERCATOR') || upper.includes('PSEUDO_MERCATOR') || upper.includes('3857')) {
+  if (upper.includes('WGS_1984_WEB_MERCATOR') || upper.includes('PSEUDO_MERCATOR') || upper.includes('WEB_MERCATOR')) {
     return getCRSByCode('EPSG:3857');
   }
   if (upper.includes('BRITISH_NATIONAL_GRID') || upper.includes('OSGB_1936')) {
@@ -211,11 +299,6 @@ export function detectCRSFromPRJ(prjContent: string): CRSInfo | null {
     return getCRSByCode('EPSG:2263');
   }
   if (upper.includes('GCS_WGS_1984') || upper.includes('GEOGCS["WGS 84"') || upper.includes('DATUM["WGS_1984"')) {
-    return getCRSByCode('EPSG:4326');
-  }
-
-  // Default to WGS 84 if typical geographic
-  if (upper.includes('GEOGCS') && upper.includes('DEGREE')) {
     return getCRSByCode('EPSG:4326');
   }
 

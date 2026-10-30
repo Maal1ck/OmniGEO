@@ -22,7 +22,8 @@ export const CRSModal: React.FC<CRSModalProps> = ({
 
   if (!isOpen) return null;
 
-  const results = searchCRS(query);
+  const matchingResults = searchCRS(query);
+  const results = matchingResults.slice(0, 100);
 
   const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +77,11 @@ export const CRSModal: React.FC<CRSModalProps> = ({
               autoFocus
             />
           </div>
+          {matchingResults.length > results.length && (
+            <p className="mt-2 text-[11px] text-stone-500">
+              Showing the first {results.length} of {matchingResults.length.toLocaleString()} matches. Refine your search to narrow the results.
+            </p>
+          )}
         </div>
 
         {/* List of CRS */}
@@ -105,6 +111,9 @@ export const CRSModal: React.FC<CRSModalProps> = ({
                     </div>
                     <p className="text-xs text-stone-400">{crs.area} · Units: {crs.unit}</p>
                     <p className="text-[11px] font-mono text-stone-500 truncate max-w-lg">{crs.proj4}</p>
+                    {crs.transformationWarning && (
+                      <p className="text-[11px] text-amber-400">{crs.transformationWarning}</p>
+                    )}
                   </div>
                   {isSelected && (
                     <span className="p-1 text-amber-400">

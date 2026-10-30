@@ -157,32 +157,25 @@ class SpatialDataset:
     bounds: Tuple[float, float, float, float]`
     },
     'packaging_guide.md': {
-      desc: 'PyInstaller and Inno Setup Windows native executable packaging instructions',
-      code: `# OmniGeo by Maodo — Windows Packaging & Build Guide
+      desc: 'Electron Windows desktop app and installer build instructions',
+      code: `# OmniGeo by Maodo — Electron Desktop Build Guide
 
 ## 1. Prerequisites
-- Python 3.10+ (64-bit)
-- OSGeo4W or Conda environment with GDAL & PROJ binaries
+- Node.js and npm
 
-## 2. Environment Setup
+## 2. Install dependencies and run the desktop app
 \`\`\`powershell
-conda create -n omnigeo python=3.10 gdal pyproj shapely geopandas pyogrio -c conda-forge
-conda activate omnigeo
-pip install PySide6 pytest pyinstaller
+npm install
+npm run desktop:dev
 \`\`\`
 
-## 3. Building Single-File Windows Executable
+## 3. Build the Windows installer
 \`\`\`powershell
-pyinstaller --name="OmniGeo-Desktop" ^
-  --windowed ^
-  --icon=resources/icon.ico ^
-  --add-data="%CONDA_PREFIX%/Library/share/gdal;gdal" ^
-  --add-data="%CONDA_PREFIX%/Library/share/proj;proj" ^
-  src/omnigeo/app.py
+npm run desktop:dist
 \`\`\`
 
-## 4. Verification
-The compiled standalone \`dist/OmniGeo-Desktop.exe\` runs independently on Windows 10/11 with zero external Python requirements.`
+The installer is written to \`release/OmniGeo-Setup-1.0.0-x64.exe\`. The app opens
+the bundled workbench directly and does not require a separate browser or local server.`
     }
   };
 
@@ -245,8 +238,8 @@ tests/test_validation.py::test_unclosed_ring_tolerance PASSED            [100%]
               <Terminal className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-display font-bold text-stone-100 text-base tracking-wide">Python Desktop Architecture & PyInstaller Packaging</h3>
-              <p className="text-xs text-stone-400 font-sans">Native Windows PySide6 / GDAL engine, PROJ coordinate pipelines, and test suites</p>
+              <h3 className="font-display font-bold text-stone-100 text-base tracking-wide">Python Core & Electron Desktop Packaging</h3>
+              <p className="text-xs text-stone-400 font-sans">Python geospatial core sources and the Electron Windows installer workflow</p>
             </div>
           </div>
           <button
@@ -321,7 +314,7 @@ tests/test_validation.py::test_unclosed_ring_tolerance PASSED            [100%]
 
         {/* Footer */}
         <div className="px-6 py-3 border-t border-stone-800 bg-[#13110E] flex items-center justify-between text-xs text-stone-400">
-          <span className="font-sans">Target Architecture: Windows x64 Native PySide6 + GDAL 3.7+</span>
+          <span className="font-sans">Desktop Architecture: Electron + Chromium | Vite + React</span>
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-100 font-semibold transition-colors"

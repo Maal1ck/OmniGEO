@@ -1,12 +1,12 @@
-# GeoFlow Desktop
+# OmniGeo Desktop
 
-A high-performance geospatial data processing workbench designed for fast, reliable batch format conversion, coordinate reference system (CRS) transformation, visual validation, and dependable processing of large collections of spatial files.
+A high-performance geospatial data processing workbench for reliable batch format conversion, coordinate reference system (CRS) transformation, visual validation, and large collections of spatial files.
 
 ---
 
 ## 1. Product Overview
 
-GeoFlow Desktop provides a clean, modern, local-first processing workbench for GIS analysts, surveyors, cartographers, and engineering teams. It bridges the gap between ad-hoc command line GDAL scripts and bloated desktop GIS suites by focusing squarely on the core batch workflow:
+OmniGeo provides a clean, modern, local-first processing workbench for GIS analysts, surveyors, cartographers, and engineering teams. It bridges the gap between ad-hoc command line GDAL scripts and bloated desktop GIS suites by focusing squarely on the core batch workflow:
 
 **Import Data → Configure Conversion → Validate → Process Batch → Review Results → Export Manifest.**
 
@@ -29,7 +29,7 @@ GeoFlow Desktop provides a clean, modern, local-first processing workbench for G
 
 ### 2.2 Conversion Lab
 - **Target Format Engine:** One-click batch format targeting with customizable layer names.
-- **Coordinate Reference System (CRS) Registry:** Over 30 curated global & regional projections (EPSG:4326, EPSG:3857, British National Grid EPSG:27700, Lambert-93 EPSG:2154, UTM zones, NAD83 State Planes) plus custom PROJ string definitions.
+- **Coordinate Reference System (CRS) Registry:** Searchable offline catalogue of more than 6,900 EPSG geographic and projected coordinate systems plus custom PROJ string definitions. Shapefile `.prj` detection uses the top-level authority identifier and preserves the source coordinate values.
 - **Reproject vs. Assign CRS Distinction:**
   - *Reproject:* Calculates new coordinate coordinates via PROJ mathematical equations.
   - *Assign:* Metadata override only; preserves numerical coordinates without distortion.
@@ -65,35 +65,26 @@ GeoFlow Desktop provides a clean, modern, local-first processing workbench for G
 
 ---
 
-## 3. Windows Desktop Native Build (PySide6 + GDAL)
+## 3. Windows Desktop App (Electron)
 
-GeoFlow Desktop's native Windows edition is powered by PySide6, Pyogrio, and GDAL.
+The desktop app loads the built workbench directly inside an Electron window. It does
+not require opening a browser or connecting to a local web server.
 
-### 3.1 Setup Environment (Conda / OSGeo4W)
+### 3.1 Build and run the desktop app
 \`\`\`powershell
-# Create environment with native GDAL and PROJ binaries
-conda create -n geoflow python=3.10 gdal pyproj shapely geopandas pyogrio -c conda-forge
-conda activate geoflow
-
-# Install UI and packaging dependencies
-pip install PySide6 pytest pyinstaller
+npm install
+npm run desktop:dev
 \`\`\`
 
-### 3.2 Running the Native Desktop App
+### 3.2 Create the Windows installer
+
+Create a distributable Windows x64 setup installer:
+
 \`\`\`powershell
-python -m geoflow.app
+npm run desktop:dist
 \`\`\`
 
-### 3.3 Building Windows Standalone Executable (.exe)
-\`\`\`powershell
-pyinstaller --name="GeoFlow-Desktop" ^
-  --windowed ^
-  --noconsole ^
-  --add-data="%CONDA_PREFIX%/Library/share/gdal;gdal" ^
-  --add-data="%CONDA_PREFIX%/Library/share/proj;proj" ^
-  src/geoflow/app.py
-\`\`\`
-The generated \`dist/GeoFlow-Desktop.exe\` is a self-contained, portable Windows application.
+The installer is written to \`release/OmniGeo-Setup-1.0.0-x64.exe\`.
 
 ---
 
@@ -110,3 +101,5 @@ npm run dev
 \`\`\`
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+The EPSG catalogue is generated from [epsg-index](https://www.npmjs.com/package/epsg-index) and its ISC license is included in the app at `licenses/epsg-index.txt`.

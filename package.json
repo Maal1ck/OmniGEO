@@ -1,14 +1,22 @@
 {
-  "name": "react-example",
+  "name": "omnigeo",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "OmniGeo desktop geospatial data processing workbench.",
+  "author": "OmniGeo by Maodo",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "generate:crs": "node scripts/generate-crs-catalog.mjs",
+    "prebuild": "npm run generate:crs",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "desktop:dev": "npm run build && electron .",
+    "desktop:dir": "npm run build && electron-builder --dir",
+    "desktop:dist": "npm run build && electron-builder --win nsis"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -39,9 +47,41 @@
     "@types/shpjs": "^3.4.7",
     "@types/sql.js": "^1.4.11",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
+    "epsg-index": "^2.0.0",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^7.0.2"
+  },
+  "build": {
+    "appId": "com.omnigeo.desktop",
+    "productName": "OmniGeo",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

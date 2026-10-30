@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import { SpatialDataset, ConversionJob } from '../types/gis';
 import { SurfaceUnit } from '../core/spatialAnalytics';
+import { getCRSByCode } from '../core/crsDefinitions';
+import { reprojectGeoJSON } from '../core/crsEngine';
 import { useI18n } from '../core/i18n';
 
 interface MapPreviewProps {
@@ -76,6 +78,9 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
   const [selectedFeatureProps, setSelectedFeatureProps] = useState<Record<string, any> | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<'attributes' | 'metadata' | 'validation'>('attributes');
   const [attributeSearch, setAttributeSearch] = useState('');
+  const [mapProjectionError, setMapProjectionError] = useState<string | null>(null);
+  const [mapProjectionWarning, setMapProjectionWarning] = useState<string | null>(null);
+  const [outputProjectionError, setOutputProjectionError] = useState<string | null>(null);
 
   // Cartographic Legend & Symbology States (Rendered outside the map frame to eliminate glitches)
   const [isLegendOpen, setIsLegendOpen] = useState(true);
@@ -223,10 +228,27 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
       geojsonLayerRef.current = null;
     }
 
+    setMapProjectionError(null);
+    setMapProjectionWarning(null);
     if (!dataset || !dataset.geojson || !isLayerVisible) return;
 
     try {
-      const layer = L.geoJSON(dataset.geojson, {
+      const sourceCRS = dataset.detectedCRS?.code;
+      if (!sourceCRS || !getCRSByCode(sourceCRS)) {
+        throw new Error(`Cannot display this layer because its source CRS (${sourceCRS || 'unknown'}) is not available.`);
+      }
+
+      const reprojection = sourceCRS === 'EPSG:4326'
+        ? { geojson: dataset.geojson, warnings: [] as string[] }
+        : reprojectGeoJSON(dataset.geojson, sourceCRS, 'EPSG:4326');
+      const coordinateErrors = reprojection.warnings.filter(warning => warning.startsWith('Coordinate transform error:'));
+      if (coordinateErrors.length > 0) {
+        throw new Error(coordinateErrors[0]);
+      }
+      const approximateWarning = reprojection.warnings.find(warning => warning.includes('not bundled'));
+      if (approximateWarning) setMapProjectionWarning(approximateWarning);
+
+      const layer = L.geoJSON(reprojection.geojson, {
         style: () => ({
           color: layerColor,
           weight: 2,
@@ -261,7 +283,9 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
         map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
       }
     } catch (err) {
-      console.warn('Map preview render error:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Map preview render error:', err);
+      setMapProjectionError(message);
     }
   }, [dataset, isLayerVisible, layerColor, layerOpacity]);
 
@@ -274,10 +298,23 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
       map.removeLayer(outputGeojsonLayerRef.current);
       outputGeojsonLayerRef.current = null;
     }
+    setOutputProjectionError(null);
 
     if (showOutputCompare && processedJob?.outputGeojson) {
       try {
-        const outLayer = L.geoJSON(processedJob.outputGeojson, {
+        const targetCRS = processedJob.targetCRS;
+        if (!getCRSByCode(targetCRS)) {
+          throw new Error(`Cannot display comparison output because CRS ${targetCRS} is not available.`);
+        }
+        const reprojection = targetCRS === 'EPSG:4326'
+          ? { geojson: processedJob.outputGeojson, warnings: [] as string[] }
+          : reprojectGeoJSON(processedJob.outputGeojson, targetCRS, 'EPSG:4326');
+        const coordinateErrors = reprojection.warnings.filter(warning => warning.startsWith('Coordinate transform error:'));
+        if (coordinateErrors.length > 0) {
+          throw new Error(coordinateErrors[0]);
+        }
+
+        const outLayer = L.geoJSON(reprojection.geojson, {
           style: () => ({
             color: '#EA580C',
             weight: 2,
@@ -299,7 +336,9 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
         outputGeojsonLayerRef.current = outLayer;
       } catch (err) {
-        console.warn('Output comparison render error:', err);
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('Output comparison render error:', err);
+        setOutputProjectionError(message);
       }
     }
   }, [showOutputCompare, processedJob]);
@@ -753,6 +792,20 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               ref={mapContainerRef}
               className={`w-full h-full ${isOverlayOpen ? 'invisible opacity-0 pointer-events-none' : ''}`}
             />
+            {(mapProjectionError || outputProjectionError || mapProjectionWarning) && (
+              <div
+                role={mapProjectionError || outputProjectionError ? 'alert' : 'status'}
+                className={`absolute top-3 left-1/2 z-[1000] w-[min(42rem,calc(100%-2rem))] -translate-x-1/2 rounded-lg border px-3 py-2 text-xs shadow-lg ${
+                  mapProjectionError || outputProjectionError
+                    ? 'border-rose-700/70 bg-rose-950/90 text-rose-200'
+                    : 'border-amber-700/70 bg-amber-950/90 text-amber-200'
+                }`}
+              >
+                {mapProjectionError || outputProjectionError
+                  ? `${t.map.mapProjectionError} ${mapProjectionError || outputProjectionError}`
+                  : t.map.mapProjectionWarning}
+              </div>
+            )}
 
             {/* Overlays rendered outside mapContainerRef DOM */}
             {isSwipeMode && processedJob?.outputGeojson && (

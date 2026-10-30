@@ -50,8 +50,8 @@ export interface Translations {
     schemaHarmonizerDesc: string;
     qaqcAudit: string;
     qaqcAuditDesc: string;
-    pythonDesktop: string;
-    pythonDesktopDesc: string;
+    desktopApp: string;
+    desktopAppDesc: string;
     dryRun: string;
     dryRunOn: string;
     dryRunOff: string;
@@ -113,9 +113,9 @@ export interface Translations {
     mapStudioTitle: string;
     mapStudioDesc: string;
     mapStudioBtn: string;
-    pythonTitle: string;
-    pythonDesc: string;
-    pythonBtn: string;
+    desktopTitle: string;
+    desktopDesc: string;
+    desktopBtn: string;
     shortcutsTitle: string;
     shortcutsSub: string;
     scPalette: string;
@@ -165,6 +165,8 @@ export interface Translations {
     extentMin: string;
     extentMax: string;
     allPassed: string;
+    mapProjectionError: string;
+    mapProjectionWarning: string;
   };
   aggregation: {
     title: string;
@@ -206,6 +208,8 @@ export interface Translations {
     dropzoneTitle: string;
     dropzoneSubtitle: string;
     supportedFormatsBadge: string;
+    uploadErrorTitle: string;
+    dismissUploadError: string;
     colName: string;
     colFormat: string;
     colCrs: string;
@@ -321,8 +325,8 @@ export const translations: Record<Language, Translations> = {
       schemaHarmonizerDesc: 'Standardize disparate column names across files',
       qaqcAudit: 'QA/QC Audit Certificate',
       qaqcAuditDesc: 'View certified geodetic compliance stamp',
-      pythonDesktop: 'Python Desktop & PyInstaller',
-      pythonDesktopDesc: 'Export native Windows GDAL/PySide6 core',
+      desktopApp: 'Electron Desktop App',
+      desktopAppDesc: 'Build the Windows installer',
       dryRun: 'Dry-Run Simulation',
       dryRunOn: 'Dry-Run On',
       dryRunOff: 'Dry-Run Off',
@@ -384,9 +388,9 @@ export const translations: Record<Language, Translations> = {
       mapStudioTitle: 'Explore Cartographic Studio & Visual Legends',
       mapStudioDesc: 'Inspect live rendered features with interactive visual layer legends, layer opacity controls, swipe comparison curtains, and attribute inspection.',
       mapStudioBtn: 'Launch Map Studio',
-      pythonTitle: 'Native Python GDAL Engine & PyInstaller Spec',
-      pythonDesc: 'View the standalone Windows PySide6 / OSGeo4W Python script core, pyogrio conversion pipelines, and automated pytest suites.',
-      pythonBtn: 'View Python Spec',
+      desktopTitle: 'Electron Desktop Installer',
+      desktopDesc: 'Build the OmniGeo Windows desktop app with its bundled workbench and setup installer.',
+      desktopBtn: 'View desktop build guide',
       shortcutsTitle: 'Cartographic Studio Keyboard & Command Shortcuts',
       shortcutsSub: 'OmniGeo by Maodo Core',
       scPalette: 'Open Master Command Dispatch',
@@ -436,6 +440,8 @@ export const translations: Record<Language, Translations> = {
       extentMin: 'Spatial Extent [MinX, MinY]',
       extentMax: 'Spatial Extent [MaxX, MaxY]',
       allPassed: 'All geometry validity and CRS boundary checks passed successfully. Zero topological kinks detected.',
+      mapProjectionError: 'The layer could not be transformed to map coordinates:',
+      mapProjectionWarning: 'Map display uses an approximate datum transformation because a required grid file is unavailable.',
     },
     aggregation: {
       title: 'Field Aggregation & Attribute Intelligence',
@@ -475,8 +481,10 @@ export const translations: Record<Language, Translations> = {
       allFormats: 'All Formats',
       allStatuses: 'All Statuses',
       dropzoneTitle: 'Drag & Drop GIS Vector Files Here',
-      dropzoneSubtitle: 'Supports GeoJSON, ESRI Shapefile (.shp/.zip), OGC GeoPackage (.gpkg), KML, FlatGeobuf, and CSV with Lon/Lat coordinates.',
+      dropzoneSubtitle: 'Supports GeoJSON, ESRI Shapefile (.shp/.zip), OGC GeoPackage (.gpkg), KML/KMZ, and CSV with Lon/Lat coordinates.',
       supportedFormatsBadge: 'AIR-GAPPED VECTOR INGESTION',
+      uploadErrorTitle: 'Some files could not be imported',
+      dismissUploadError: 'Dismiss',
       colName: 'Dataset Name',
       colFormat: 'Format',
       colCrs: 'Detected CRS',
@@ -492,7 +500,7 @@ export const translations: Record<Language, Translations> = {
       section1Title: 'Target Output Format',
       selectedFormat: 'Selected:',
       section2Title: 'Geodetic Datum & Coordinate Reference System (CRS)',
-      browseCrs: 'Browse 20+ EPSG Systems...',
+      browseCrs: 'Browse 6,900+ EPSG Systems...',
       changeCrs: 'Change Target CRS',
       areaOfUse: 'Area of Use:',
       units: 'Units:',
@@ -590,8 +598,8 @@ export const translations: Record<Language, Translations> = {
       schemaHarmonizerDesc: 'Normalisation des colonnes hétérogènes entre fichiers',
       qaqcAudit: 'Certificat d\'Audit QA/QC',
       qaqcAuditDesc: 'Consulter le tampon de conformité géodésique scellé',
-      pythonDesktop: 'Noyau Python & PyInstaller',
-      pythonDesktopDesc: 'Export du moteur natif Windows GDAL/PySide6',
+      desktopApp: 'Application Electron',
+      desktopAppDesc: 'Créer l’installeur Windows',
       dryRun: 'Simulation à blanc',
       dryRunOn: 'Simulation ON',
       dryRunOff: 'Simulation OFF',
@@ -653,9 +661,9 @@ export const translations: Record<Language, Translations> = {
       mapStudioTitle: 'Studio Cartographique & Légendes Dynamiques',
       mapStudioDesc: 'Visualisez vos entités avec légendes interactives, gestion de l\'opacité, rideau comparatif avant/après et inspection tabulaire.',
       mapStudioBtn: 'Ouvrir le Studio Carto',
-      pythonTitle: 'Noyau Python GDAL & Packaging PyInstaller',
-      pythonDesc: 'Consultez l\'architecture Python PySide6 autonome, les pipelines de conversion pyogrio et la suite de tests unitaires pytest.',
-      pythonBtn: 'Voir les spécifications Python',
+      desktopTitle: 'Installeur de bureau Electron',
+      desktopDesc: 'Générez l’application OmniGeo Windows avec son interface intégrée et son installeur.',
+      desktopBtn: 'Voir le guide de compilation',
       shortcutsTitle: 'Raccourcis Clavier & Ligne de Commande',
       shortcutsSub: 'Moteur OmniGeo par Maodo',
       scPalette: 'Palette de commandes globale',
@@ -705,6 +713,8 @@ export const translations: Record<Language, Translations> = {
       extentMin: 'Emprise spatiale [MinX, MinY]',
       extentMax: 'Emprise spatiale [MaxX, MaxY]',
       allPassed: 'Tous les tests de conformité géométrique et de limites SCR sont validés. Aucun nœud topologique invalide.',
+      mapProjectionError: 'La couche ne peut pas être transformée pour son affichage sur la carte :',
+      mapProjectionWarning: 'L’affichage utilise une transformation de datum approximative car un fichier de grille requis est indisponible.',
     },
     aggregation: {
       title: 'Agrégation Attributaire & Intelligence Spatiale',
@@ -744,8 +754,10 @@ export const translations: Record<Language, Translations> = {
       allFormats: 'Tous les formats',
       allStatuses: 'Tous les statuts',
       dropzoneTitle: 'Glissez-déposez vos fichiers vectoriels SIG ici',
-      dropzoneSubtitle: 'Prise en charge de GeoJSON, ESRI Shapefile (.shp/.zip), OGC GeoPackage (.gpkg), KML, FlatGeobuf et CSV avec colonnes Lon/Lat.',
+      dropzoneSubtitle: 'Prise en charge de GeoJSON, ESRI Shapefile (.shp/.zip), GeoPackage OGC (.gpkg), KML/KMZ et CSV avec colonnes Lon/Lat.',
       supportedFormatsBadge: 'INGESTION VECTORIELLE ISOLÉE',
+      uploadErrorTitle: 'Certains fichiers n’ont pas pu être importés',
+      dismissUploadError: 'Fermer',
       colName: 'Nom du jeu de données',
       colFormat: 'Format',
       colCrs: 'SCR Détecté',
@@ -761,7 +773,7 @@ export const translations: Record<Language, Translations> = {
       section1Title: 'Format de Sortie Cible',
       selectedFormat: 'Sélectionné :',
       section2Title: 'Système de Coordonnées de Référence (SCR) & Datum',
-      browseCrs: 'Parcourir plus de 20 codes EPSG...',
+      browseCrs: 'Parcourir plus de 6 900 codes EPSG...',
       changeCrs: 'Modifier le SCR cible',
       areaOfUse: 'Zone d\'application :',
       units: 'Unités :',

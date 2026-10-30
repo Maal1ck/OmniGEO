@@ -1,17 +1,7 @@
-import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
+import { Database } from 'sql.js';
 import { getCRSByCode } from './crsDefinitions';
 import { getWKTForCRS } from './shapefileBundle';
-
-let sqlPromise: Promise<SqlJsStatic> | null = null;
-
-function getSqlJs(): Promise<SqlJsStatic> {
-  if (!sqlPromise) {
-    sqlPromise = initSqlJs({
-      locateFile: (file) => `https://sql.js.org/dist/${file}`,
-    });
-  }
-  return sqlPromise;
-}
+import { getSqlJs } from './sqlJs';
 
 /**
  * Converts a GeoJSON geometry into GeoPackage Binary (GPB) header + WKB

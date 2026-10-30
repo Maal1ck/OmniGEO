@@ -81,6 +81,13 @@ export function reprojectGeoJSON(
   const fromInfo = getCRSByCode(fromCRS);
   const toInfo = getCRSByCode(toCRS);
 
+  for (const warning of new Set([
+    fromInfo?.transformationWarning,
+    toInfo?.transformationWarning,
+  ].filter((value): value is string => !!value))) {
+    warnings.push(warning);
+  }
+
   if (!fromInfo) {
     warnings.push(`Source CRS ${fromCRS} definition not found in registry. Using standard fallback.`);
   }
@@ -94,13 +101,23 @@ export function reprojectGeoJSON(
   const transformedFeatures = features.map((f: any) => {
     if (!f || !f.geometry) return f;
     count++;
-    const newCoords = transformCoordsDeep(f.geometry.coordinates, fromCRS, toCRS, warnings);
+    const transformGeometry = (geometry: any): any => {
+      if (!geometry) return geometry;
+      if (geometry.type === 'GeometryCollection') {
+        return {
+          ...geometry,
+          geometries: geometry.geometries.map(transformGeometry),
+        };
+      }
+      return {
+        ...geometry,
+        coordinates: transformCoordsDeep(geometry.coordinates, fromCRS, toCRS, warnings),
+      };
+    };
+
     return {
       ...f,
-      geometry: {
-        ...f.geometry,
-        coordinates: newCoords,
-      },
+      geometry: transformGeometry(f.geometry),
     };
   });
 

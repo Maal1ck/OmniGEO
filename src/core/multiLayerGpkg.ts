@@ -1,19 +1,9 @@
-import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
+import { Database } from 'sql.js';
 import JSZip from 'jszip';
 import { SpatialDataset } from '../types/gis';
 import { getCRSByCode } from './crsDefinitions';
 import { getWKTForCRS } from './shapefileBundle';
-
-let sqlPromise: Promise<SqlJsStatic> | null = null;
-
-function getSqlJs(): Promise<SqlJsStatic> {
-  if (!sqlPromise) {
-    sqlPromise = initSqlJs({
-      locateFile: (file) => `https://sql.js.org/dist/${file}`,
-    });
-  }
-  return sqlPromise;
-}
+import { getSqlJs } from './sqlJs';
 
 function geometryToGeoPackageBlob(geom: any, srsId: number): Uint8Array {
   if (!geom || !geom.coordinates) {
