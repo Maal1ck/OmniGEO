@@ -26,6 +26,7 @@ import {
 import { Logo } from './Logo';
 import { BatchSettings, PresetProfile } from '../types/gis';
 import { PRESET_PROFILES } from '../core/presets';
+import { useI18n } from '../core/i18n';
 
 export type NavTab = 'craft' | 'workspace' | 'lab' | 'map' | 'monitor';
 
@@ -66,6 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
   selectedPresetId,
   onSelectPreset,
 }) => {
+  const { lang, setLang, t } = useI18n();
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const toolsMenuRef = useRef<HTMLDivElement>(null);
 
@@ -89,7 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div 
           className="flex items-center space-x-3 cursor-pointer group" 
           onClick={() => setActiveTab('craft')}
-          title="OmniGeo by Maodo — Return to Craft Studio"
+          title="OmniGeo by Maodo"
         >
           <Logo size={36} className="group-hover:scale-105 transition-transform duration-200" />
           
@@ -104,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div className="flex items-center space-x-1.5 text-[10px] text-stone-400 font-sans">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Air-Gapped WASM</span>
+              <span>{t.header.airGapped}</span>
               <span className="text-stone-600">·</span>
               <span className="font-mono text-stone-400">{settings.targetFormat.toUpperCase()}</span>
             </div>
@@ -123,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'craft' ? 'text-stone-950 fill-current' : 'text-amber-400'}`} />
-            <span>Craft</span>
+            <span>{t.header.craftTab}</span>
           </button>
 
           {/* Workspace Tab */}
@@ -136,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Workspace</span>
+            <span>{t.header.workspaceTab}</span>
             {datasetCount > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-800/50">
                 {datasetCount}
@@ -154,7 +156,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Settings2 className="w-3.5 h-3.5" />
-            <span>Conversion Lab</span>
+            <span>{t.header.labTab}</span>
           </button>
 
           {/* Map Preview Tab */}
@@ -167,7 +169,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <MapIcon className="w-3.5 h-3.5" />
-            <span>Map Studio</span>
+            <span>{t.header.mapTab}</span>
           </button>
 
           {/* Job Monitor Tab */}
@@ -180,7 +182,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>Monitor</span>
+            <span>{t.header.monitorTab}</span>
             {runningJobCount > 0 && (
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
             )}
@@ -190,15 +192,45 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Streamlined Clean Controls & Primary CTA */}
       <div className="flex items-center space-x-2.5">
+        {/* Subtle Language Switch */}
+        <div 
+          className="flex items-center rounded-xl bg-[#1C1713] border border-stone-800 p-0.5 text-xs font-mono shadow-sm"
+          title={lang === 'en' ? 'Switch language (EN / FR)' : 'Changer de langue (EN / FR)'}
+        >
+          <button
+            type="button"
+            onClick={() => setLang('en')}
+            className={`px-2 py-1 rounded-lg transition-all text-[11px] font-semibold ${
+              lang === 'en'
+                ? 'bg-[#2A221C] text-amber-300 border border-amber-600/40 shadow-sm'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            EN
+          </button>
+          <span className="text-stone-700 mx-0.5">·</span>
+          <button
+            type="button"
+            onClick={() => setLang('fr')}
+            className={`px-2 py-1 rounded-lg transition-all text-[11px] font-semibold ${
+              lang === 'fr'
+                ? 'bg-[#2A221C] text-amber-300 border border-amber-600/40 shadow-sm'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            FR
+          </button>
+        </div>
+
         {/* Command Palette Trigger */}
         <button
           onClick={onOpenCommandPalette}
           className="flex items-center space-x-2 bg-[#1C1713] hover:bg-[#251E19] border border-stone-800 hover:border-amber-600/40 px-3 py-1.5 rounded-xl text-xs text-stone-400 hover:text-stone-200 transition-all shadow-sm"
-          title="Command Dispatch (Ctrl+K or ⌘K)"
+          title={t.header.commands}
         >
           <Search className="w-3.5 h-3.5 text-stone-400" />
-          <span className="hidden lg:inline text-[11px]">Commands</span>
-          <kbd className="font-mono text-[10px] bg-stone-800/90 text-stone-300 px-1.5 py-0.5 rounded border border-stone-700">⌘K</kbd>
+          <span className="hidden lg:inline text-[11px]">{t.header.commands}</span>
+          <kbd className="font-mono text-[10px] bg-stone-800/90 text-stone-300 px-1.5 py-0.5 rounded border border-stone-700">{t.header.commandsKbd}</kbd>
         </button>
 
         {/* Specialized Tools & Presets Dropdown */}
@@ -211,11 +243,10 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'bg-[#1C1713] text-stone-300 border-stone-800 hover:bg-[#251E19] hover:border-stone-700'
             }`}
           >
-            <span>Tools & Presets</span>
+            <span>{t.header.toolsAndPresets}</span>
             {hasCertificate && (
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
             )}
-            <ChevronDown className={`w-3.5 h-3.5 text-stone-400 transition-transform ${isToolsOpen ? 'rotate-180 text-amber-400' : ''}`} />
           </button>
 
           {/* Tools Menu Popover */}
@@ -226,7 +257,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-mono uppercase text-stone-400 font-semibold tracking-wider flex items-center space-x-1">
                     <Bookmark className="w-3 h-3 text-amber-400" />
-                    <span>Active Preset</span>
+                    <span>{t.header.activePreset}</span>
                   </span>
                   <span className="text-[10px] text-amber-400 font-mono">{settings.targetCRS}</span>
                 </div>
@@ -257,8 +288,8 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <Stethoscope className="w-4 h-4 text-amber-400 flex-shrink-0" />
                   <div>
-                    <div className="font-semibold text-xs">Pre-Flight Spatial Doctor</div>
-                    <div className="text-[10px] text-stone-400">Detect inverted Lat/Lon & auto-repair geometries</div>
+                    <div className="font-semibold text-xs">{t.header.spatialDoctor}</div>
+                    <div className="text-[10px] text-stone-400">{t.header.spatialDoctorDesc}</div>
                   </div>
                 </button>
 
@@ -271,8 +302,8 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <TableProperties className="w-4 h-4 text-orange-400 flex-shrink-0" />
                   <div>
-                    <div className="font-semibold text-xs">Batch Schema Harmonizer</div>
-                    <div className="text-[10px] text-stone-400">Standardize disparate column names across files</div>
+                    <div className="font-semibold text-xs">{t.header.schemaHarmonizer}</div>
+                    <div className="text-[10px] text-stone-400">{t.header.schemaHarmonizerDesc}</div>
                   </div>
                 </button>
 
@@ -286,8 +317,8 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <Award className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                     <div>
-                      <div className="font-semibold text-xs">QA/QC Audit Certificate</div>
-                      <div className="text-[10px] text-emerald-400/80">View certified geodetic compliance stamp</div>
+                      <div className="font-semibold text-xs">{t.header.qaqcAudit}</div>
+                      <div className="text-[10px] text-emerald-400/80">{t.header.qaqcAuditDesc}</div>
                     </div>
                   </button>
                 )}
@@ -301,8 +332,8 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <Terminal className="w-4 h-4 text-amber-400 flex-shrink-0" />
                   <div>
-                    <div className="font-semibold text-xs">Python Desktop & PyInstaller</div>
-                    <div className="text-[10px] text-stone-400">Export native Windows GDAL/PySide6 core</div>
+                    <div className="font-semibold text-xs">{t.header.pythonDesktop}</div>
+                    <div className="text-[10px] text-stone-400">{t.header.pythonDesktopDesc}</div>
                   </div>
                 </button>
               </div>
@@ -323,7 +354,7 @@ export const Header: React.FC<HeaderProps> = ({
                     ) : (
                       <CheckCircle2 className="w-3.5 h-3.5 text-stone-500" />
                     )}
-                    <span>Dry-Run Simulation</span>
+                    <span>{t.header.dryRun}</span>
                   </div>
                   <span className="font-mono text-[10px] uppercase font-bold">{settings.isDryRun ? 'ON' : 'OFF'}</span>
                 </button>
@@ -340,7 +371,7 @@ export const Header: React.FC<HeaderProps> = ({
           title="Execute Batch Processing Pipeline"
         >
           <Play className="w-3.5 h-3.5 fill-current" />
-          <span>{settings.isDryRun ? 'Dry Check' : 'Process Batch'}</span>
+          <span>{settings.isDryRun ? t.header.dryCheck : t.header.processBatch}</span>
           {readyCount > 0 && (
             <span className="ml-1 bg-stone-950/30 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold text-stone-950">
               {readyCount}

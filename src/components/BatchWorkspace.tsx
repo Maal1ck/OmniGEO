@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { SpatialDataset } from '../types/gis';
 import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers } from '../core/formatParsers';
+import { useI18n } from '../core/i18n';
 
 interface BatchWorkspaceProps {
   datasets: SpatialDataset[];
@@ -49,6 +50,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   onCalculateSurfaces,
   onOpenAggregationModal,
 }) => {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterFormat, setFilterFormat] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -253,27 +255,27 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             <div className="flex items-center space-x-2">
               <h1 className="text-sm font-display font-bold text-[#FAF6F0] tracking-tight flex items-center space-x-2">
                 <Database className="w-4 h-4 text-amber-400" />
-                <span>Geospatial Queue</span>
+                <span>{t.workspace.queueTitle}</span>
               </h1>
               <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md bg-amber-950/70 text-amber-300 border border-amber-700/50">
-                {datasets.length} {datasets.length === 1 ? 'file' : 'files'}
+                {datasets.length} {t.workspace.filesCount}
               </span>
             </div>
             {/* Unboxed Metadata Discipline */}
             <p className="text-xs text-stone-400 mt-0.5 font-mono">
-              <span>{totalFeatures.toLocaleString()} features</span>
+              <span>{totalFeatures.toLocaleString()} {t.workspace.totalFeatures}</span>
               <span className="mx-1.5 text-stone-600">·</span>
-              <span>{(totalSizeBytes / (1024 * 1024)).toFixed(2)} MB total</span>
+              <span>{(totalSizeBytes / (1024 * 1024)).toFixed(2)} MB {t.workspace.totalSize}</span>
               {warningCount > 0 && (
                 <>
                   <span className="mx-1.5 text-stone-600">·</span>
-                  <span className="text-amber-400 font-semibold">{warningCount} warnings</span>
+                  <span className="text-amber-400 font-semibold">{warningCount} {t.workspace.warningsCount}</span>
                 </>
               )}
               {errorCount > 0 && (
                 <>
                   <span className="mx-1.5 text-stone-600">·</span>
-                  <span className="text-rose-400 font-semibold">{errorCount} invalid</span>
+                  <span className="text-rose-400 font-semibold">{errorCount} {t.workspace.invalidCount}</span>
                 </>
               )}
             </p>
@@ -288,7 +290,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-950/70 hover:bg-amber-900/70 text-amber-300 border border-amber-600/60 transition-all shadow-sm"
             >
               <Stethoscope className="w-3.5 h-3.5 text-amber-400" />
-              <span>Fix {warningCount} Warnings</span>
+              <span>{t.workspace.fixWarnings} ({warningCount})</span>
             </button>
           )}
 
@@ -298,7 +300,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-stone-950 shadow-md shadow-amber-950/40 transition-all"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Load Sample GIS Datasets</span>
+              <span>{t.workspace.loadSamples}</span>
             </button>
           )}
 
@@ -316,7 +318,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-amber-600 hover:bg-amber-500 text-stone-950 shadow-sm shadow-amber-950/40 transition-all"
           >
             <FolderPlus className="w-3.5 h-3.5" />
-            <span>Add Files</span>
+            <span>{t.workspace.addFiles}</span>
           </button>
 
           {datasets.length > 0 && (
@@ -327,7 +329,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                   className="flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-950/50 text-rose-300 border border-rose-800/60 hover:bg-rose-900/50 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remove ({selectedIds.size})</span>
+                  <span>{t.workspace.removeSelected} ({selectedIds.size})</span>
                 </button>
               )}
               <button
@@ -362,10 +364,10 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               </div>
               <div>
                 <p className="text-sm font-display font-semibold text-[#FAF6F0]">
-                  Drop GIS files here or click to browse
+                  {t.workspace.dropzoneTitle}
                 </p>
                 <p className="text-xs text-stone-400 mt-0.5">
-                  Full sidecar pairing, coordinate detection, and topology validation on upload
+                  {t.workspace.dropzoneSubtitle}
                 </p>
               </div>
             </div>
@@ -404,7 +406,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search datasets, CRS, attributes..."
+                placeholder={t.workspace.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-[#13110E] border border-stone-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500 transition-colors"
@@ -425,7 +427,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                         : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
                     }`}
                   >
-                    {fmt.toUpperCase()}
+                    {fmt === 'all' ? t.workspace.allFormats : fmt.toUpperCase()}
                   </button>
                 ))}
               </div>
@@ -444,7 +446,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                         : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
                     }`}
                   >
-                    {st}
+                    {st === 'all' ? t.workspace.allStatuses : st}
                   </button>
                 ))}
               </div>
@@ -467,14 +469,14 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       )}
                     </button>
                   </th>
-                  <th className="py-3 px-3.5">Dataset Name</th>
-                  <th className="py-3 px-3.5">Format & Sidecars</th>
+                  <th className="py-3 px-3.5">{t.workspace.colName}</th>
+                  <th className="py-3 px-3.5">{t.workspace.colFormat}</th>
                   <th className="py-3 px-3.5">Geometry</th>
-                  <th className="py-3 px-3.5">Features</th>
-                  <th className="py-3 px-3.5">Source CRS</th>
-                  <th className="py-3 px-3.5">File Size</th>
-                  <th className="py-3 px-3.5">Pre-Flight Audit</th>
-                  <th className="py-3 px-3.5 text-right">Actions</th>
+                  <th className="py-3 px-3.5">{t.workspace.colFeatures}</th>
+                  <th className="py-3 px-3.5">{t.workspace.colCrs}</th>
+                  <th className="py-3 px-3.5">{t.workspace.colSize}</th>
+                  <th className="py-3 px-3.5">{t.workspace.colStatus}</th>
+                  <th className="py-3 px-3.5 text-right">{t.workspace.colActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-850/60 font-mono">

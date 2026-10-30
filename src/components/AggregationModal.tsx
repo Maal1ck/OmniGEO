@@ -22,6 +22,7 @@ import {
   appendAggregationColumnToDataset, 
   AggregationResult 
 } from '../core/spatialAnalytics';
+import { useI18n } from '../core/i18n';
 
 interface AggregationModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
   dataset,
   onUpdateDataset,
 }) => {
+  const { t } = useI18n();
   if (!isOpen || !dataset) return null;
 
   const fields = dataset.fields || [];
@@ -109,13 +111,13 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
             </div>
             <div>
               <h3 className="font-display font-bold text-stone-100 text-base tracking-wide flex items-center space-x-2">
-                <span>Field Aggregation & Attribute Intelligence</span>
+                <span>{t.aggregation.title}</span>
                 <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-700/50">
                   {dataset.name}
                 </span>
               </h3>
               <p className="text-xs text-stone-400 font-sans">
-                Group spatial features by categorical fields, compute statistics, and append as a new column.
+                {t.aggregation.subtitle}
               </p>
             </div>
           </div>
@@ -140,7 +142,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-semibold text-stone-300 block mb-1.5 font-sans">
-                Group By Field:
+                {t.aggregation.groupByField}:
               </label>
               <select
                 value={groupByField}
@@ -157,25 +159,25 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
 
             <div>
               <label className="text-xs font-semibold text-stone-300 block mb-1.5 font-sans">
-                Aggregation Metric:
+                {t.aggregation.metricLabel}:
               </label>
               <select
                 value={metric}
                 onChange={(e) => setMetric(e.target.value as any)}
                 className="w-full bg-[#120F0D] border border-stone-700 rounded-xl px-3 py-2 text-xs text-stone-100 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
               >
-                <option value="count">Count Features</option>
-                <option value="sum">Sum of Field</option>
-                <option value="mean">Average (Mean)</option>
-                <option value="min">Minimum Value</option>
-                <option value="max">Maximum Value</option>
+                <option value="count">{t.aggregation.countFeatures}</option>
+                <option value="sum">{t.aggregation.sumField}</option>
+                <option value="mean">{t.aggregation.meanField}</option>
+                <option value="min">{t.aggregation.minField}</option>
+                <option value="max">{t.aggregation.maxField}</option>
               </select>
             </div>
 
             {metric !== 'count' && (
               <div>
                 <label className="text-xs font-semibold text-stone-300 block mb-1.5 font-sans">
-                  Numeric Value Field:
+                  {t.aggregation.numericField}:
                 </label>
                 <select
                   value={valueField}
@@ -204,22 +206,22 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
           <div className="rounded-2xl border border-stone-800 bg-[#120F0D] overflow-hidden">
             <div className="px-4 py-2.5 bg-[#171310] border-b border-stone-800 flex items-center justify-between text-xs font-mono">
               <span className="text-stone-300 font-bold">
-                Aggregation Summary ({aggregation.groups.length} distinct groups)
+                {t.aggregation.summaryTitle} ({aggregation.groups.length} {t.common.all})
               </span>
-              <span className="text-stone-400">Total Features: {aggregation.totalCount}</span>
+              <span className="text-stone-400">{t.aggregation.totalFeatures}: {aggregation.totalCount}</span>
             </div>
 
             <div className="max-h-56 overflow-y-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="sticky top-0 bg-[#14100E] border-b border-stone-800/80 text-stone-400 font-mono text-[11px]">
                   <tr>
-                    <th className="py-2 px-3">Category ({groupByField})</th>
-                    <th className="py-2 px-3 text-right">Feature Count</th>
+                    <th className="py-2 px-3">{t.aggregation.categoryCol} ({groupByField})</th>
+                    <th className="py-2 px-3 text-right">{t.aggregation.countCol}</th>
                     {metric !== 'count' && (
                       <th className="py-2 px-3 text-right capitalize">{metric} ({valueField})</th>
                     )}
-                    <th className="py-2 px-3 text-right">% of Total</th>
-                    <th className="py-2 px-3 w-32">Distribution</th>
+                    <th className="py-2 px-3 text-right">{t.aggregation.pctCol}</th>
+                    <th className="py-2 px-3 w-32">{t.aggregation.distCol}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-800/50 font-mono text-[11px]">
@@ -253,11 +255,11 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
             <div className="flex items-center space-x-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
               <label className="text-xs font-display font-bold text-stone-200">
-                Append as New Column to All Features
+                {t.aggregation.appendTitle}
               </label>
             </div>
             <p className="text-[11px] text-stone-400 font-sans leading-relaxed">
-              Every feature in this dataset will receive this new column populated with its group's aggregated value.
+              {t.aggregation.appendDesc}
             </p>
             <div className="flex items-center space-x-2 pt-1">
               <input
@@ -273,7 +275,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-display font-bold text-xs transition-all shadow-md shadow-amber-950/40 flex items-center space-x-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Column</span>
+                <span>{t.aggregation.addColumnBtn}</span>
               </button>
             </div>
           </div>
@@ -286,14 +288,14 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-medium transition-colors border border-stone-700"
           >
             <Download className="w-3.5 h-3.5 text-amber-400" />
-            <span>Export CSV</span>
+            <span>{t.common.exportCsv}</span>
           </button>
 
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-semibold transition-colors"
           >
-            Close
+            {t.common.close}
           </button>
         </div>
       </div>

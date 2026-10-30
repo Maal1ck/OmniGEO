@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { SpatialDataset, ConversionJob } from '../types/gis';
 import { SurfaceUnit } from '../core/spatialAnalytics';
+import { useI18n } from '../core/i18n';
 
 interface MapPreviewProps {
   dataset: SpatialDataset | null;
@@ -60,6 +61,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
   onOpenAggregationModal,
   isOverlayOpen = false,
 }) => {
+  const { t } = useI18n();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const geojsonLayerRef = useRef<L.GeoJSON | null>(null);
@@ -350,12 +352,12 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             title="Toggle Cartographic Legend Sidebar (Outside Map Frame)"
           >
             {isLegendOpen ? <PanelLeftClose className="w-3.5 h-3.5 text-amber-400" /> : <PanelLeftOpen className="w-3.5 h-3.5 text-stone-400" />}
-            <span>{isLegendOpen ? 'Hide Legend' : 'Show Legend'}</span>
+            <span>{isLegendOpen ? t.map.hideLegend : t.map.showLegend}</span>
           </button>
 
           {/* Dataset Switcher */}
           <div className="flex items-center space-x-2">
-            <span className="text-stone-400 font-medium">Layer:</span>
+            <span className="text-stone-400 font-medium">{t.map.layerLabel}:</span>
             <select
               value={dataset?.id || ''}
               onChange={(e) => {
@@ -366,7 +368,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             >
               {datasets.map((d) => (
                 <option key={d.id} value={d.id} className="bg-stone-900 text-stone-100">
-                  {d.name} ({d.geometryType}, {d.featureCount} feats)
+                  {d.name} ({d.geometryType}, {d.featureCount} {t.common.features})
                 </option>
               ))}
             </select>
@@ -377,7 +379,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               <span className="px-2 py-0.5 rounded-md bg-amber-950/80 text-amber-300 border border-amber-700/50">
                 {dataset.detectedCRS?.code || 'EPSG:4326'}
               </span>
-              <span>{dataset.featureCount} features</span>
+              <span>{dataset.featureCount} {t.common.features}</span>
             </div>
           )}
         </div>
@@ -393,14 +395,14 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 title="Calculate geodesic surface area as new column"
               >
                 <Calculator className="w-3.5 h-3.5" />
-                <span>Calc Surfaces</span>
+                <span>{t.map.calcSurfaces}</span>
                 <ChevronDown className="w-3 h-3 ml-0.5" />
               </button>
 
               {isSurfaceMenuOpen && (
                 <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-[#1C1714] border border-stone-700 shadow-2xl p-1 z-40 text-xs">
                   <div className="px-2.5 py-1 text-[10px] font-mono text-stone-400 uppercase font-semibold">
-                    Select Surface Unit:
+                    {t.map.selectUnit}:
                   </div>
                   <button
                     onClick={() => {
@@ -409,7 +411,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     }}
                     className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-800 text-stone-200 hover:text-amber-300 flex items-center justify-between"
                   >
-                    <span>Hectares (ha)</span>
+                    <span>{t.map.unitHa}</span>
                     <span className="font-mono text-[10px] text-amber-400 font-bold">+surface_ha</span>
                   </button>
                   <button
@@ -419,7 +421,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     }}
                     className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-800 text-stone-200 hover:text-amber-300 flex items-center justify-between"
                   >
-                    <span>Square Meters (m²)</span>
+                    <span>{t.map.unitM2}</span>
                     <span className="font-mono text-[10px] text-amber-400 font-bold">+surface_m2</span>
                   </button>
                   <button
@@ -429,7 +431,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     }}
                     className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-800 text-stone-200 hover:text-amber-300 flex items-center justify-between"
                   >
-                    <span>Square Kilometers</span>
+                    <span>{t.map.unitKm2}</span>
                     <span className="font-mono text-[10px] text-amber-400 font-bold">+surface_km2</span>
                   </button>
                   <button
@@ -439,7 +441,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     }}
                     className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-800 text-stone-200 hover:text-amber-300 flex items-center justify-between"
                   >
-                    <span>Acres</span>
+                    <span>{t.map.unitAcres}</span>
                     <span className="font-mono text-[10px] text-amber-400 font-bold">+surface_acres</span>
                   </button>
                 </div>
@@ -455,7 +457,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               title="Aggregate fields by category & append summary columns"
             >
               <PieChart className="w-3.5 h-3.5 text-orange-400" />
-              <span className="hidden sm:inline">Aggregate</span>
+              <span className="hidden sm:inline">{t.map.aggregateBtn}</span>
             </button>
           )}
 
@@ -466,7 +468,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             title="Zoom to layer extent"
           >
             <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-            <span>Extent</span>
+            <span>{t.map.extentBtn}</span>
           </button>
 
           {/* Compare toggle if output exists */}
@@ -485,7 +487,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               title="Interactive side-by-side swipe comparison curtain"
             >
               <Sliders className="w-3.5 h-3.5" />
-              <span>{isSwipeMode ? 'Swipe On' : 'Swipe'}</span>
+              <span>{isSwipeMode ? t.map.swipeOn : t.map.swipeBtn}</span>
             </button>
           )}
 
@@ -497,7 +499,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 basemap === 'dark' ? 'bg-amber-600 text-stone-950 font-bold' : 'text-stone-400 hover:text-stone-200'
               }`}
             >
-              Dark
+              {t.map.basemapDark}
             </button>
             <button
               onClick={() => setBasemap('osm')}
@@ -505,7 +507,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 basemap === 'osm' ? 'bg-amber-600 text-stone-950 font-bold' : 'text-stone-400 hover:text-stone-200'
               }`}
             >
-              OSM
+              {t.map.basemapOsm}
             </button>
             <button
               onClick={() => setBasemap('satellite')}
@@ -513,7 +515,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 basemap === 'satellite' ? 'bg-amber-600 text-stone-950 font-bold' : 'text-stone-400 hover:text-stone-200'
               }`}
             >
-              Satellite
+              {t.map.basemapSatellite}
             </button>
             <button
               onClick={() => setBasemap('offline_grid')}
@@ -521,7 +523,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 basemap === 'offline_grid' ? 'bg-amber-600 text-stone-950 font-bold' : 'text-stone-400 hover:text-stone-200'
               }`}
             >
-              Grid
+              {t.map.basemapGrid}
             </button>
           </div>
         </div>
@@ -538,13 +540,13 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               <div className="flex items-center space-x-2">
                 <Palette className="w-4 h-4 text-amber-400" />
                 <h3 className="font-display font-bold text-stone-100 text-xs tracking-wide">
-                  Layer Legend & Symbology
+                  {t.map.legendTitle}
                 </h3>
               </div>
               <button
                 onClick={() => setIsLegendOpen(false)}
                 className="p-1 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors"
-                title="Collapse Legend Panel"
+                title={t.map.hideLegend}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -596,19 +598,19 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-stone-400 font-mono pt-1 border-t border-stone-800/80">
-                  <span>Record Count:</span>
-                  <span className="text-stone-200 font-semibold">{dataset.featureCount} features</span>
+                  <span>{t.map.recordCount}:</span>
+                  <span className="text-stone-200 font-semibold">{dataset.featureCount} {t.common.features}</span>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-stone-400 font-mono">
-                  <span>Datum / CRS:</span>
+                  <span>{t.map.datumCrs}:</span>
                   <span className="text-amber-400 font-bold">{dataset.detectedCRS?.code || 'EPSG:4326'}</span>
                 </div>
 
                 {/* Color Palette Swatches */}
                 <div className="pt-2 border-t border-stone-800/80 space-y-1.5">
                   <span className="text-[10px] text-stone-400 uppercase font-mono font-semibold block">
-                    Layer Symbology Color:
+                    {t.map.symbologyColor}:
                   </span>
                   <div className="flex items-center space-x-2 pt-0.5">
                     {LAYER_PALETTE.map(p => (
@@ -628,7 +630,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 {/* Fill Opacity Slider */}
                 <div className="pt-2 border-t border-stone-800/80 space-y-1.5">
                   <div className="flex justify-between text-[10px] text-stone-400 font-mono">
-                    <span>Fill Opacity:</span>
+                    <span>{t.map.fillOpacity}:</span>
                     <span className="text-amber-400 font-bold">{Math.round(layerOpacity * 100)}%</span>
                   </div>
                   <input
@@ -649,14 +651,14 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   <div className="flex items-center space-x-2">
                     <div className="w-5 h-3.5 rounded border-2 border-dashed border-orange-400 bg-orange-500/30" />
                     <span className="font-display font-bold text-orange-200 text-xs">
-                      Target Reprojection
+                      {t.map.targetReprojection}
                     </span>
                   </div>
                   <div className="text-[11px] text-orange-300 font-mono">
                     Target CRS: <span className="font-bold text-orange-400">{processedJob.targetCRS}</span>
                   </div>
                   <p className="text-[10px] text-stone-400 leading-relaxed font-sans">
-                    Sub-millimeter conformal drift verified via PROJ 9.3 pipeline.
+                    {t.map.conformalDrift}
                   </p>
                 </div>
               )}
@@ -664,7 +666,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               {/* Quick Actions in Legend Dock */}
               <div className="space-y-2 pt-2 border-t border-stone-800">
                 <span className="text-[10px] text-stone-400 uppercase font-mono font-semibold block">
-                  Quick Analytical Actions:
+                  {t.map.quickActions}:
                 </span>
                 
                 {onCalculateSurfaces && dataset.geometryType.includes('Polygon') && (
@@ -674,7 +676,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   >
                     <span className="flex items-center space-x-2">
                       <Calculator className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Calc Surface (ha)</span>
+                      <span>{t.craft.calcHaBtn}</span>
                     </span>
                     <span className="font-mono text-[10px] text-amber-400 font-bold">+column</span>
                   </button>
@@ -687,7 +689,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   >
                     <span className="flex items-center space-x-2">
                       <PieChart className="w-3.5 h-3.5 text-orange-400" />
-                      <span>Aggregate by Field</span>
+                      <span>{t.map.aggregateBtn}</span>
                     </span>
                     <span className="font-mono text-[10px] text-orange-400 font-bold">Group Σ</span>
                   </button>
@@ -698,7 +700,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border border-stone-800 transition-colors"
                 >
                   <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Zoom to Extent</span>
+                  <span>{t.map.zoomExtent}</span>
                 </button>
               </div>
 
@@ -706,7 +708,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               {datasets.length > 1 && (
                 <div className="space-y-2 pt-2 border-t border-stone-800">
                   <span className="text-[10px] text-stone-400 uppercase font-mono font-semibold block">
-                    All Workspace Layers ({datasets.length}):
+                    {t.map.allLayers} ({datasets.length}):
                   </span>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                     {datasets.map(d => (
@@ -824,7 +826,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   }`}
                 >
                   <Table className="w-3.5 h-3.5" />
-                  <span>Attribute Table ({filteredFeatures.length})</span>
+                  <span>{t.map.attrTableTab} ({filteredFeatures.length})</span>
                 </button>
 
                 <button
@@ -836,7 +838,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   }`}
                 >
                   <Info className="w-3.5 h-3.5" />
-                  <span>Layer Metadata & Bounds</span>
+                  <span>{t.map.metadataTab}</span>
                 </button>
 
                 <button
@@ -848,7 +850,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   }`}
                 >
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Validation Audit ({dataset?.validationIssues.length || 0})</span>
+                  <span>{t.map.validationTab} ({dataset?.validationIssues.length || 0})</span>
                 </button>
               </div>
 
@@ -857,17 +859,17 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   <button
                     onClick={exportTableCSV}
                     className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-stone-850 hover:bg-stone-800 text-stone-300 text-xs transition-colors border border-stone-700"
-                    title="Export Attribute Table to CSV"
+                    title={t.common.exportCsv}
                   >
                     <Download className="w-3 h-3 text-amber-400" />
-                    <span className="hidden sm:inline">Export CSV</span>
+                    <span className="hidden sm:inline">{t.common.exportCsv}</span>
                   </button>
 
                   <div className="relative">
                     <Search className="w-3 h-3 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      placeholder="Filter rows..."
+                      placeholder={t.map.filterRowsPlaceholder}
                       value={attributeSearch}
                       onChange={(e) => setAttributeSearch(e.target.value)}
                       className="bg-[#13110E] border border-stone-700 rounded-md px-2 pl-7 py-0.5 text-xs text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500"

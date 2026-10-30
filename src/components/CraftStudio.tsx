@@ -28,6 +28,7 @@ import {
 import { SpatialDataset, BatchSettings, ConsolidationSettings } from '../types/gis';
 import { SurfaceUnit } from '../core/spatialAnalytics';
 import { NavTab } from './Header';
+import { useI18n } from '../core/i18n';
 
 interface CraftStudioProps {
   datasets: SpatialDataset[];
@@ -66,6 +67,7 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
   onStartBatch,
   hasCertificate,
 }) => {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
@@ -100,179 +102,179 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
   const craftActions: CraftAction[] = [
     {
       id: 'surface-calc-ha',
-      title: 'Calculate Surfaces in Hectares (ha)',
+      title: t.craft.calcHaTitle,
       category: 'analytics',
-      description: 'Calculates geodesic spherical area for all polygons and seamlessly appends a new "surface_ha" column into the attribute table.',
+      description: t.craft.calcHaDesc,
       icon: Calculator,
       badge: 'Analytical Geometry',
       badgeColor: 'bg-amber-950 text-amber-300 border-amber-700/50',
       cliCommand: `python -c "import geopandas as gpd; gdf = gpd.read_file('input.geojson'); gdf['surface_ha'] = gdf.to_crs(6933).area / 10000; gdf.to_file('output.geojson', driver='GeoJSON')"`,
-      actionLabel: 'Calculate in Hectares',
+      actionLabel: t.craft.calcHaBtn,
       onExecute: () => {
         onCalculateSurfaces('ha');
-        showToast('Calculated surface area in hectares (ha)! New column added to attribute table.');
+        showToast(t.craft.calcHaToast);
       },
     },
     {
       id: 'surface-calc-m2',
-      title: 'Calculate Surfaces in Square Meters (m²)',
+      title: t.craft.calcM2Title,
       category: 'analytics',
-      description: 'Calculates high-precision geodesic surface areas and creates a new "surface_m2" column for spatial cadastral appraisal.',
+      description: t.craft.calcM2Desc,
       icon: Calculator,
       badge: 'Metric Cadastre',
       badgeColor: 'bg-amber-950 text-amber-300 border-amber-700/50',
       cliCommand: `ogr2ogr -f "GeoJSON" output.geojson input.geojson -dialect sqlite -sql "SELECT *, ST_Area(ST_Transform(geometry, 3857)) as surface_m2 FROM input"`,
-      actionLabel: 'Calculate in m²',
+      actionLabel: t.craft.calcM2Btn,
       onExecute: () => {
         onCalculateSurfaces('m2');
-        showToast('Calculated surface area in m²! New column added to attribute table.');
+        showToast(t.craft.calcM2Toast);
       },
     },
     {
       id: 'field-aggregation',
-      title: 'Aggregate Attributes by Field',
+      title: t.craft.aggregateTitle,
       category: 'analytics',
-      description: 'Group spatial features by category/zone and compute Count, Sum, Mean, Min, or Max. Append summary stats directly as a new column.',
+      description: t.craft.aggregateDesc,
       icon: PieChart,
       badge: 'Field Intelligence',
       badgeColor: 'bg-orange-950 text-orange-300 border-orange-700/50',
       cliCommand: `python -c "import geopandas as gpd; gdf = gpd.read_file('input.geojson'); stats = gdf.groupby('zone')['surface_ha'].mean(); print(stats)"`,
-      actionLabel: 'Open Aggregation Builder',
+      actionLabel: t.craft.aggregateBtn,
       onExecute: () => {
         onOpenAggregationModal();
       },
     },
     {
       id: 'reproject-wgs84',
-      title: 'Reproject to Global GPS (WGS 84 - EPSG:4326)',
+      title: t.craft.reprojectWgs84Title,
       category: 'geodesy',
-      description: 'Converts projected national grid coordinates into unprojected latitude/longitude ellipsoidal coordinates for web & GPS consumption.',
+      description: t.craft.reprojectWgs84Desc,
       icon: Globe,
       badge: 'EPSG:4326',
       badgeColor: 'bg-stone-900 text-stone-200 border-stone-700',
       cliCommand: `ogr2ogr -f "GeoJSON" -t_srs "EPSG:4326" output_wgs84.geojson input.shp`,
-      actionLabel: 'Set WGS 84 Target',
+      actionLabel: t.craft.reprojectWgs84Btn,
       onExecute: () => {
         setSettings(s => ({ ...s, targetCRS: 'EPSG:4326', crsMode: 'reproject' }));
         setActiveTab('lab');
-        showToast('Configured pipeline for WGS 84 (EPSG:4326) reprojection.');
+        showToast(t.craft.reprojectWgs84Toast);
       },
     },
     {
       id: 'reproject-webmercator',
-      title: 'Reproject to Web Mercator (EPSG:3857)',
+      title: t.craft.reprojectMercatorTitle,
       category: 'geodesy',
-      description: 'Converts datasets into spherical mercator for seamless overlay on Mapbox, OpenStreetMap, Google Maps, and Leaflet.',
+      description: t.craft.reprojectMercatorDesc,
       icon: Globe,
       badge: 'EPSG:3857',
       badgeColor: 'bg-stone-900 text-stone-200 border-stone-700',
       cliCommand: `ogr2ogr -f "GeoJSON" -t_srs "EPSG:3857" output_3857.geojson input.shp`,
-      actionLabel: 'Set Web Mercator Target',
+      actionLabel: t.craft.reprojectMercatorBtn,
       onExecute: () => {
         setSettings(s => ({ ...s, targetCRS: 'EPSG:3857', crsMode: 'reproject' }));
         setActiveTab('lab');
-        showToast('Configured pipeline for Web Mercator (EPSG:3857).');
+        showToast(t.craft.reprojectMercatorToast);
       },
     },
     {
       id: 'consolidate-gpkg',
-      title: 'Consolidate into Single Multi-Layer GeoPackage + QGIS Project',
+      title: t.craft.gpkgBundleTitle,
       category: 'packaging',
-      description: 'Bundles all imported vector datasets into a single OGC SQLite GeoPackage container with an auto-generated QGIS 3.x project (.qgs).',
+      description: t.craft.gpkgBundleDesc,
       icon: FileBox,
       badge: 'QGIS & ArcGIS Pro',
       badgeColor: 'bg-amber-950 text-amber-300 border-amber-700/50',
       cliCommand: `ogr2ogr -f "GPKG" -update -append consolidated.gpkg input1.geojson -nln layer_1`,
-      actionLabel: 'Configure GPKG Bundle',
+      actionLabel: t.craft.gpkgBundleBtn,
       onExecute: () => {
         setConsolidationSettings(s => ({ ...s, consolidateToSingleGeoPackage: true, generateQgisProject: true }));
         setSettings(s => ({ ...s, targetFormat: 'geopackage' }));
         setActiveTab('lab');
-        showToast('Multi-Layer GeoPackage consolidation activated!');
+        showToast(t.craft.gpkgBundleToast);
       },
     },
     {
       id: 'shapefile-export',
-      title: 'Convert Batch to ESRI Shapefile (.zip)',
+      title: t.craft.shpTitle,
       category: 'packaging',
-      description: 'Strict 10-character DBF truncation handling, .prj WKT coordinate specification, and sidecar bundle packaging.',
+      description: t.craft.shpDesc,
       icon: FileBox,
       badge: 'Legacy Standard',
       badgeColor: 'bg-stone-900 text-stone-300 border-stone-700',
       cliCommand: `ogr2ogr -f "ESRI Shapefile" output_shp input.geojson`,
-      actionLabel: 'Set Shapefile Target',
+      actionLabel: t.craft.shpBtn,
       onExecute: () => {
         setSettings(s => ({ ...s, targetFormat: 'shapefile' }));
         setActiveTab('lab');
-        showToast('Target format set to ESRI Shapefile bundle.');
+        showToast(t.craft.shpToast);
       },
     },
     {
       id: 'preflight-doctor',
-      title: 'Run Spatial Pre-Flight Doctor',
+      title: t.craft.doctorTitle,
       category: 'quality',
-      description: 'Audit dataset for inverted latitude/longitude bounding boxes (e.g. coordinates in Null Island or outer space) and 1-click axis swap repair.',
+      description: t.craft.doctorDesc,
       icon: Stethoscope,
       badge: 'Integrity Audit',
       badgeColor: 'bg-amber-950 text-amber-300 border-amber-700/50',
-      actionLabel: 'Launch Pre-Flight Doctor',
+      actionLabel: t.craft.doctorBtn,
       onExecute: () => {
         onOpenSpatialDoctor();
       },
     },
     {
       id: 'schema-harmonizer',
-      title: 'Batch Standardize Schema Across Files',
+      title: t.craft.harmonizerTitle,
       category: 'quality',
-      description: 'Harmonize mismatched column names across multiple datasets (e.g., mapping "ID_PARCELLE" and "p_id" into "parcel_id").',
+      description: t.craft.harmonizerDesc,
       icon: TableProperties,
       badge: 'Schema Harmonizer',
       badgeColor: 'bg-orange-950 text-orange-300 border-orange-700/50',
-      actionLabel: 'Launch Schema Harmonizer',
+      actionLabel: t.craft.harmonizerBtn,
       onExecute: () => {
         onOpenSchemaHarmonizer();
       },
     },
     {
       id: 'audit-certificate',
-      title: 'Generate Certified QA/QC Compliance Certificate',
+      title: t.craft.certTitle,
       category: 'quality',
-      description: 'Produces a tamper-proof spatial audit certificate with SHA-256 cryptographic hashes, coordinate boundary stamps, and topological audits.',
+      description: t.craft.certDesc,
       icon: Award,
       badge: 'ISO / OGC Certified',
       badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-700/50',
-      actionLabel: hasCertificate ? 'View Audit Certificate' : 'Run Batch to Certify',
+      actionLabel: hasCertificate ? t.craft.certBtnView : t.craft.certBtnRun,
       onExecute: () => {
         if (hasCertificate) {
           onOpenAuditCertificate();
         } else {
           setActiveTab('workspace');
-          showToast('Run the batch conversion first to generate the certified audit certificate.');
+          showToast(t.craft.certToast);
         }
       },
     },
     {
       id: 'map-studio-inspect',
-      title: 'Explore Cartographic Studio & Visual Legends',
+      title: t.craft.mapStudioTitle,
       category: 'map',
-      description: 'Inspect live rendered features with interactive visual layer legends, layer opacity controls, swipe comparison curtains, and attribute inspection.',
+      description: t.craft.mapStudioDesc,
       icon: MapIcon,
       badge: 'Cartography',
       badgeColor: 'bg-stone-900 text-stone-200 border-stone-700',
-      actionLabel: 'Launch Map Studio',
+      actionLabel: t.craft.mapStudioBtn,
       onExecute: () => {
         setActiveTab('map');
       },
     },
     {
       id: 'python-core-export',
-      title: 'Native Python GDAL Engine & PyInstaller Spec',
+      title: t.craft.pythonTitle,
       category: 'quality',
-      description: 'View the standalone Windows PySide6 / OSGeo4W Python script core, pyogrio conversion pipelines, and automated pytest suites.',
+      description: t.craft.pythonDesc,
       icon: Terminal,
       badge: 'Desktop x64',
       badgeColor: 'bg-stone-900 text-stone-300 border-stone-700',
-      actionLabel: 'View Python Spec',
+      actionLabel: t.craft.pythonBtn,
       onExecute: () => {
         onOpenPythonModal();
       },
@@ -280,12 +282,12 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
   ];
 
   const categories = [
-    { id: 'all', label: 'All Crafts' },
-    { id: 'analytics', label: 'Surface & Aggregations' },
-    { id: 'geodesy', label: 'Datum & Reprojection' },
-    { id: 'packaging', label: 'Multi-Layer & Formats' },
-    { id: 'quality', label: 'QA/QC & Pre-Flight' },
-    { id: 'map', label: 'Cartography & Legends' },
+    { id: 'all', label: t.craft.allCrafts },
+    { id: 'analytics', label: t.craft.catAnalytics },
+    { id: 'geodesy', label: t.craft.catGeodesy },
+    { id: 'packaging', label: t.craft.catPackaging },
+    { id: 'quality', label: t.craft.catQuality },
+    { id: 'map', label: t.craft.catMap },
   ];
 
   const filteredActions = craftActions.filter(action => {
@@ -317,21 +319,25 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
           <div className="relative z-10 max-w-2xl space-y-4">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600/40 text-amber-300 text-xs font-mono font-medium">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>OmniGeo Studio Dispatch</span>
+              <span>{t.craft.heroBadge}</span>
             </div>
 
             <h1 className="text-3xl md:text-4xl font-display font-extrabold text-[#FAF6F0] tracking-tight">
-              What do you want to <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-orange-400">craft</span> today?
+              {t.craft.heroTitlePrefix}{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-orange-400">
+                {t.craft.heroTitleCraft}
+              </span>{' '}
+              {t.craft.heroTitleSuffix}
             </h1>
 
             <p className="text-stone-300 text-sm font-sans leading-relaxed">
-              Calculate surfaces, aggregate spatial fields, reproject coordinate systems, consolidate multi-layer GeoPackages, or run pre-flight health checks in seconds.
+              {t.craft.heroSubtitle}
             </p>
 
             {/* Active Dataset Selector Context */}
             {datasets.length > 0 && (
               <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="text-stone-400 font-sans">Active Target Dataset:</span>
+                <span className="text-stone-400 font-sans">{t.craft.targetDataset}:</span>
                 <select
                   value={currentDataset?.id || ''}
                   onChange={(e) => {
@@ -342,7 +348,7 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
                 >
                   {datasets.map(d => (
                     <option key={d.id} value={d.id} className="bg-stone-900 text-stone-100">
-                      {d.name} ({d.geometryType} · {d.featureCount} features)
+                      {d.name} ({d.geometryType} · {d.featureCount} {t.common.features})
                     </option>
                   ))}
                 </select>
@@ -358,7 +364,7 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
             <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search crafts, algorithms, or commands (e.g. surface, aggregate, GeoPackage, doctor)..."
+              placeholder={t.craft.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#13110E]/90 border border-stone-700/80 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/40 shadow-inner"
@@ -447,27 +453,27 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
           <div className="flex items-center justify-between border-b border-stone-800 pb-2">
             <span className="font-display font-bold text-stone-200 text-xs flex items-center space-x-2">
               <Terminal className="w-4 h-4 text-amber-400" />
-              <span>Cartographic Studio Keyboard & Command Shortcuts</span>
+              <span>{t.craft.shortcutsTitle}</span>
             </span>
-            <span className="text-[11px] text-stone-500">OmniGeo by Maodo Core</span>
+            <span className="text-[11px] text-stone-500">{t.craft.shortcutsSub}</span>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
             <div className="p-2.5 rounded-xl bg-[#1A1613] border border-stone-800/80">
               <span className="text-amber-400 font-bold block mb-0.5">⌘K / Ctrl+K</span>
-              <span className="text-stone-400 font-sans">Open Master Command Dispatch</span>
+              <span className="text-stone-400 font-sans">{t.craft.scPalette}</span>
             </div>
             <div className="p-2.5 rounded-xl bg-[#1A1613] border border-stone-800/80">
               <span className="text-amber-400 font-bold block mb-0.5">Surface Columns</span>
-              <span className="text-stone-400 font-sans">Auto-appends `surface_ha` & `m²`</span>
+              <span className="text-stone-400 font-sans">{t.craft.scSurface}</span>
             </div>
             <div className="p-2.5 rounded-xl bg-[#1A1613] border border-stone-800/80">
               <span className="text-amber-400 font-bold block mb-0.5">Field Aggregations</span>
-              <span className="text-stone-400 font-sans">Group by zone/type with count & sum</span>
+              <span className="text-stone-400 font-sans">{t.craft.scAgg}</span>
             </div>
             <div className="p-2.5 rounded-xl bg-[#1A1613] border border-stone-800/80">
               <span className="text-amber-400 font-bold block mb-0.5">Interactive Legend</span>
-              <span className="text-stone-400 font-sans">Toggleable on live map studio</span>
+              <span className="text-stone-400 font-sans">{t.craft.scLegend}</span>
             </div>
           </div>
         </div>
