@@ -20,12 +20,9 @@ import {
   Stethoscope,
   TableProperties,
   Award,
-  ShieldCheck,
-  Check,
   Sun,
   Moon,
-  Globe,
-  Download
+  Globe
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { BatchSettings, PresetProfile } from '../types/gis';
@@ -91,62 +88,62 @@ export const Header: React.FC<HeaderProps> = ({
   const activePreset = PRESET_PROFILES.find(p => p.id === selectedPresetId);
 
   return (
-    <header className="h-15 border-b border-stone-800/80 bg-[#15120F]/95 backdrop-blur-xl select-none z-30 sticky top-0 flex items-center justify-between px-5">
+    <header className="h-15 border-b border-white/[0.06] bg-[#13110E]/95 backdrop-blur-md select-none z-30 sticky top-0 flex items-center justify-between gap-4 px-5">
       {/* Left: Refined Brand Identity */}
-      <div className="flex items-center space-x-6">
-        <div 
-          className="flex items-center space-x-3 cursor-pointer group" 
+      <div className="flex min-w-0 items-center gap-5">
+        <button
+          type="button"
+          className="flex shrink-0 items-center gap-2.5 cursor-pointer group text-left"
           onClick={() => setActiveTab('craft')}
           title="OmniGeo by Maodo"
         >
-          <Logo size={36} className="group-hover:scale-105 transition-transform duration-200" />
+          <Logo size={32} className="transition-transform duration-200 group-hover:scale-105" />
           
           <div className="flex flex-col">
-            <div className="flex items-center space-x-2">
-              <span className="font-display font-extrabold tracking-tight text-[#FAF6F0] text-base group-hover:text-amber-200 transition-colors">
+            <div className="flex items-center gap-2">
+              <span className="font-display font-bold tracking-tight text-stone-100 text-sm group-hover:text-white transition-colors">
                 OmniGeo
               </span>
-              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-600/40 tracking-wider">
-                by Maodo
-              </span>
+              <span className="text-[10px] text-stone-500">by Maodo</span>
             </div>
-            <div className="flex items-center space-x-1.5 text-[10px] text-stone-400 font-sans">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="hidden xl:flex items-center gap-1.5 text-[10px] text-stone-500 font-sans">
               <span>{t.header.airGapped}</span>
-              <span className="text-stone-600">·</span>
+              <span className="text-stone-700">·</span>
               <span className="font-mono text-stone-400">{settings.targetFormat.toUpperCase()}</span>
             </div>
           </div>
-        </div>
+        </button>
 
         {/* Center-Left Navigation Tabs */}
-        <nav className="hidden md:flex items-center space-x-1 bg-[#1E1915] p-1 rounded-xl border border-stone-800 shadow-inner">
+        <nav className="hidden md:flex items-center gap-0.5">
           {/* Craft Studio Tab */}
           <button
             onClick={() => setActiveTab('craft')}
-            className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            title={t.header.craftTab}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors ${
               activeTab === 'craft'
-                ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-stone-950 shadow-md font-bold'
-                : 'text-amber-300/90 hover:text-amber-200 hover:bg-stone-800/50'
+                ? 'bg-white/[0.07] text-stone-100 font-semibold'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
             }`}
           >
-            <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'craft' ? 'text-stone-950 fill-current' : 'text-amber-400'}`} />
-            <span>{t.header.craftTab}</span>
+            <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'craft' ? 'text-amber-300' : ''}`} />
+            <span className="hidden xl:inline">{t.header.craftTab}</span>
           </button>
 
           {/* Workspace Tab */}
           <button
             onClick={() => setActiveTab('workspace')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            title={t.header.workspaceTab}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors ${
               activeTab === 'workspace'
-                ? 'bg-[#29221C] text-amber-300 shadow-sm border border-stone-700 font-semibold'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
+                ? 'bg-white/[0.07] text-stone-100 font-semibold'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>{t.header.workspaceTab}</span>
+            <span className="hidden xl:inline">{t.header.workspaceTab}</span>
             {datasetCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-800/50">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/[0.08] text-stone-300">
                 {datasetCount}
               </span>
             )}
@@ -155,58 +152,61 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Conversion Lab Tab */}
           <button
             onClick={() => setActiveTab('lab')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            title={t.header.labTab}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors ${
               activeTab === 'lab'
-                ? 'bg-[#29221C] text-amber-300 shadow-sm border border-stone-700 font-semibold'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
+                ? 'bg-white/[0.07] text-stone-100 font-semibold'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
             }`}
           >
             <Settings2 className="w-3.5 h-3.5" />
-            <span>{t.header.labTab}</span>
+            <span className="hidden xl:inline">{t.header.labTab}</span>
           </button>
 
           {/* Map Preview Tab */}
           <button
             onClick={() => setActiveTab('map')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            title={t.header.mapTab}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors ${
               activeTab === 'map'
-                ? 'bg-[#29221C] text-amber-300 shadow-sm border border-stone-700 font-semibold'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
+                ? 'bg-white/[0.07] text-stone-100 font-semibold'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
             }`}
           >
             <MapIcon className="w-3.5 h-3.5" />
-            <span>{t.header.mapTab}</span>
+            <span className="hidden xl:inline">{t.header.mapTab}</span>
           </button>
 
           {/* Job Monitor Tab */}
           <button
             onClick={() => setActiveTab('monitor')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            title={t.header.monitorTab}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors ${
               activeTab === 'monitor'
-                ? 'bg-[#29221C] text-amber-300 shadow-sm border border-stone-700 font-semibold'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
+                ? 'bg-white/[0.07] text-stone-100 font-semibold'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>{t.header.monitorTab}</span>
+            <span className="hidden xl:inline">{t.header.monitorTab}</span>
             {runningJobCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
             )}
           </button>
 
           {/* Showcase & Website Tab */}
           <button
             onClick={() => setActiveTab('showcase')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors ${
               activeTab === 'showcase'
-                ? 'bg-[#29221C] text-amber-300 shadow-sm border border-stone-700 font-semibold'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
+                ? 'bg-white/[0.07] text-stone-100 font-semibold'
+                : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
             }`}
-            title="View product presentation website & Windows .exe release"
+            title={t.header.showcaseTab}
           >
-            <Globe className="w-3.5 h-3.5 text-amber-400" />
-            <span>{t.header.showcaseTab}</span>
-            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-amber-950 text-amber-300 border border-amber-700/50 uppercase font-semibold">
+            <Globe className="w-3.5 h-3.5" />
+            <span className="hidden xl:inline">{t.header.showcaseTab}</span>
+            <span className="hidden xl:inline px-1.5 py-0.2 rounded text-[9px] font-mono bg-white/[0.08] text-stone-300 uppercase">
               .exe
             </span>
           </button>
@@ -214,112 +214,66 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Right: Streamlined Clean Controls & Primary CTA */}
-      <div className="flex items-center space-x-2.5">
-        {/* Direct Download .EXE CTA */}
-        <a
-          href="https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden xl:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 text-xs font-bold transition-all shadow-md shadow-amber-950/30"
-          title="Download OmniGeo Windows x64 .exe release installer"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>.EXE</span>
-        </a>
-        {/* Subtle Language Switch */}
-        <div 
-          className="flex items-center rounded-xl bg-[#1C1713] border border-stone-800 p-0.5 text-xs font-mono shadow-sm"
-          title={lang === 'ar' ? 'تبديل اللغة (EN / FR / عربي)' : lang === 'fr' ? 'Changer de langue (EN / FR / عربي)' : 'Switch language (EN / FR / AR)'}
-        >
-          <button
-            type="button"
-            onClick={() => setLang('en')}
-            className={`px-2 py-1 rounded-lg transition-all text-[11px] font-semibold ${
-              lang === 'en'
-                ? 'bg-[#2A221C] text-amber-300 border border-amber-600/40 shadow-sm'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
+      <div className="flex shrink-0 items-center gap-1.5">
+        <label className="flex h-9 items-center gap-1.5 rounded-lg px-2 text-stone-400 transition-colors hover:bg-white/[0.04] hover:text-stone-200 focus-within:ring-2 focus-within:ring-amber-500/60">
+          <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <select
+            value={lang}
+            onChange={(e) => setLang(e.target.value as typeof lang)}
+            aria-label={lang === 'fr' ? 'Langue' : lang === 'ar' ? 'اللغة' : 'Language'}
+            className="w-10 cursor-pointer appearance-none bg-transparent py-1 text-xs text-current focus:outline-none"
           >
-            EN
-          </button>
-          <span className="text-stone-700 mx-0.5">·</span>
-          <button
-            type="button"
-            onClick={() => setLang('fr')}
-            className={`px-2 py-1 rounded-lg transition-all text-[11px] font-semibold ${
-              lang === 'fr'
-                ? 'bg-[#2A221C] text-amber-300 border border-amber-600/40 shadow-sm'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
-          >
-            FR
-          </button>
-          <span className="text-stone-700 mx-0.5">·</span>
-          <button
-            type="button"
-            onClick={() => setLang('ar')}
-            className={`px-2 py-1 rounded-lg transition-all text-[11px] font-semibold ${
-              lang === 'ar'
-                ? 'bg-[#2A221C] text-amber-300 border border-amber-600/40 shadow-sm'
-                : 'text-stone-400 hover:text-stone-200'
-            }`}
-            title="اللغة العربية"
-          >
-            عربي
-          </button>
-        </div>
+            <option value="en" className="bg-[#1C1713] text-stone-100">{t.common.langEn}</option>
+            <option value="fr" className="bg-[#1C1713] text-stone-100">{t.common.langFr}</option>
+            <option value="ar" className="bg-[#1C1713] text-stone-100">{t.common.langAr}</option>
+          </select>
+          <ChevronDown className="h-3 w-3 shrink-0" aria-hidden="true" />
+        </label>
 
         {/* Minimalist Theme Toggle (Light with white background / Default Dark) */}
         <button
           type="button"
           onClick={toggleTheme}
-          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border transition-all text-xs font-medium shadow-sm ${
+          className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 ${
             theme === 'light'
-              ? 'bg-amber-500/10 border-amber-600/40 text-amber-850 hover:bg-amber-500/20'
-              : 'bg-[#1C1713] border-stone-800 hover:border-amber-600/40 text-stone-300 hover:text-stone-100 hover:bg-[#251E19]'
+              ? 'border-stone-200 text-stone-600 hover:bg-stone-100'
+              : 'border-transparent text-stone-400 hover:bg-white/[0.06] hover:text-stone-100'
           }`}
           title={
             theme === 'dark' 
               ? (lang === 'fr' ? 'Activer le thème clair (fond blanc)' : 'Switch to Light theme (white background)') 
               : (lang === 'fr' ? 'Activer le thème sombre par défaut' : 'Switch to Default Dark theme')
           }
-          aria-label="Toggle Theme"
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
         >
-          {theme === 'dark' ? (
-            <>
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline text-[11px] font-semibold">{lang === 'fr' ? 'Clair' : 'Light'}</span>
-            </>
-          ) : (
-            <>
-              <Moon className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden sm:inline text-[11px] font-semibold">{lang === 'fr' ? 'Sombre' : 'Dark'}</span>
-            </>
-          )}
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
 
         {/* Command Palette Trigger */}
         <button
           onClick={onOpenCommandPalette}
-          className="flex items-center space-x-2 bg-[#1C1713] hover:bg-[#251E19] border border-stone-800 hover:border-amber-600/40 px-3 py-1.5 rounded-xl text-xs text-stone-400 hover:text-stone-200 transition-all shadow-sm"
-          title={t.header.commands}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-white/[0.06] hover:text-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+          title={`${t.header.commands} (${t.header.commandsKbd})`}
+          aria-label={t.header.commands}
         >
-          <Search className="w-3.5 h-3.5 text-stone-400" />
-          <span className="hidden lg:inline text-[11px]">{t.header.commands}</span>
-          <kbd className="font-mono text-[10px] bg-stone-800/90 text-stone-300 px-1.5 py-0.5 rounded border border-stone-700">{t.header.commandsKbd}</kbd>
+          <Search className="h-4 w-4" />
         </button>
 
         {/* Specialized Tools & Presets Dropdown */}
         <div className="relative" ref={toolsMenuRef}>
           <button
             onClick={() => setIsToolsOpen(!isToolsOpen)}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+            title={t.header.toolsAndPresets}
+            aria-label={t.header.toolsAndPresets}
+            className={`flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
               isToolsOpen || hasCertificate
-                ? 'bg-[#251E19] text-amber-300 border-amber-600/50 shadow-sm'
-                : 'bg-[#1C1713] text-stone-300 border-stone-800 hover:bg-[#251E19] hover:border-stone-700'
+                ? 'border-white/[0.12] bg-white/[0.06] text-stone-100'
+                : 'border-transparent text-stone-300 hover:bg-white/[0.06]'
             }`}
           >
-            <span>{t.header.toolsAndPresets}</span>
+            <Settings2 className="h-4 w-4 xl:hidden" />
+            <span className="hidden xl:inline">{t.header.toolsAndPresets}</span>
+            <ChevronDown className={`h-3.5 w-3.5 text-stone-500 transition-transform ${isToolsOpen ? 'rotate-180' : ''}`} />
             {hasCertificate && (
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
             )}
@@ -443,13 +397,14 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onStartBatch}
           disabled={datasetCount === 0 || runningJobCount > 0}
-          className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-stone-950 shadow-lg shadow-amber-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all transform active:scale-95"
+          className="flex items-center space-x-2 rounded-lg bg-[#A87945] px-3.5 py-2 text-xs font-semibold text-stone-950 transition-colors hover:bg-[#B98953] disabled:cursor-not-allowed disabled:opacity-40"
           title="Execute Batch Processing Pipeline"
+          aria-label={settings.isDryRun ? t.header.dryCheck : t.header.processBatch}
         >
           <Play className="w-3.5 h-3.5 fill-current" />
-          <span>{settings.isDryRun ? t.header.dryCheck : t.header.processBatch}</span>
+          <span className="hidden xl:inline">{settings.isDryRun ? t.header.dryCheck : t.header.processBatch}</span>
           {readyCount > 0 && (
-            <span className="ml-1 bg-stone-950/30 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold text-stone-950">
+            <span className="ml-1 hidden xl:inline bg-stone-950/30 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold text-stone-950">
               {readyCount}
             </span>
           )}
