@@ -21,14 +21,19 @@ import {
   TableProperties,
   Award,
   ShieldCheck,
-  Check
+  Check,
+  Sun,
+  Moon,
+  Globe,
+  Download
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { BatchSettings, PresetProfile } from '../types/gis';
 import { PRESET_PROFILES } from '../core/presets';
 import { useI18n } from '../core/i18n';
+import { useTheme } from '../core/theme';
 
-export type NavTab = 'craft' | 'workspace' | 'lab' | 'map' | 'monitor';
+export type NavTab = 'craft' | 'workspace' | 'lab' | 'map' | 'monitor' | 'showcase';
 
 interface HeaderProps {
   activeTab: NavTab;
@@ -68,6 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectPreset,
 }) => {
   const { lang, setLang, t } = useI18n();
+  const { theme, toggleTheme } = useTheme();
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const toolsMenuRef = useRef<HTMLDivElement>(null);
 
@@ -187,15 +193,43 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
             )}
           </button>
+
+          {/* Showcase & Website Tab */}
+          <button
+            onClick={() => setActiveTab('showcase')}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'showcase'
+                ? 'bg-[#29221C] text-amber-300 shadow-sm border border-stone-700 font-semibold'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
+            }`}
+            title="View product presentation website & Windows .exe release"
+          >
+            <Globe className="w-3.5 h-3.5 text-amber-400" />
+            <span>{t.header.showcaseTab}</span>
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-amber-950 text-amber-300 border border-amber-700/50 uppercase font-semibold">
+              .exe
+            </span>
+          </button>
         </nav>
       </div>
 
       {/* Right: Streamlined Clean Controls & Primary CTA */}
       <div className="flex items-center space-x-2.5">
+        {/* Direct Download .EXE CTA */}
+        <a
+          href="https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden xl:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 text-xs font-bold transition-all shadow-md shadow-amber-950/30"
+          title="Download OmniGeo Windows x64 .exe release installer"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>.EXE</span>
+        </a>
         {/* Subtle Language Switch */}
         <div 
           className="flex items-center rounded-xl bg-[#1C1713] border border-stone-800 p-0.5 text-xs font-mono shadow-sm"
-          title={lang === 'en' ? 'Switch language (EN / FR)' : 'Changer de langue (EN / FR)'}
+          title={lang === 'ar' ? 'تبديل اللغة (EN / FR / عربي)' : lang === 'fr' ? 'Changer de langue (EN / FR / عربي)' : 'Switch language (EN / FR / AR)'}
         >
           <button
             type="button"
@@ -220,7 +254,49 @@ export const Header: React.FC<HeaderProps> = ({
           >
             FR
           </button>
+          <span className="text-stone-700 mx-0.5">·</span>
+          <button
+            type="button"
+            onClick={() => setLang('ar')}
+            className={`px-2 py-1 rounded-lg transition-all text-[11px] font-semibold ${
+              lang === 'ar'
+                ? 'bg-[#2A221C] text-amber-300 border border-amber-600/40 shadow-sm'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+            title="اللغة العربية"
+          >
+            عربي
+          </button>
         </div>
+
+        {/* Minimalist Theme Toggle (Light with white background / Default Dark) */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border transition-all text-xs font-medium shadow-sm ${
+            theme === 'light'
+              ? 'bg-amber-500/10 border-amber-600/40 text-amber-850 hover:bg-amber-500/20'
+              : 'bg-[#1C1713] border-stone-800 hover:border-amber-600/40 text-stone-300 hover:text-stone-100 hover:bg-[#251E19]'
+          }`}
+          title={
+            theme === 'dark' 
+              ? (lang === 'fr' ? 'Activer le thème clair (fond blanc)' : 'Switch to Light theme (white background)') 
+              : (lang === 'fr' ? 'Activer le thème sombre par défaut' : 'Switch to Default Dark theme')
+          }
+          aria-label="Toggle Theme"
+        >
+          {theme === 'dark' ? (
+            <>
+              <Sun className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline text-[11px] font-semibold">{lang === 'fr' ? 'Clair' : 'Light'}</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden sm:inline text-[11px] font-semibold">{lang === 'fr' ? 'Sombre' : 'Dark'}</span>
+            </>
+          )}
+        </button>
 
         {/* Command Palette Trigger */}
         <button

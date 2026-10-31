@@ -67,7 +67,7 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
   onStartBatch,
   hasCertificate,
 }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
@@ -264,6 +264,19 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
       actionLabel: t.craft.mapStudioBtn,
       onExecute: () => {
         setActiveTab('map');
+      },
+    },
+    {
+      id: 'website-showcase',
+      title: lang === 'fr' ? 'Site Web Officiel & Téléchargement .EXE' : 'Product Website & Windows .EXE Release',
+      category: 'quality',
+      description: lang === 'fr' ? 'Découvrez la présentation complète d\'OmniGeo par Maodo et téléchargez l\'exécutable natif Windows x64.' : 'Explore the comprehensive OmniGeo by Maodo presentation website and download the standalone Windows x64 .exe release.',
+      icon: Globe,
+      badge: 'Release v1.0.0',
+      badgeColor: 'bg-amber-950 text-amber-300 border-amber-700/50',
+      actionLabel: lang === 'fr' ? 'Voir le Site / .EXE' : 'Open Website / .EXE',
+      onExecute: () => {
+        setActiveTab('showcase');
       },
     },
     {

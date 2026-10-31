@@ -18,6 +18,7 @@ import { BatchWorkspace } from './components/BatchWorkspace';
 import { ConversionLab } from './components/ConversionLab';
 import { MapPreview } from './components/MapPreview';
 import { JobMonitor } from './components/JobMonitor';
+import { ShowcaseWebsite } from './components/ShowcaseWebsite';
 import { CommandPalette } from './components/CommandPalette';
 import { PythonCoreModal } from './components/PythonCoreModal';
 import { CRSModal } from './components/CRSModal';
@@ -29,8 +30,10 @@ import { generateAutoHarmonizerRules, applySchemaHarmonization } from './core/sc
 import { createMultiLayerGeoPackage, generateQgisProjectXml, bundleConsolidatedHandoff } from './core/multiLayerGpkg';
 import { generateQAQCReportData } from './core/auditCertificate';
 import { appendSurfaceColumnToDataset, SurfaceUnit } from './core/spatialAnalytics';
+import { useTheme } from './core/theme';
 
 export default function App() {
+  const { theme } = useTheme();
   // Pre-load high quality sample datasets on first load
   const [datasets, setDatasets] = useState<SpatialDataset[]>(() => createSampleDatasets());
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(() => 'demo-parcels');
@@ -348,7 +351,9 @@ export default function App() {
   const processedJobForPreview = jobs.find(j => j.datasetId === selectedDataset?.id && j.outputGeojson) || null;
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#13110E] text-[#F5EBE1] font-sans antialiased">
+    <div className={`flex flex-col h-screen w-screen overflow-hidden font-sans antialiased transition-colors duration-200 ${
+      theme === 'light' ? 'bg-white text-stone-900' : 'bg-[#13110E] text-[#F5EBE1]'
+    }`}>
       {/* App Header */}
       <Header
         activeTab={activeTab}
@@ -446,6 +451,12 @@ export default function App() {
             hasCertificate={!!qaqcReport}
             onDownloadConsolidated={handleDownloadConsolidatedHandoff}
             hasConsolidated={!!consolidatedHandoffBlob}
+          />
+        )}
+
+        {activeTab === 'showcase' && (
+          <ShowcaseWebsite
+            onLaunchWorkbench={(tab) => setActiveTab(tab || 'craft')}
           />
         )}
       </main>

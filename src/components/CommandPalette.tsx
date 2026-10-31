@@ -15,8 +15,10 @@ import {
   X, 
   Stethoscope, 
   TableProperties, 
-  Award 
+  Award,
+  Download
 } from 'lucide-react';
+import { NavTab } from './Header';
 
 interface CommandItem {
   id: string;
@@ -30,7 +32,7 @@ interface CommandItem {
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  setActiveTab: (tab: 'craft' | 'workspace' | 'lab' | 'map' | 'monitor') => void;
+  setActiveTab: (tab: NavTab) => void;
   onStartBatch: () => void;
   onLoadSampleData: () => void;
   onSetFormat: (format: any) => void;
@@ -116,6 +118,27 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       category: 'Navigation',
       icon: <Activity className="w-4 h-4 text-amber-400" />,
       run: () => { setActiveTab('monitor'); onClose(); },
+    },
+    {
+      id: 'nav-showcase',
+      title: 'Go to Product Website & Presentation Showcase',
+      category: 'Navigation',
+      icon: <Globe className="w-4 h-4 text-amber-400" />,
+      run: () => { setActiveTab('showcase'); onClose(); },
+    },
+    {
+      id: 'act-download-exe',
+      title: 'Download Windows x64 Native Installer (.exe)',
+      category: 'Action',
+      icon: <Download className="w-4 h-4 text-emerald-400" />,
+      run: () => { window.open('https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe', '_blank'); onClose(); },
+    },
+    {
+      id: 'act-view-github',
+      title: 'Open GitHub Repository (Maal1ck/OmniGEO)',
+      category: 'Action',
+      icon: <Globe className="w-4 h-4 text-sky-400" />,
+      run: () => { window.open('https://github.com/Maal1ck/OmniGEO', '_blank'); onClose(); },
     },
 
     // Actions

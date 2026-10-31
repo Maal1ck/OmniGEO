@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniGeo by Maodo — Geospatial Batch Processing Workbench</title>
+  <meta name="description" content="High-performance geospatial data processing workbench for reliable batch format conversion, coordinate reference system (CRS) transformation, visual validation, and GIS handoffs by Maodo.">
+  <meta property="og:title" content="OmniGeo by Maodo — High-Performance Geospatial Batch Workbench">
+  <meta property="og:description" content="Air-gapped, local-first platform to convert, reproject, audit, and consolidate OGC GeoPackages, ESRI Shapefiles, GeoJSON, and KML with mathematical precision.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://maal1ck.github.io/OmniGEO/">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'Cairo', 'sans-serif'],
+            display: ['Outfit', 'Cairo', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            amber: {
+              450: '#F59E0B',
+              850: '#92400E',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    html[dir="rtl"] body {
+      font-family: 'Cairo', 'Plus Jakarta Sans', sans-serif;
+    }
+    .font-display { font-family: 'Outfit', sans-serif; }
+    html[dir="rtl"] .font-display { font-family: 'Cairo', 'Outfit', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(217, 119, 6, 0.7); }
+
+    /* Light Theme Contrast Rules */
+    html.light body {
+      background-color: #FFFFFF !important;
+      color: #0F172A !important;
+    }
+    html.light .surface-card {
+      background-color: #FFFFFF !important;
+      border-color: #E2E8F0 !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+    }
+    html.light .surface-inner {
+      background-color: #F8FAFC !important;
+      border-color: #E2E8F0 !important;
+    }
+    html.light .hero-card {
+      background: linear-gradient(135deg, #FFFDF7 0%, #FEF3C7 50%, #FFF7ED 100%) !important;
+      border-color: #FCD34D !important;
+      box-shadow: 0 10px 25px -5px rgba(217, 119, 6, 0.08) !important;
+    }
+    html.light .hero-card h2, html.light .hero-card h3 {
+      color: #0F172A !important;
+    }
+    html.light .hero-card p {
+      color: #334155 !important;
+    }
+    html.light .text-amber-glow {
+      color: #92400E !important;
+    }
+    html.light .badge-amber {
+      background-color: #FEF3C7 !important;
+      color: #92400E !important;
+      border-color: #FCD34D !important;
+    }
+    html.light .badge-emerald {
+      background-color: #D1FAE5 !important;
+      color: #065F46 !important;
+      border-color: #6EE7B7 !important;
+    }
+    html.light .badge-stone {
+      background-color: #F1F5F9 !important;
+      color: #334155 !important;
+      border-color: #CBD5E1 !important;
+    }
+  </style>
+</head>
+
+<body class="bg-[#13110E] text-[#F5EBE1] antialiased selection:bg-amber-500/30 selection:text-amber-200 min-h-screen flex flex-col">
+
+  <!-- TOP BANNER -->
+  <aside aria-label="Version announcement" class="bg-gradient-to-r from-amber-950 via-amber-900/60 to-orange-950 border-b border-amber-600/30 px-4 py-2 text-xs">
+    <div class="max-w-6xl mx-auto flex items-center justify-between font-mono text-[11px]">
+      <div class="flex items-center space-x-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-bold text-amber-200" data-i18n="topBannerTitle">OmniGeo v1.0.0 Released:</span>
+        <span class="text-stone-300 hidden sm:inline" data-i18n="topBannerDesc">Official Windows x64 Native Installer (.exe) & Air-Gapped Web GIS</span>
+      </div>
+      <div class="flex items-center space-x-3">
+        <a href="https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe" class="text-amber-300 hover:text-white font-bold underline flex items-center space-x-1">
+          <span>Download .EXE</span>
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        </a>
+        <span class="text-stone-600">·</span>
+        <a href="https://github.com/Maal1ck/OmniGEO" target="_blank" rel="noopener noreferrer" class="text-stone-400 hover:text-amber-300 flex items-center space-x-1">
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- NAVBAR -->
+  <header class="sticky top-0 z-40 bg-[#15120F]/95 backdrop-blur-xl border-b border-stone-800/80 px-6 py-3.5 transition-colors">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      
+      <!-- Brand -->
+      <a href="#" class="flex items-center space-x-3 group">
+        <!-- SVG Celestial Globe Logo -->
+        <svg class="w-9 h-9 drop-shadow-sm group-hover:scale-105 transition-transform" viewBox="0 0 48 48" fill="none">
+          <defs>
+            <linearGradient id="omniAura" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.3" />
+              <stop offset="100%" stop-color="#EA580C" stop-opacity="0.1" />
+            </linearGradient>
+            <linearGradient id="omniRing" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FBBF24" />
+              <stop offset="50%" stop-color="#F59E0B" />
+              <stop offset="100%" stop-color="#D97706" />
+            </linearGradient>
+            <linearGradient id="facetLight" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFFBEB" />
+              <stop offset="100%" stop-color="#F59E0B" />
+            </linearGradient>
+            <linearGradient id="facetDark" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#D97706" />
+              <stop offset="100%" stop-color="#78350F" />
+            </linearGradient>
+          </defs>
+          <circle cx="24" cy="24" r="22" fill="url(#omniAura)" stroke="#F59E0B" stroke-width="0.8" stroke-opacity="0.35" />
+          <circle cx="24" cy="24" r="17" stroke="url(#omniRing)" stroke-width="1.8" />
+          <ellipse cx="24" cy="24" rx="17" ry="6" transform="rotate(-26 24 24)" stroke="#F59E0B" stroke-width="1.4" />
+          <polygon points="24,14 31.5,24 24,24" fill="url(#facetLight)" />
+          <polygon points="24,24 16.5,24 24,34" fill="url(#facetLight)" opacity="0.85" />
+          <polygon points="24,14 24,24 16.5,24" fill="url(#facetDark)" />
+          <polygon points="24,24 31.5,24 24,34" fill="url(#facetDark)" opacity="0.95" />
+          <circle cx="24" cy="24" r="2.2" fill="#FFFFFF" />
+          <circle cx="24" cy="24" r="1.1" fill="#92400E" />
+        </svg>
+
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-display font-extrabold text-base tracking-tight text-[#FAF6F0]">OmniGeo</span>
+            <span class="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-600/40">by Maodo</span>
+          </div>
+          <div class="text-[10px] text-stone-400 font-sans">Geospatial Batch Processing Workbench</div>
+        </div>
+      </a>
+
+      <!-- Right Controls -->
+      <div class="flex items-center space-x-3">
+        <!-- Language Switcher -->
+        <div class="flex items-center rounded-xl bg-[#1C1713] surface-inner border border-stone-800 p-0.5 text-xs font-mono">
+          <button id="langEnBtn" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-[#2A221C] text-amber-300 border border-amber-600/40">EN</button>
+          <span class="text-stone-700 mx-0.5">·</span>
+          <button id="langFrBtn" class="px-2 py-1 rounded-lg text-[11px] font-semibold text-stone-400 hover:text-stone-200">FR</button>
+          <span class="text-stone-700 mx-0.5">·</span>
+          <button id="langArBtn" class="px-2 py-1 rounded-lg text-[11px] font-semibold text-stone-400 hover:text-stone-200" title="اللغة العربية">عربي</button>
+        </div>
+
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" class="p-2 rounded-xl bg-[#1C1713] surface-inner border border-stone-800 text-stone-300 hover:text-white text-xs" title="Toggle Dark/Light Mode">
+          <span id="themeIcon">☀️</span>
+        </button>
+
+        <!-- Direct Download .EXE Header Button -->
+        <a href="https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe" class="hidden md:flex items-center space-x-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-display font-bold text-xs shadow-md transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          <span>Download .EXE</span>
+        </a>
+
+        <!-- GitHub Link -->
+        <a href="https://github.com/Maal1ck/OmniGEO" target="_blank" rel="noopener noreferrer" class="p-2 rounded-xl bg-[#1C1713] surface-inner border border-stone-800 text-stone-300 hover:text-white" title="View Source on GitHub">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN HERO -->
+  <main class="flex-1 max-w-6xl mx-auto px-6 py-14 space-y-20">
+
+    <section class="text-center space-y-6">
+      <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-amber-950/80 badge-amber border border-amber-600/40 text-amber-300 text-xs font-mono font-medium shadow-lg">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        <span data-i18n="heroBadge">Official Release v1.0.0 · Windows x64 & Web GIS</span>
+      </div>
+
+      <h1 class="text-4xl sm:text-5xl md:text-6xl font-display font-extrabold tracking-tight text-[#FAF6F0] max-w-4xl mx-auto leading-[1.12]">
+        <span data-i18n="heroTitlePrefix">The Definitive </span>
+        <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-orange-400" data-i18n="heroTitleHighlight">Geospatial Batch</span>
+        <span data-i18n="heroTitleSuffix"> Workbench.</span>
+      </h1>
+
+      <p class="text-sm sm:text-base text-stone-300 max-w-2xl mx-auto leading-relaxed" data-i18n="heroSubtitle">
+        OmniGeo by Maodo delivers an air-gapped, local-first platform to convert, reproject, validate, calculate surfaces, and bundle OGC GeoPackages with mathematical geodetic precision.
+      </p>
+
+      <!-- Primary Action Buttons -->
+      <div class="pt-4 flex flex-wrap items-center justify-center gap-4">
+        <!-- Direct EXE Download -->
+        <a href="https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe" class="flex items-center space-x-3 px-7 py-4 rounded-2xl bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-stone-950 font-display font-bold text-sm shadow-xl shadow-amber-950/30 transition-all transform hover:-translate-y-0.5">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          <div class="text-left">
+            <span class="block text-sm font-extrabold leading-tight" data-i18n="btnDownload">Download for Windows (.exe)</span>
+            <span class="block text-[10px] text-stone-950/80 font-mono" data-i18n="btnDownloadSub">v1.0.0 (x64 Installer) · ~85 MB · SHA-256 Verified</span>
+          </div>
+        </a>
+
+        <!-- GitHub Releases Button -->
+        <a href="https://github.com/Maal1ck/OmniGEO/releases" target="_blank" rel="noopener noreferrer" class="flex items-center space-x-2 px-6 py-4 rounded-2xl bg-[#1F1915] surface-card hover:bg-[#2A221C] border border-stone-700/80 text-[#FAF6F0] font-display font-bold text-sm transition-all shadow-md">
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          <span data-i18n="btnReleases">View All Release Assets</span>
+        </a>
+
+        <!-- GitHub Star -->
+        <a href="https://github.com/Maal1ck/OmniGEO" target="_blank" rel="noopener noreferrer" class="flex items-center space-x-2 px-5 py-4 rounded-2xl bg-[#181411] surface-inner border border-stone-800 text-stone-300 hover:text-white text-sm font-semibold transition-colors">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+          <span data-i18n="btnStar">Star on GitHub</span>
+        </a>
+      </div>
+
+      <!-- Trust Badges -->
+      <div class="pt-4 flex flex-wrap items-center justify-center gap-3 text-xs font-mono text-stone-400">
+        <span class="px-3 py-1 rounded-full bg-[#181411] surface-inner border border-stone-800 flex items-center space-x-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>100% Air-Gapped / Zero Telemetry</span>
+        </span>
+        <span class="px-3 py-1 rounded-full bg-[#181411] surface-inner border border-stone-800 flex items-center space-x-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+          <span>WASM SQLite & PROJ Engine</span>
+        </span>
+        <span class="px-3 py-1 rounded-full bg-[#181411] surface-inner border border-stone-800 flex items-center space-x-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+          <span>6,900+ EPSG Geodetic Systems</span>
+        </span>
+      </div>
+    </section>
+
+    <!-- WINDOWS RELEASE SPOTLIGHT -->
+    <section class="rounded-3xl p-8 bg-gradient-to-br from-[#1C1713] via-[#16120F] to-[#120E0C] hero-card border border-amber-600/40 shadow-2xl">
+      <div class="flex flex-col lg:flex-row items-center justify-between gap-8">
+        <div class="space-y-4 max-w-xl">
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-amber-950 badge-amber text-amber-300 border border-amber-600/40 text-[11px] font-mono font-semibold">
+            <span>Windows 64-bit Desktop Release</span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-display font-bold text-[#FAF6F0]" data-i18n="releaseCardTitle">
+            Official Windows Desktop Installer (.exe)
+          </h2>
+          <p class="text-xs sm:text-sm text-stone-300 leading-relaxed font-sans" data-i18n="releaseCardDesc">
+            Direct download for Windows 10 & 11 (x64). Standalone Electron desktop architecture, native multi-threaded worker pools, direct file-system ingestion, and zero dependencies on Python or external GDAL binaries.
+          </p>
+
+          <div class="p-3.5 rounded-xl bg-[#110E0C] surface-inner border border-stone-800 font-mono text-xs space-y-1.5">
+            <div class="flex justify-between text-[11px] text-stone-400">
+              <span>Setup Executable:</span>
+              <span class="text-amber-300 font-bold">OmniGeo-Setup-1.0.0-x64.exe</span>
+            </div>
+            <div class="flex justify-between text-[11px] text-stone-400">
+              <span>Direct Link:</span>
+              <a href="https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe" class="text-amber-400 underline truncate max-w-xs">github.com/Maal1ck/OmniGEO/releases/...</a>
+            </div>
+            <div class="flex justify-between text-[11px] text-stone-400">
+              <span>SmartScreen Tip:</span>
+              <span class="text-stone-300">Click &ldquo;More info&rdquo; &rarr; &ldquo;Run anyway&rdquo;</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col items-center sm:items-end space-y-3 flex-shrink-0 w-full sm:w-auto">
+          <a href="https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe" class="w-full sm:w-auto flex items-center justify-center space-x-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-display font-extrabold text-base shadow-2xl transition-all transform hover:scale-105 active:scale-95">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            <span>Download .EXE (x64)</span>
+          </a>
+          <a href="https://github.com/Maal1ck/OmniGEO/releases" target="_blank" rel="noopener noreferrer" class="text-xs font-mono text-stone-400 hover:text-amber-300 underline">
+            Browse all GitHub release notes &rarr;
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CORE CAPABILITIES -->
+    <section class="space-y-8">
+      <div class="text-center space-y-2">
+        <h2 class="text-2xl sm:text-3xl font-display font-bold text-[#FAF6F0]" data-i18n="featSectionTitle">
+          Engineered for Rigorous Geospatial Demands
+        </h2>
+        <p class="text-xs sm:text-sm text-stone-400 max-w-xl mx-auto" data-i18n="featSectionSub">
+          Built for GIS analysts, surveyors, cartographers, and defense teams requiring uncompromising precision.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Card 1 -->
+        <div class="p-6 rounded-2xl bg-[#181411] surface-card border border-stone-800 space-y-3 shadow-lg">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+          </div>
+          <h3 class="font-display font-bold text-base text-[#FAF6F0]" data-i18n="card1Title">Universal Vector Engine</h3>
+          <p class="text-xs text-stone-400 leading-relaxed font-sans" data-i18n="card1Desc">
+            Seamless conversions across OGC GeoPackage (.gpkg), ESRI Shapefile suite (.shp, .shx, .dbf, .prj), GeoJSON RFC 7946, Google Earth KML, and Spatial CSV.
+          </p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="p-6 rounded-2xl bg-[#181411] surface-card border border-stone-800 space-y-3 shadow-lg">
+          <div class="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <h3 class="font-display font-bold text-base text-[#FAF6F0]" data-i18n="card2Title">PROJ 6,900+ EPSG Systems</h3>
+          <p class="text-xs text-stone-400 leading-relaxed font-sans" data-i18n="card2Desc">
+            Rigorous mathematical datum shifts (WGS 84, Lambert-93, UTM, Web Mercator, British National Grid) with explicit distinction between Reproject and Assign CRS.
+          </p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="p-6 rounded-2xl bg-[#181411] surface-card border border-stone-800 space-y-3 shadow-lg">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+          </div>
+          <h3 class="font-display font-bold text-base text-[#FAF6F0]" data-i18n="card3Title">Spatial Doctor & Auto-Repair</h3>
+          <p class="text-xs text-stone-400 leading-relaxed font-sans" data-i18n="card3Desc">
+            Automated heuristic diagnosis for inverted Lat/Lon coordinates ($X \leftrightarrow Y$) with 1-click swap repair, polygon ring snapping, and duplicate vertex cleaning.
+          </p>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="p-6 rounded-2xl bg-[#181411] surface-card border border-stone-800 space-y-3 shadow-lg">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+          </div>
+          <h3 class="font-display font-bold text-base text-[#FAF6F0]" data-i18n="card4Title">Surface Geodesy & Aggregations</h3>
+          <p class="text-xs text-stone-400 leading-relaxed font-sans" data-i18n="card4Desc">
+            Seamlessly append geodesic surface area columns (<code class="text-amber-400 font-mono">surface_ha</code>, <code class="text-amber-400 font-mono">surface_m2</code>) and build dynamic group-by statistics.
+          </p>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="p-6 rounded-2xl bg-[#181411] surface-card border border-stone-800 space-y-3 shadow-lg">
+          <div class="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
+          </div>
+          <h3 class="font-display font-bold text-base text-[#FAF6F0]" data-i18n="card5Title">Multi-Layer GPKG & QGIS Handoff</h3>
+          <p class="text-xs text-stone-400 leading-relaxed font-sans" data-i18n="card5Desc">
+            Consolidate an entire directory of mixed vector files into a single unified OGC GeoPackage container accompanied by an auto-generated styled QGIS 3.x project (.qgs).
+          </p>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="p-6 rounded-2xl bg-[#181411] surface-card border border-stone-800 space-y-3 shadow-lg">
+          <div class="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          </div>
+          <h3 class="font-display font-bold text-base text-[#FAF6F0]" data-i18n="card6Title">Certified QA/QC Audit Records</h3>
+          <p class="text-xs text-stone-400 leading-relaxed font-sans" data-i18n="card6Desc">
+            Cryptographically sealed compliance records with SHA-256 hashes, exact PROJ mathematical parameter disclosure, and exportable printable audit certificates.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- GITHUB PAGES HOSTING GUIDE -->
+    <section class="rounded-3xl p-8 bg-[#181411] surface-card border border-stone-800 space-y-4">
+      <div class="flex items-center space-x-2 text-amber-400 font-display font-bold text-lg">
+        <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+        <span>Instant GitHub Pages Deployment for this Website</span>
+      </div>
+      <p class="text-xs sm:text-sm text-stone-300 leading-relaxed font-sans">
+        This presentation website is already packaged inside the repository&apos;s <code class="text-amber-400 font-mono">/docs</code> folder. To host it publicly on GitHub Pages:
+      </p>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+        <div class="p-4 rounded-xl bg-[#110E0C] surface-inner border border-stone-800 space-y-1">
+          <span class="text-amber-400 font-bold block">Step 1: Open Settings</span>
+          <span class="text-stone-400 text-[11px]">Go to <a href="https://github.com/Maal1ck/OmniGEO/settings/pages" target="_blank" rel="noopener noreferrer" class="text-amber-300 underline">Settings &rarr; Pages</a> in your repo.</span>
+        </div>
+        <div class="p-4 rounded-xl bg-[#110E0C] surface-inner border border-stone-800 space-y-1">
+          <span class="text-amber-400 font-bold block">Step 2: Choose Source</span>
+          <span class="text-stone-400 text-[11px]">Select &ldquo;Deploy from a branch&rdquo; &rarr; branch: <code class="text-amber-300">main</code>, folder: <code class="text-amber-300">/docs</code>.</span>
+        </div>
+        <div class="p-4 rounded-xl bg-[#110E0C] surface-inner border border-stone-800 space-y-1">
+          <span class="text-emerald-400 font-bold block">Step 3: Site is Live!</span>
+          <span class="text-stone-400 text-[11px]">Your website is live at <code class="text-emerald-300">maal1ck.github.io/OmniGEO/</code>.</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="mt-auto border-t border-stone-800/80 bg-[#110E0C] px-6 py-8 text-xs font-mono text-stone-400">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-2">
+        <span class="font-bold text-stone-200">OmniGeo by Maodo</span>
+        <span class="text-stone-600">·</span>
+        <span>Apache 2.0 Open Source</span>
+        <span class="text-stone-600">·</span>
+        <span class="text-emerald-400">Windows x64 Native</span>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <a href="https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe" class="text-amber-400 hover:text-white font-bold flex items-center space-x-1">
+          <span>Download .EXE</span>
+        </a>
+        <a href="https://github.com/Maal1ck/OmniGEO/releases" target="_blank" rel="noopener noreferrer" class="hover:text-stone-200">Releases</a>
+        <a href="https://github.com/Maal1ck/OmniGEO" target="_blank" rel="noopener noreferrer" class="hover:text-stone-200">GitHub Repo</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- BILINGUAL & THEME TOGGLE JS LOGIC -->
+  <script>
+    const translations = {
+      en: {
+        topBannerTitle: "OmniGeo v1.0.0 Released:",
+        topBannerDesc: "Official Windows x64 Native Installer (.exe) & Air-Gapped Web GIS",
+        heroBadge: "Official Release v1.0.0 · Windows x64 & Web GIS",
+        heroTitlePrefix: "The Definitive ",
+        heroTitleHighlight: "Geospatial Batch",
+        heroTitleSuffix: " Workbench.",
+        heroSubtitle: "OmniGeo by Maodo delivers an air-gapped, local-first platform to convert, reproject, validate, calculate surfaces, and bundle OGC GeoPackages with mathematical geodetic precision.",
+        btnDownload: "Download for Windows (.exe)",
+        btnDownloadSub: "v1.0.0 (x64 Installer) · ~85 MB · SHA-256 Verified",
+        btnReleases: "View All Release Assets",
+        btnStar: "Star on GitHub",
+        releaseCardTitle: "Official Windows Desktop Installer (.exe)",
+        releaseCardDesc: "Direct download for Windows 10 & 11 (x64). Standalone Electron desktop architecture, native multi-threaded worker pools, direct file-system ingestion, and zero dependencies on Python or external GDAL binaries.",
+        featSectionTitle: "Engineered for Rigorous Geospatial Demands",
+        featSectionSub: "Built for GIS analysts, surveyors, cartographers, and defense teams requiring uncompromising precision.",
+        card1Title: "Universal Vector Engine",
+        card1Desc: "Seamless conversions across OGC GeoPackage (.gpkg), ESRI Shapefile suite (.shp, .shx, .dbf, .prj), GeoJSON RFC 7946, Google Earth KML, and Spatial CSV.",
+        card2Title: "PROJ 6,900+ EPSG Systems",
+        card2Desc: "Rigorous mathematical datum shifts (WGS 84, Lambert-93, UTM, Web Mercator, British National Grid) with explicit distinction between Reproject and Assign CRS.",
+        card3Title: "Spatial Doctor & Auto-Repair",
+        card3Desc: "Automated heuristic diagnosis for inverted Lat/Lon coordinates ($X \leftrightarrow Y$) with 1-click swap repair, polygon ring snapping, and duplicate vertex cleaning.",
+        card4Title: "Surface Geodesy & Aggregations",
+        card4Desc: "Seamlessly append geodesic surface area columns (surface_ha, surface_m2) and build dynamic group-by statistics.",
+        card5Title: "Multi-Layer GPKG & QGIS Handoff",
+        card5Desc: "Consolidate an entire directory of mixed vector files into a single unified OGC GeoPackage container accompanied by an auto-generated styled QGIS 3.x project (.qgs).",
+        card6Title: "Certified QA/QC Audit Records",
+        card6Desc: "Cryptographically sealed compliance records with SHA-256 hashes, exact PROJ mathematical parameter disclosure, and exportable printable audit certificates.",
+      },
+      fr: {
+        topBannerTitle: "OmniGeo v1.0.0 Disponible :",
+        topBannerDesc: "Installeur officiel natif Windows x64 (.exe) & SIG Web Isolé",
+        heroBadge: "Version Officielle v1.0.0 · Windows x64 & SIG Web",
+        heroTitlePrefix: "L'Atelier ",
+        heroTitleHighlight: "Géospatial Haute Précision",
+        heroTitleSuffix: " de Référence.",
+        heroSubtitle: "OmniGeo par Maodo propose une plateforme locale et étanche pour convertir, reprojeter, valider, calculer des surfaces et consolider des GeoPackages OGC avec une rigueur géodésique absolue.",
+        btnDownload: "Télécharger pour Windows (.exe)",
+        btnDownloadSub: "v1.0.0 (Installeur x64) · ~85 Mo · SHA-256 Vérifié",
+        btnReleases: "Tous les artefacts de version",
+        btnStar: "Étoiler sur GitHub",
+        releaseCardTitle: "Installeur Bureau Officiel Windows (.exe)",
+        releaseCardDesc: "Téléchargement direct pour Windows 10 & 11 (x64). Architecture Electron autonome, exécution multithread en arrière-plan, intégration système directe et zéro dépendance Python ou GDAL externe.",
+        featSectionTitle: "Conçu pour l'Ingénierie Géomatique Exigeante",
+        featSectionSub: "Développé pour les géomètres-experts, cartographes, bureaux d'études et acteurs publics exigeant une intégrité géométrique sans faille.",
+        card1Title: "Conversion Universelle de Vecteurs",
+        card1Desc: "Interopérabilité complète par lot entre OGC GeoPackage (.gpkg), suite ESRI Shapefile (.shp), GeoJSON RFC 7946, KML Google Earth et CSV spatial.",
+        card2Title: "Moteur PROJ & Catalogue 6 900+ EPSG",
+        card2Desc: "Transformations ellipsoïdales mathématiques rigoureuses (WGS 84, Lambert-93, UTM, Web Mercator) avec calcul en temps réel du décalage de datum.",
+        card3Title: "Docteur Spatial Pré-vol",
+        card3Desc: "Diagnostic heuristique d'inversion d'axes ($X \leftrightarrow Y$ / Lat vs Lon) avec réparation en 1 clic et fermeture topologique des anneaux.",
+        card4Title: "Surfaces Géodésiques & Agrégations",
+        card4Desc: "Ajout instantané de colonnes de surface géodésique (surface_ha, surface_m2) et agrégation dynamique d'attributs par champ.",
+        card5Title: "GeoPackage Multi-Couches & Projet QGIS",
+        card5Desc: "Consolidation d'un lot hétérogène dans un conteneur OGC GeoPackage unique avec génération d'un projet QGIS 3.x stylisé (.qgs).",
+        card6Title: "Certificat d'Audit QA/QC Scellé",
+        card6Desc: "Rapports formels d'audit géodésique scellés cryptographiquement avec empreintes SHA-256, tolérances et export HTML imprimable.",
+      },
+      ar: {
+        topBannerTitle: "إطلاق OmniGeo v1.0.0:",
+        topBannerDesc: "المثبّت الرسمي لنظام Windows x64 بصيغة (.exe) ومنصة نظم المعلومات الجغرافية المعزولة",
+        heroBadge: "الإصدار الرسمي v1.0.0 · ويندوز x64 ونظم المعلومات الجغرافية",
+        heroTitlePrefix: "المنصة المتكاملة ",
+        heroTitleHighlight: "للمعالجة الجغرافية المكانية الدقيقة",
+        heroTitleSuffix: " بالدفعات.",
+        heroSubtitle: "توفر OmniGeo بواسطة Maodo بيئة محلية معزولة بالكامل لتحويل وإعادة إسقاط والتحقق من صحة وحساب مساحات وتجميع حزم GeoPackage بدقة جيوديسية رياضية متناهية.",
+        btnDownload: "تحميل لنظام ويندوز (.exe)",
+        btnDownloadSub: "v1.0.0 (مثبت x64) · حوالي 85 ميجابايت · مدقق بـ SHA-256",
+        btnReleases: "استعراض جميع إصدارات GitHub",
+        btnStar: "النجمة على GitHub",
+        releaseCardTitle: "المثبت المكتبي الرسمي لنظام ويندوز (.exe)",
+        releaseCardDesc: "تنزيل مباشر لنظامي التشغيل Windows 10 و 11 (x64). بنية تطبيق Electron مستقلة، معالجة متعددة الخيوط بالخلفية، قراءة مباشرة من نظام الملفات وبدون أي اعتمادية على Python أو مكتبات GDAL الخارجية.",
+        featSectionTitle: "مصمم لتلبية أعلى المعايير الهندسية الجيوماتيكية",
+        featSectionSub: "مطوّر لمهندسي المساحة، وخبراء الاستشعار عن بعد، والخرائطيين، وفرق الدفاع التي تتطلب دقة هندسية لا تهاون فيها.",
+        card1Title: "محرك تحويل المتجهات الشامل",
+        card1Desc: "تحويل سلس ودفعي بين حزم OGC GeoPackage (.gpkg)، وملفات ESRI Shapefile (.shp)، و GeoJSON RFC 7946، و KML، و CSV المكاني.",
+        card2Title: "مكتبة PROJ مع 6,900+ نظام إحداثيات",
+        card2Desc: "تحويلات إهليلجية رياضية صارمة (WGS 84، Lambert-93، UTM، Web Mercator) مع تفريق دقيق بين إعادة الإسقاط وتعيين نظام الإحداثيات.",
+        card3Title: "طبيب البيانات المكانية والفحص المسبق",
+        card3Desc: "تشخيص آلي لانقلاب محاور خطوط الطول والعرض ($X \leftrightarrow Y$) مع إصلاح فوري بنقرة واحدة وإغلاق هندسي للحلقات المضلعة.",
+        card4Title: "حساب المساحات الجيوديسية والتجميع",
+        card4Desc: "إضافة تلقائية لأعمدة المساحة الجيوديسية الحقيقية (surface_ha، surface_m2) وتجميع إحصائي ديناميكي حسب الحقول الوصفية.",
+        card5Title: "حزم GeoPackage متعددة الطبقات ومشروع QGIS",
+        card5Desc: "دمج مجلد كامل من الملفات المتجهية في قاعدة بيانات OGC GeoPackage موحدة مع إنشاء تلقائي لمشروع QGIS 3.x (.qgs) منسق ومصنف.",
+        card6Title: "سجل تدقيق QA/QC معتمد ومختوم",
+        card6Desc: "تقارير تدقيق جيوديسي رسمية مختومة تشفيرياً ببصمات SHA-256 مع إفصاح دقيق عن معاملات التحويل الرياضية وإمكانية طباعة الشهادة.",
+      }
+    };
+
+    let currentLang = 'en';
+    const langEnBtn = document.getElementById('langEnBtn');
+    const langFrBtn = document.getElementById('langFrBtn');
+    const langArBtn = document.getElementById('langArBtn');
+
+    function updateLanguage(lang) {
+      currentLang = lang;
+      const dict = translations[lang] || translations.en;
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) el.textContent = dict[key];
+      });
+
+      document.documentElement.setAttribute('lang', lang);
+      document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+
+      // Update button active styling
+      const activeClass = 'px-2 py-1 rounded-lg text-[11px] font-semibold bg-[#2A221C] text-amber-300 border border-amber-600/40';
+      const inactiveClass = 'px-2 py-1 rounded-lg text-[11px] font-semibold text-stone-400 hover:text-stone-200';
+
+      langEnBtn.className = lang === 'en' ? activeClass : inactiveClass;
+      langFrBtn.className = lang === 'fr' ? activeClass : inactiveClass;
+      if (langArBtn) {
+        langArBtn.className = lang === 'ar' ? activeClass : inactiveClass;
+      }
+    }
+
+    langEnBtn.addEventListener('click', () => updateLanguage('en'));
+    langFrBtn.addEventListener('click', () => updateLanguage('fr'));
+    if (langArBtn) {
+      langArBtn.addEventListener('click', () => updateLanguage('ar'));
+    }
+
+    // Theme Toggle
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const themeIcon = document.getElementById('themeIcon');
+    let isDark = true;
+
+    themeToggleBtn.addEventListener('click', () => {
+      isDark = !isDark;
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+        themeIcon.textContent = '☀️';
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+        themeIcon.textContent = '🌙';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -34,6 +34,7 @@ import { SurfaceUnit } from '../core/spatialAnalytics';
 import { getCRSByCode } from '../core/crsDefinitions';
 import { reprojectGeoJSON } from '../core/crsEngine';
 import { useI18n } from '../core/i18n';
+import { useTheme } from '../core/theme';
 
 interface MapPreviewProps {
   dataset: SpatialDataset | null;
@@ -64,13 +65,23 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
   isOverlayOpen = false,
 }) => {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const geojsonLayerRef = useRef<L.GeoJSON | null>(null);
   const outputGeojsonLayerRef = useRef<L.GeoJSON | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
-  const [basemap, setBasemap] = useState<'dark' | 'osm' | 'satellite' | 'offline_grid'>('dark');
+  const [basemap, setBasemap] = useState<'dark' | 'osm' | 'satellite' | 'offline_grid'>(() => theme === 'light' ? 'osm' : 'dark');
+
+  // Sync basemap when theme toggles
+  useEffect(() => {
+    if (theme === 'light' && basemap === 'dark') {
+      setBasemap('osm');
+    } else if (theme === 'dark' && basemap === 'osm') {
+      setBasemap('dark');
+    }
+  }, [theme]);
   const [showOutputCompare, setShowOutputCompare] = useState(false);
   const [isSwipeMode, setIsSwipeMode] = useState(false);
   const [swipePosition, setSwipePosition] = useState(50);

@@ -5,12 +5,13 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type Language = 'en' | 'fr';
+export type Language = 'en' | 'fr' | 'ar';
 
 export interface Translations {
   common: {
     langEn: string;
     langFr: string;
+    langAr: string;
     loading: string;
     close: string;
     save: string;
@@ -40,6 +41,7 @@ export interface Translations {
     labTab: string;
     mapTab: string;
     monitorTab: string;
+    showcaseTab: string;
     commands: string;
     commandsKbd: string;
     toolsAndPresets: string;
@@ -279,6 +281,35 @@ export interface Translations {
     colDuration: string;
     colStatus: string;
   };
+  showcase: {
+    badge: string;
+    heroTitlePrefix: string;
+    heroTitleHighlight: string;
+    heroTitleSuffix: string;
+    heroSubtitle: string;
+    downloadExeBtn: string;
+    downloadExeSub: string;
+    launchWebBtn: string;
+    viewGitHubBtn: string;
+    airGappedCardTitle: string;
+    airGappedCardDesc: string;
+    formatCardTitle: string;
+    formatCardDesc: string;
+    projCardTitle: string;
+    projCardDesc: string;
+    doctorCardTitle: string;
+    doctorCardDesc: string;
+    releaseTitle: string;
+    releaseSub: string;
+    winReqs: string;
+    featuresTitle: string;
+    featuresSub: string;
+    desktopVsWebTitle: string;
+    desktopVsWebSub: string;
+    ghPagesDeployTitle: string;
+    ghPagesDeploySub: string;
+    footerBy: string;
+  };
 }
 
 export const translations: Record<Language, Translations> = {
@@ -286,6 +317,7 @@ export const translations: Record<Language, Translations> = {
     common: {
       langEn: 'EN',
       langFr: 'FR',
+      langAr: 'عربي',
       loading: 'Loading...',
       close: 'Close',
       save: 'Save',
@@ -315,6 +347,7 @@ export const translations: Record<Language, Translations> = {
       labTab: 'Conversion Lab',
       mapTab: 'Map Studio',
       monitorTab: 'Monitor',
+      showcaseTab: 'Showcase',
       commands: 'Commands',
       commandsKbd: '⌘K',
       toolsAndPresets: 'Tools & Presets',
@@ -554,11 +587,41 @@ export const translations: Record<Language, Translations> = {
       colDuration: 'Duration',
       colStatus: 'Status',
     },
+    showcase: {
+      badge: 'Official Release v1.0.0 · Windows x64 & Web GIS',
+      heroTitlePrefix: 'The Definitive ',
+      heroTitleHighlight: 'Geospatial Batch',
+      heroTitleSuffix: ' Workbench.',
+      heroSubtitle: 'OmniGeo by Maodo delivers an air-gapped, local-first platform to convert, reproject, validate, calculate surfaces, and bundle OGC GeoPackages with mathematical geodetic precision.',
+      downloadExeBtn: 'Download for Windows (.exe)',
+      downloadExeSub: 'v1.0.0 (x64 Installer) · ~85 MB · SHA-256 Verified',
+      launchWebBtn: 'Launch Web Workbench',
+      viewGitHubBtn: 'Star on GitHub',
+      airGappedCardTitle: '100% Air-Gapped & Local-First',
+      airGappedCardDesc: 'Zero telemetry, zero external network requests. Client-side WebAssembly SQLite and PROJ4 keep sensitive cadastral datasets strictly on your workstation.',
+      formatCardTitle: 'Universal Vector Conversion',
+      formatCardDesc: 'Full batch interoperability between OGC GeoPackage (.gpkg), ESRI Shapefile suite (.shp bundle), RFC 7946 GeoJSON, Google Earth KML, and Spatial CSV.',
+      projCardTitle: 'PROJ 6,900+ EPSG Registry',
+      projCardDesc: 'Rigorous mathematical ellipsoidal transformations (WGS 84, Lambert-93, UTM, Web Mercator, British National Grid) with real-time datum shift calculations.',
+      doctorCardTitle: 'Spatial Pre-Flight Doctor',
+      doctorCardDesc: 'Automated heuristic diagnosis for inverted Lat/Lon coordinates ($X \leftrightarrow Y$) with 1-click swap repair and topological ring closing.',
+      releaseTitle: 'Windows Desktop Release (.exe)',
+      releaseSub: 'Get the native standalone executable with full file-system integration, background worker threads, and zero installation friction.',
+      winReqs: 'Compatible with Windows 11 & Windows 10 (64-bit) · No Python or GDAL installation required.',
+      featuresTitle: 'Built for High-Stakes GIS Engineering',
+      featuresSub: 'Engineered for surveyors, urban planners, GIS cartographers, and defense contractors demanding absolute coordinate integrity.',
+      desktopVsWebTitle: 'Desktop App vs. Web GIS Workbench',
+      desktopVsWebSub: 'Both editions are 100% free, open source, and privacy-preserving. Choose the workflow that fits your team.',
+      ghPagesDeployTitle: 'Deployable Directly via GitHub Pages',
+      ghPagesDeploySub: 'This presentation website is already packaged inside the repository /docs folder for instant 1-click hosting on GitHub.',
+      footerBy: 'OmniGeo by Maodo · Open Source Geospatial Engineering',
+    },
   },
   fr: {
     common: {
       langEn: 'EN',
       langFr: 'FR',
+      langAr: 'عربي',
       loading: 'Chargement...',
       close: 'Fermer',
       save: 'Enregistrer',
@@ -588,6 +651,7 @@ export const translations: Record<Language, Translations> = {
       labTab: 'Labo de conversion',
       mapTab: 'Studio carto',
       monitorTab: 'Supervision',
+      showcaseTab: 'Présentation',
       commands: 'Commandes',
       commandsKbd: '⌘K',
       toolsAndPresets: 'Outils & Profils',
@@ -827,6 +891,339 @@ export const translations: Record<Language, Translations> = {
       colDuration: 'Durée',
       colStatus: 'Statut',
     },
+    showcase: {
+      badge: 'Version Officielle v1.0.0 · Windows x64 & SIG Web',
+      heroTitlePrefix: 'L\'Atelier ',
+      heroTitleHighlight: 'Géospatial Haute Précision',
+      heroTitleSuffix: ' de Référence.',
+      heroSubtitle: 'OmniGeo par Maodo propose une plateforme locale et étanche pour convertir, reprojeter, valider, calculer des surfaces et consolider des GeoPackages OGC avec une rigueur géodésique absolue.',
+      downloadExeBtn: 'Télécharger pour Windows (.exe)',
+      downloadExeSub: 'v1.0.0 (Installeur x64) · ~85 Mo · SHA-256 Vérifié',
+      launchWebBtn: 'Lancer l\'Atelier Web',
+      viewGitHubBtn: 'Voir sur GitHub',
+      airGappedCardTitle: '100% Local & Isolé (Air-Gapped)',
+      airGappedCardDesc: 'Zéro télémétrie, aucune requête sortante. SQLite WebAssembly et PROJ4 garantissent la confidentialité intégrale de vos données cadastrales et géodésiques.',
+      formatCardTitle: 'Conversion Universelle de Vecteurs',
+      formatCardDesc: 'Interopérabilité complète par lot entre OGC GeoPackage (.gpkg), suite ESRI Shapefile (.shp), GeoJSON RFC 7946, KML Google Earth et CSV spatial.',
+      projCardTitle: 'Moteur PROJ & Catalogue 6 900+ EPSG',
+      projCardDesc: 'Transformations ellipsoïdales mathématiques rigoureuses (WGS 84, Lambert-93, UTM, Web Mercator) avec calcul en temps réel du décalage de datum.',
+      doctorCardTitle: 'Docteur Spatial Pré-vol',
+      doctorCardDesc: 'Diagnostic heuristique d\'inversion d\'axes ($X \leftrightarrow Y$ / Lat vs Lon) avec réparation en 1 clic et fermeture topologique des anneaux.',
+      releaseTitle: 'Version Bureau Windows (.exe)',
+      releaseSub: 'Obtenez l\'exécutable natif avec intégration complète au système de fichiers, exécution multithread en arrière-plan et zéro dépendance externe.',
+      winReqs: 'Compatible Windows 11 & Windows 10 (64 bits) · Aucune installation préalable de Python ou GDAL requise.',
+      featuresTitle: 'Conçu pour l\'Ingénierie Géomatique Exigeante',
+      featuresSub: 'Développé pour les géomètres-experts, cartographes, bureaux d\'études et acteurs publics exigeant une intégrité géométrique sans faille.',
+      desktopVsWebTitle: 'Application Bureau vs Atelier SIG Web',
+      desktopVsWebSub: 'Les deux versions sont 100% gratuites, open source et respectueuses de votre vie privée.',
+      ghPagesDeployTitle: 'Déployable Directement sur GitHub Pages',
+      ghPagesDeploySub: 'Ce site de présentation est déjà prêt dans le dossier /docs du dépôt pour un hébergement en 1 clic sur GitHub Pages.',
+      footerBy: 'OmniGeo par Maodo · Ingénierie Géospatiale Open Source',
+    },
+  },
+  ar: {
+    common: {
+      langEn: 'EN',
+      langFr: 'FR',
+      langAr: 'عربي',
+      loading: 'جارٍ التحميل...',
+      close: 'إغلاق',
+      save: 'حفظ',
+      cancel: 'إلغاء',
+      delete: 'حذف',
+      apply: 'تطبيق',
+      search: 'بحث...',
+      all: 'الكل',
+      features: 'معالم',
+      layers: 'طبقات',
+      records: 'سجلات',
+      valid: 'صالح',
+      warning: 'تنبيه',
+      invalid: 'غير صالح',
+      selected: 'محدد',
+      success: 'تم بنجاح',
+      copied: 'تم النسخ',
+      copy: 'نسخ',
+      exportCsv: 'تصدير CSV',
+      actions: 'إجراءات',
+    },
+    header: {
+      brandSubtitle: 'استوديو المعالجة المكانية ورسم الخرائط',
+      airGapped: 'معالجة محلية معزولة WASM',
+      craftTab: 'ورشة الإبداع',
+      workspaceTab: 'مساحة العمل',
+      labTab: 'مختبر التحويل',
+      mapTab: 'استوديو الخرائط',
+      monitorTab: 'المراقبة',
+      showcaseTab: 'العرض التقديمي',
+      commands: 'الأوامر',
+      commandsKbd: 'K⌘',
+      toolsAndPresets: 'الأدوات والإعدادات',
+      activePreset: 'الإعداد النشط',
+      spatialDoctor: 'طبيب البيانات المكانية',
+      spatialDoctorDesc: 'كشف انعكاس خطوط العرض/الطول والإصلاح التلقائي',
+      schemaHarmonizer: 'موفق مخططات البيانات',
+      schemaHarmonizerDesc: 'توحيد الحقول المتباينة بين الملفات المتعددة',
+      qaqcAudit: 'شهادة تدقيق الجودة QA/QC',
+      qaqcAuditDesc: 'عرض ختم المطابقة الجيوديسية المشفر',
+      desktopApp: 'تطبيق سطح المكتب',
+      desktopAppDesc: 'بناء ملف تثبيت ويندوز',
+      dryRun: 'تشغيل تجريبي افتراضي',
+      dryRunOn: 'تجريبي مفعّل',
+      dryRunOff: 'تجريبي معطّل',
+      processBatch: 'بدء المعالجة',
+      dryCheck: 'فحص تجريبي',
+    },
+    craft: {
+      heroBadge: 'استوديو OmniGeo المتقدم',
+      heroTitlePrefix: 'ما الذي ترغب في ',
+      heroTitleCraft: 'صناعته',
+      heroTitleSuffix: ' اليوم؟',
+      heroSubtitle: 'احسب المساحات الجيوديسية، جمّع البيانات المكانية حسب الحقول، حول نظم الإحداثيات، أو ادمج حزم GeoPackage متعددة الطبقات في ثوانٍ معدودة.',
+      targetDataset: 'مجموعة البيانات النشطة:',
+      searchPlaceholder: 'ابحث عن خوارزمية أو أمر (مساحة، تجميع، GeoPackage، طبيب)...',
+      allCrafts: 'كافة الأدوات',
+      catAnalytics: 'المساحات والتجميع',
+      catGeodesy: 'الأنظمة والتحويل الجيوديسي',
+      catPackaging: 'الحزم وتعدد الطبقات',
+      catQuality: 'فحص الجودة والتحقق',
+      catMap: 'الخرائط والمفاتيح',
+      calcHaTitle: 'حساب المساحات بالهكتار (ha)',
+      calcHaDesc: 'يحسب المساحة الجيوديسية الكروية لكافة المضلعات ويضيف تلقائياً عمود "surface_ha" لجدول البيانات.',
+      calcHaBtn: 'حساب بالهكتار',
+      calcHaToast: 'تم حساب المساحات بالهكتار! تمت إضافة العمود الجديد.',
+      calcM2Title: 'حساب المساحات بالمتر المربع (m²)',
+      calcM2Desc: 'حساب عالي الدقة للمساحات مع إضافة عمود "surface_m2" للتقييم العقاري والمساحي.',
+      calcM2Btn: 'حساب بالمتر المربع',
+      calcM2Toast: 'تم حساب المساحات بالمتر المربع! تمت إضافة العمود الجديد.',
+      aggregateTitle: 'تجميع المعالم حسب حقل',
+      aggregateDesc: 'تجميع المعالم المكانية حسب المنطقة وحساب العدد والمجموع والمتوسط والحد الأدنى والأقصى وإضافتها كعمود جديد.',
+      aggregateBtn: 'فتح أداة التجميع',
+      reprojectWgs84Title: 'التحويل إلى نظام GPS العالمي (WGS 84 - EPSG:4326)',
+      reprojectWgs84Desc: 'تحويل إحداثيات المساقط الوطنية إلى خطوط طول وعرض كروية ملائمة لتطبيقات الويب ونظام الملاحة.',
+      reprojectWgs84Btn: 'تحديد WGS 84 كهدف',
+      reprojectWgs84Toast: 'تم ضبط مسار التحويل إلى WGS 84 (EPSG:4326).',
+      reprojectMercatorTitle: 'التحويل إلى Web Mercator (EPSG:3857)',
+      reprojectMercatorDesc: 'تحويل الإحداثيات إلى مسقط مركاتور القياسي لخرائط الويب الرقمية.',
+      reprojectMercatorBtn: 'تحديد Web Mercator كهدف',
+      reprojectMercatorToast: 'تم ضبط مسار التحويل إلى EPSG:3857.',
+      gpkgBundleTitle: 'تجميع حزمة GeoPackage موحدة ومتعددة الطبقات',
+      gpkgBundleDesc: 'دمج كافة الملفات المكانية في ملف SQLite جيوديسي واحد متوافق مع معايير OGC مع إنشاء مشروع QGIS جاهز.',
+      gpkgBundleBtn: 'تكوين حزمة GPKG',
+      gpkgBundleToast: 'تم تفعيل وضع دمج GeoPackage المتعدد الطبقات.',
+      shpTitle: 'التحويل إلى حزمة ESRI Shapefile (.zip)',
+      shpDesc: 'تصدير أرشيف ZIP منظم يحافظ تلقائياً على الملفات المرافقة (.shp, .shx, .dbf, .prj).',
+      shpBtn: 'تحديد Shapefile كهدف',
+      shpToast: 'تم ضبط صيغة الإخراج إلى Shapefile ZIP.',
+      doctorTitle: 'فحص السلامة الجيوديسية والإصلاح',
+      doctorDesc: 'فحص فوري لانعكاس الإحداثيات (Lat ↔ Lon) وتصحيح العقد المكررة وإغلاق حلقات المضلعات بنقرة واحدة.',
+      doctorBtn: 'تشغيل طبيب البيانات',
+      harmonizerTitle: 'موفق مخططات البيانات وتوحيد الأعمدة',
+      harmonizerDesc: 'مطابقة الحقول ذات التسميات المختلفة من مقاولين متعددين في مخطط موحد قياسي.',
+      harmonizerBtn: 'فتح موفق المخططات',
+      certTitle: 'شهادة المطابقة والتدقيق الجيوديسي QA/QC',
+      certDesc: 'وثيقة رسمية مشفرة بتوقيع SHA-256 توثق معدلات النجاح والتحويل الجيوديسي قابلة للطباعة والتصدير.',
+      certBtnView: 'عرض الشهادة المعتمدة',
+      certBtnRun: 'تشغيل الدفعة لإنشاء الشهادة',
+      certToast: 'قم بتشغيل معالجة الدفعة لإنشاء شهادة التدقيق المشفرة.',
+      mapStudioTitle: 'فحص المعالم في استوديو الخرائط',
+      mapStudioDesc: 'استكشاف الطبقات المكانية بمفتاح خريطة منفصل وستارة مقارنة تفاعلية قبل/بعد التحويل.',
+      mapStudioBtn: 'فتح الخريطة التفاعلية',
+      desktopTitle: 'تطبيق سطح المكتب لويندوز (Electron x64)',
+      desktopDesc: 'معمارية مستقلة تعمل دون اتصال بالإنترنت مع استهلاك أمثل للذاكرة وواجهة برمجية بايثون متقدمة.',
+      desktopBtn: 'تعليمات معمارية سطح المكتب',
+      shortcutsTitle: 'مرجع الأوامر السريعة والاختصارات',
+      shortcutsSub: 'أدوات مساعدة لرفع كفاءة المعالجة الجيوديسية',
+      scPalette: 'لوحة الأوامر السريعة للتنقل والتحويل الفوري',
+      scSurface: 'حساب المساحة الجيوديسية بالهكتار والمتر المربع',
+      scAgg: 'تجميع إحصائي حسب الحقل وإضافته كعمود',
+      scLegend: 'مفتاح رموز خريطة مستقل وستارة تقسيم تفاعلية',
+    },
+    workspace: {
+      queueTitle: 'قائمة المعالجة الجغرافية',
+      filesCount: 'ملفات',
+      totalFeatures: 'معالم',
+      totalSize: 'الحجم الإجمالي',
+      warningsCount: 'تنبيهات',
+      invalidCount: 'غير صالح',
+      fixWarnings: 'إصلاح التنبيهات',
+      loadSamples: 'تحميل عينات بيانات SIG',
+      addFiles: 'إضافة ملفات',
+      removeSelected: 'حذف المحدد',
+      searchPlaceholder: 'بحث بالاسم، الصيغة، أو نظام الإحداثيات...',
+      allFormats: 'كافة الصيغ',
+      allStatuses: 'كافة الحالات',
+      dropzoneTitle: 'اسحب وأفلت الملفات المكانية هنا، أو انقر للاستعراض',
+      dropzoneSubtitle: 'يدعم GeoPackage وShapefile (.shp/.zip) وGeoJSON وKML وCSV مع خطوط الطول والعرض',
+      supportedFormatsBadge: 'استيراد محلي معزول بالكامل',
+      uploadErrorTitle: 'تعذر استيراد بعض الملفات',
+      dismissUploadError: 'إغلاق',
+      colName: 'اسم الملف',
+      colFormat: 'الصيغة',
+      colCrs: 'نظام الإحداثيات',
+      colFeatures: 'المعالم',
+      colSize: 'الحجم',
+      colStatus: 'الحالة',
+      colActions: 'الإجراءات',
+    },
+    lab: {
+      title: 'مختبر التحويل والمعاملات الجيوديسية',
+      subtitle: 'تشفير الصيغة المستهدفة، تحويل المساقط عبر PROJ، وسياسات المخططات وتفادي التعارض',
+      activePipeline: 'المسار النشط:',
+      section1Title: 'صيغة الإخراج المستهدفة',
+      selectedFormat: 'الصيغة المحددة:',
+      section2Title: 'المرجع والتحويل الجيوديسي (CRS)',
+      browseCrs: 'استعراض الكتالوج',
+      changeCrs: 'تغيير النظام',
+      areaOfUse: 'نطاق الاستخدام:',
+      units: 'الوحدات:',
+      presetsTitle: 'الإعدادات الجيوديسية الشائعة',
+      coordOperation: 'عملية الإحداثيات:',
+      reprojectTitle: 'إعادة الإسقاط (حساب رياضي حقيقي عبر PROJ)',
+      reprojectDesc: 'يحسب إحداثيات جديدة بدقة مليمترية بناءً على معادلات الإهليلج الرياضية.',
+      assignTitle: 'تعيين المرجع فقط (تعديل البيانات الوصفية)',
+      assignDesc: 'يعدل بطاقة تعريف نظام الإحداثيات دون تغيير القيم العددية للنقاط.',
+      section3Title: 'سياسة تسمية الملفات وتفادي التعارض',
+      namingPattern: 'نمط تسمية الملفات:',
+      availableTokens: 'الرموز المتاحة:',
+      collisionPolicy: 'سياسة معالجة الملفات المكررة:',
+      collisionRename: 'إعادة التسمية التلقائية',
+      collisionOverwrite: 'استبدال مباشر',
+      collisionSkip: 'تخطي الملف الموجود',
+      section4Title: 'أداء المعالجة وضوابط الجودة',
+      workerLimit: 'الحد الأقصى لمعالجات المعالجة المتزامنة:',
+      workerPoolDesc: 'يعزل مهام المعالجة في خيوط مستقلة لحماية ذاكرة النظام وسرعة التخزين.',
+      validateGeom: 'التحقق الهندسي الصارم قبل التصدير',
+      validateGeomDesc: 'يفحص الحلقات غير المغلقة والقيم غير المعرفة NaNs أثناء المعالجة.',
+      section5Title: 'تجميع حزمة GeoPackage الموحدة مع مشروع QGIS',
+      consolidateGpkg: 'دمج كافة ملفات الدفعة في ملف GeoPackage موحد (.gpkg)',
+      consolidateGpkgDesc: 'يجمع كل المخرجات في قاعدة بيانات SQLite مكانية واحدة متوافقة مع معايير OGC.',
+      containerName: 'اسم ملف الحزمة الموحدة:',
+      generateQgis: 'إنشاء ملف مشروع QGIS 3.x (.qgs) مع الرموز وتجميع الطبقات',
+      integrityWorkflows: 'أدوات سلامة البيانات المكانية',
+      integrityDesc: 'تحسين التوافق وضبط المسميات وإصلاح الأخطاء الطوبولوجية',
+      doctorBtn: 'طبيب البيانات المكانية',
+      harmonizerBtn: 'موفق مخططات البيانات',
+    },
+    map: {
+      hideLegend: 'إخفاء المفتاح',
+      showLegend: 'إظهار المفتاح',
+      layerLabel: 'الطبقة:',
+      calcSurfaces: 'حساب المساحة',
+      selectUnit: 'اختر وحدة المساحة:',
+      unitHa: 'هكتار (ha)',
+      unitM2: 'متر مربع (m²)',
+      unitKm2: 'كيلومتر مربع (km²)',
+      unitAcres: 'أكر (Acres)',
+      aggregateBtn: 'تجميع إحصائي',
+      extentBtn: 'امتداد الطبقة',
+      swipeOn: 'إلغاء التقسيم',
+      swipeBtn: 'ستارة المقارنة',
+      basemapDark: 'داكن',
+      basemapOsm: 'شوارع OSM',
+      basemapSatellite: 'أقمار صناعية',
+      basemapGrid: 'شبكة مكانية',
+      legendTitle: 'مفتاح الخريطة والرموز',
+      recordCount: 'عدد السجلات:',
+      datumCrs: 'المرجع الجيوديسي:',
+      symbologyColor: 'لون رموز الطبقة:',
+      fillOpacity: 'شفافية التعبئة:',
+      targetReprojection: 'إعادة الإسقاط المستهدفة',
+      conformalDrift: 'انحراف شكلي تحت المليمتر تم التحقق منه عبر خط أنابيب PROJ 9.3.',
+      quickActions: 'إجراءات تحليلية سريعة:',
+      zoomExtent: 'تكبير إلى الامتداد',
+      allLayers: 'كافة طبقات مساحة العمل',
+      attrTableTab: 'جدول البيانات الوصفية',
+      metadataTab: 'البيانات الوصفية والحدود',
+      validationTab: 'تدقيق التحقق والصلاحية',
+      exportCsv: 'تصدير CSV',
+      filterRowsPlaceholder: 'تصفية الصفوف...',
+      noAttributes: 'لا توجد حقول وصفية في هذه الطبقة.',
+      sourceLeft: 'المصدر الأصلي',
+      reprojectedRight: 'بعد إعادة الإسقاط',
+      featureAttributes: 'خصائص المعلم',
+      detectedCrs: 'نظام الإحداثيات المكتشف',
+      geomType: 'نوع الهندسة المكانية',
+      extentMin: 'الحد الأدنى للنطاق [MinX, MinY]',
+      extentMax: 'الحد الأقصى للنطاق [MaxX, MaxY]',
+      allPassed: 'تم اجتياز جميع اختبارات الصلاحية الهندسية وحدود نظام الإحداثيات بنجاح. خالية من العقد الطوبولوجية.',
+      mapProjectionError: 'تعذر تحويل الطبقة لإحداثيات الخريطة:',
+      mapProjectionWarning: 'تنبيه: يستخدم عرض الخريطة تحويلاً تقريبياً للمرجع نظراً لعدم توفر ملف الشبكة المطلوب.',
+    },
+    aggregation: {
+      title: 'تجميع الحقول والذكاء الوصفي',
+      subtitle: 'تجميع المعالم المكانية حسب حقول تصنيفية، وحساب الإحصائيات، وإضافتها كعمود جديد.',
+      groupByField: 'تجميع حسب الحقل:',
+      metricLabel: 'مؤشر التجميع:',
+      countFeatures: 'عدد المعالم (Count)',
+      sumField: 'مجموع الحقل (Sum)',
+      meanField: 'المتوسط الحسابي (Mean)',
+      minField: 'القيمة الصغرى (Min)',
+      maxField: 'القيمة العظمى (Max)',
+      numericField: 'الحقل العددي المحسوب:',
+      summaryTitle: 'ملخص التجميع الإحصائي',
+      totalFeatures: 'إجمالي المعالم:',
+      categoryCol: 'الفئة',
+      countCol: 'عدد المعالم',
+      pctCol: '% من الإجمالي',
+      distCol: 'التوزيع',
+      appendTitle: 'إضافة كعمود جديد لكافة المعالم',
+      appendDesc: 'سيحصل كل معلم في مجموعة البيانات على هذا العمود الجديد معبأ بالقيمة المجمعة لمجموعته.',
+      addColumnBtn: 'إضافة العمود',
+      exportCsvBtn: 'تصدير CSV',
+      toastAdded: 'تمت إضافة العمود الجديد بنجاح إلى مجموعة البيانات!',
+    },
+    monitor: {
+      title: 'مراقبة تنفيذ المهام في الوقت الفعلي',
+      subtitle: 'مسار تحويل WASM معزول ومؤشرات تدفق البيانات',
+      overallProgress: 'التقدم الكلي للدفعة',
+      statusRunning: 'جارٍ المعالجة',
+      statusIdle: 'في الانتظار / جاهز',
+      cardCompleted: 'ملفات مكتملة',
+      cardWarnings: 'مكتملة مع تنبيهات',
+      cardFailed: 'مهام غير ناجحة',
+      cardThroughput: 'معدل المعالجة',
+      btnCancel: 'إلغاء المعالجة',
+      btnExportManifest: 'تصدير البيان (JSON)',
+      btnRetry: 'إعادة محاولة الفاشلة',
+      btnViewCert: 'عرض شهادة التدقيق',
+      btnDownloadBundle: 'تنزيل حزمة GPKG + QGIS (.zip)',
+      queueHeader: 'مسار تنفيذ المهام',
+      colJobFile: 'الملف المصدر',
+      colTransformation: 'عملية التحويل',
+      colStage: 'المرحلة / التقدم',
+      colDuration: 'المدة',
+      colStatus: 'الحالة',
+    },
+    showcase: {
+      badge: 'الإصدار الرسمي v1.0.0 · ويندوز x64 ونظام SIG ويب',
+      heroTitlePrefix: 'المحطة الشاملة لـ ',
+      heroTitleHighlight: 'المعالجة الجيوديسية المكانية',
+      heroTitleSuffix: ' الفائقة.',
+      heroSubtitle: 'يقدم OmniGeo منصة محلية ومعزولة لتحويل، وإعادة إسقاط، والتحقق من صحة، وحساب مساحات ودمج حزم GeoPackage بدقة جيوديسية رياضية مطلقة.',
+      downloadExeBtn: 'تنزيل لنظام ويندوز (.exe)',
+      downloadExeSub: 'الإصدار 1.0.0 (مثبت x64) · ~85 ميغابايت · فحص SHA-256',
+      launchWebBtn: 'تشغيل محطة الويب',
+      viewGitHubBtn: 'عرض على GitHub',
+      airGappedCardTitle: '100% محلي ومعزول تماماً (Air-Gapped)',
+      airGappedCardDesc: 'صفر بيانات مرسلة، دون أي اتصالات خارجية. تضمن محركات SQLite WASM وPROJ4 الخصوصية التامة لبياناتك المساحية والجيوديسية الحساسة.',
+      formatCardTitle: 'تحويل شامل للملفات الشعاعية',
+      formatCardDesc: 'توافق تام بين حزم OGC GeoPackage (.gpkg) وESRI Shapefile (.shp) وGeoJSON وKML وCSV.',
+      projCardTitle: 'محرك PROJ وكتالوج 6,900+ EPSG',
+      projCardDesc: 'تحويلات إهليلجية دقيقة (WGS 84, Lambert-93, UTM, Web Mercator) مع حساب فوري لفرق المرجع (Datum Shift).',
+      doctorCardTitle: 'طبيب البيانات المكانية وفحص ما قبل الرحلة',
+      doctorCardDesc: 'كشف تلقائي عن انعكاس محاور الإحداثيات (خط العرض مقابل خط الطول) وإصلاحها بنقرة واحدة.',
+      releaseTitle: 'إصدار سطح المكتب لويندوز (.exe)',
+      releaseSub: 'احصل على الملف التنفيذي المباشر مع دعم كامل لمعالجة الملفات في الخلفية ودون الحاجة لتثبيت بايثون أو GDAL.',
+      winReqs: 'متوافق مع ويندوز 10 وويندوز 11 (64 بت) · لا يتطلب تثبيت أدوات خارجية.',
+      featuresTitle: 'مصمم لأعلى معايير الهندسة المساحية والجيوماتكس',
+      featuresSub: 'مطور للمساحين والمخططين والمهندسين والفرق المتخصصة التي تتطلب دقة مطلقة في الإحداثيات.',
+      desktopVsWebTitle: 'مقارنة تطبيق سطح المكتب ومحطة الويب',
+      desktopVsWebSub: 'كلا الإصدارين مجانيان تماماً ومفتوحا المصدر ويحافظان على سرية بياناتك 100%.',
+      ghPagesDeployTitle: 'جاهز للنشر مباشرة على GitHub Pages',
+      ghPagesDeploySub: 'موقع العرض هذا مدمج وجاهز داخل مجلد docs/ للنشر بنقرة واحدة.',
+      footerBy: 'OmniGeo بواسطة Maodo · هندسة البرمجيات الجيومكانية مفتوحة المصدر',
+    },
   },
 };
 
@@ -846,14 +1243,26 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [lang, setLangState] = useState<Language>(() => {
     try {
       const saved = localStorage.getItem('omnigeo_lang') as Language;
-      if (saved === 'en' || saved === 'fr') return saved;
-      // Default to browser language if starts with fr
+      if (saved === 'en' || saved === 'fr' || saved === 'ar') return saved;
+      // Default to browser language if starts with ar or fr
+      if (navigator.language && navigator.language.startsWith('ar')) return 'ar';
       if (navigator.language && navigator.language.startsWith('fr')) return 'fr';
     } catch {
       // ignore
     }
     return 'en';
   });
+
+  // Automatically sync dir (RTL for Arabic, LTR for English/French)
+  useEffect(() => {
+    if (lang === 'ar') {
+      document.documentElement.setAttribute('dir', 'rtl');
+      document.documentElement.setAttribute('lang', 'ar');
+    } else {
+      document.documentElement.setAttribute('dir', 'ltr');
+      document.documentElement.setAttribute('lang', lang);
+    }
+  }, [lang]);
 
   const setLang = (newLang: Language) => {
     setLangState(newLang);
@@ -874,3 +1283,4 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export const useI18n = () => useContext(I18nContext);
+
