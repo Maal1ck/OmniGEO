@@ -219,6 +219,12 @@ export interface Translations {
     colSize: string;
     colStatus: string;
     colActions: string;
+    selectFiles: string;
+    selectFolder: string;
+    includeSubfolders: string;
+    filterDataTypes: string;
+    folderScanSummary: string;
+    noMatchingFilesInFolder: string;
   };
   lab: {
     title: string;
@@ -525,6 +531,12 @@ export const translations: Record<Language, Translations> = {
       colSize: 'Size',
       colStatus: 'Status',
       colActions: 'Actions',
+      selectFiles: 'Select Files',
+      selectFolder: 'Select Folder',
+      includeSubfolders: 'Include nested subfolders',
+      filterDataTypes: 'Filter Data Types',
+      folderScanSummary: 'Found {count} dataset(s) across {folders} folder(s)',
+      noMatchingFilesInFolder: 'No geospatial files matching the selected data types were found in this folder.',
     },
     lab: {
       title: 'Conversion Lab & Geodetic Parameters',
@@ -829,6 +841,12 @@ export const translations: Record<Language, Translations> = {
       colSize: 'Taille',
       colStatus: 'Statut',
       colActions: 'Actions',
+      selectFiles: 'Sélectionner des fichiers',
+      selectFolder: 'Sélectionner un dossier',
+      includeSubfolders: 'Inclure les sous-dossiers',
+      filterDataTypes: 'Filtrer les types de données',
+      folderScanSummary: '{count} jeu(x) de données trouvé(s) dans {folders} dossier(s)',
+      noMatchingFilesInFolder: 'Aucun fichier géospatial correspondant aux types sélectionnés n\'a été trouvé dans ce dossier.',
     },
     lab: {
       title: 'Laboratoire de Conversion & Paramètres Géodésiques',
@@ -1065,6 +1083,12 @@ export const translations: Record<Language, Translations> = {
       colSize: 'الحجم',
       colStatus: 'الحالة',
       colActions: 'الإجراءات',
+      selectFiles: 'اختيار ملفات',
+      selectFolder: 'اختيار مجلد',
+      includeSubfolders: 'تضمين المجلدات الفرعية',
+      filterDataTypes: 'تصفية أنواع البيانات',
+      folderScanSummary: 'تم العثور على {count} مجموعة بيانات في {folders} مجلد',
+      noMatchingFilesInFolder: 'لم يتم العثور على أي ملفات مكانية تطابق الأنواع المحددة في هذا المجلد.',
     },
     lab: {
       title: 'مختبر التحويل والمعاملات الجيوديسية',

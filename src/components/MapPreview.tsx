@@ -450,8 +450,14 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               </button>
 
               {isSurfaceMenuOpen && (
-                <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-[#1C1714] border border-stone-700 shadow-2xl p-1 z-40 text-xs">
-                  <div className="px-2.5 py-1 text-[10px] font-mono text-stone-400 uppercase font-semibold">
+                <div className={`absolute right-0 mt-1.5 w-48 rounded-xl border p-1 z-40 text-xs shadow-2xl ${
+                  theme === 'light'
+                    ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-stone-400/25'
+                    : 'bg-[#1C1714] border-stone-700 text-stone-200 shadow-stone-950/80'
+                }`}>
+                  <div className={`px-2.5 py-1 text-[10px] font-mono uppercase font-semibold ${
+                    theme === 'light' ? 'text-stone-500' : 'text-stone-400'
+                  }`}>
                     {t.map.selectUnit}:
                   </div>
                   <button
@@ -459,40 +465,56 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                       onCalculateSurfaces('ha');
                       setIsSurfaceMenuOpen(false);
                     }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-800 text-stone-200 hover:text-amber-300 flex items-center justify-between"
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors ${
+                      theme === 'light'
+                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        : 'hover:bg-stone-800 text-stone-200 hover:text-amber-300'
+                    }`}
                   >
                     <span>{t.map.unitHa}</span>
-                    <span className="font-mono text-[10px] text-amber-400 font-bold">+surface_ha</span>
+                    <span className={`font-mono text-[10px] font-bold ${theme === 'light' ? 'text-amber-700' : 'text-amber-400'}`}>+surface_ha</span>
                   </button>
                   <button
                     onClick={() => {
                       onCalculateSurfaces('m2');
                       setIsSurfaceMenuOpen(false);
                     }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-800 text-stone-200 hover:text-amber-300 flex items-center justify-between"
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors ${
+                      theme === 'light'
+                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        : 'hover:bg-stone-800 text-stone-200 hover:text-amber-300'
+                    }`}
                   >
                     <span>{t.map.unitM2}</span>
-                    <span className="font-mono text-[10px] text-amber-400 font-bold">+surface_m2</span>
+                    <span className={`font-mono text-[10px] font-bold ${theme === 'light' ? 'text-amber-700' : 'text-amber-400'}`}>+surface_m2</span>
                   </button>
                   <button
                     onClick={() => {
                       onCalculateSurfaces('km2');
                       setIsSurfaceMenuOpen(false);
                     }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-800 text-stone-200 hover:text-amber-300 flex items-center justify-between"
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors ${
+                      theme === 'light'
+                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        : 'hover:bg-stone-800 text-stone-200 hover:text-amber-300'
+                    }`}
                   >
                     <span>{t.map.unitKm2}</span>
-                    <span className="font-mono text-[10px] text-amber-400 font-bold">+surface_km2</span>
+                    <span className={`font-mono text-[10px] font-bold ${theme === 'light' ? 'text-amber-700' : 'text-amber-400'}`}>+surface_km2</span>
                   </button>
                   <button
                     onClick={() => {
                       onCalculateSurfaces('acres');
                       setIsSurfaceMenuOpen(false);
                     }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-stone-800 text-stone-200 hover:text-amber-300 flex items-center justify-between"
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors ${
+                      theme === 'light'
+                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        : 'hover:bg-stone-800 text-stone-200 hover:text-amber-300'
+                    }`}
                   >
                     <span>{t.map.unitAcres}</span>
-                    <span className="font-mono text-[10px] text-amber-400 font-bold">+surface_acres</span>
+                    <span className={`font-mono text-[10px] font-bold ${theme === 'light' ? 'text-amber-700' : 'text-amber-400'}`}>+surface_acres</span>
                   </button>
                 </div>
               )}

@@ -5,7 +5,6 @@
 
 import React, { useState } from 'react';
 import { 
-  Download, 
   ExternalLink, 
   Github, 
   Sparkles, 
@@ -46,8 +45,6 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
   const [activeFeatureTab, setActiveFeatureTab] = useState<'formats' | 'geodesy' | 'doctor' | 'cartography' | 'audit'>('formats');
 
   const githubRepoUrl = 'https://github.com/Maal1ck/OmniGEO';
-  const exeDownloadUrl = 'https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe';
-  const releasesUrl = 'https://github.com/Maal1ck/OmniGEO/releases';
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -63,17 +60,17 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
         <div className="max-w-6xl mx-auto w-full flex items-center justify-between text-[11px] font-mono">
           <div className="flex items-center space-x-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-bold text-amber-200">OmniGeo v1.0.0 Released:</span>
-            <span className="text-stone-300 hidden sm:inline">Windows x64 Native Installer & Offline Web GIS Studio</span>
+            <span className="font-bold text-amber-200">OmniGeo v1.0.0:</span>
+            <span className="text-stone-300 hidden sm:inline">Offline Web GIS Studio & Batch Workbench</span>
           </div>
           <div className="flex items-center space-x-3">
-            <a 
-              href={exeDownloadUrl} 
-              className="text-amber-300 hover:text-white font-bold flex items-center space-x-1 underline decoration-amber-500/50"
+            <button 
+              onClick={() => onLaunchWorkbench('craft')}
+              className="text-amber-300 hover:text-white font-bold flex items-center space-x-1"
             >
-              <span>Download .EXE</span>
-              <Download className="w-3 h-3" />
-            </a>
+              <span>{t.showcase.launchWebBtn}</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
             <span className="text-stone-600">·</span>
             <a 
               href={githubRepoUrl} 
@@ -118,29 +115,23 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
 
           {/* Primary Action Buttons */}
           <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
-            {/* Windows EXE Download Button */}
-            <a
-              href={exeDownloadUrl}
-              className="group flex items-center space-x-3 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-stone-950 font-display font-bold text-sm shadow-xl shadow-amber-950/40 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
-              title="Download Windows x64 .exe release installer"
-            >
-              <div className="p-1 rounded-lg bg-stone-950/15">
-                <Download className="w-5 h-5 text-stone-950" />
-              </div>
-              <div className="text-left">
-                <span className="block leading-tight text-sm font-extrabold">{t.showcase.downloadExeBtn}</span>
-                <span className="block text-[10px] text-stone-950/80 font-mono font-medium">{t.showcase.downloadExeSub}</span>
-              </div>
-            </a>
-
-            {/* Launch Web Workbench Button */}
+            {/* Launch GIS Studio Button */}
             <button
               onClick={() => onLaunchWorkbench('craft')}
+              className="flex items-center space-x-2.5 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-stone-950 font-display font-bold text-sm shadow-xl shadow-amber-950/40 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <Sparkles className="w-4 h-4 text-stone-950 fill-current" />
+              <span>{t.showcase.launchWebBtn}</span>
+              <ArrowRight className="w-4 h-4 text-stone-950" />
+            </button>
+
+            {/* Launch Ingestion Workspace */}
+            <button
+              onClick={() => onLaunchWorkbench('workspace')}
               className="flex items-center space-x-2.5 px-6 py-3.5 rounded-2xl bg-[#1F1915] hover:bg-[#2A221C] border border-stone-700/80 hover:border-amber-500/50 text-[#FAF6F0] font-display font-bold text-sm transition-all shadow-md transform hover:-translate-y-0.5"
             >
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>{t.showcase.launchWebBtn}</span>
-              <ArrowRight className="w-4 h-4 text-stone-400" />
+              <Layers className="w-4 h-4 text-amber-400" />
+              <span>{t.header.workspaceTab}</span>
             </button>
 
             {/* View on GitHub */}
@@ -148,7 +139,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
               href={githubRepoUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center space-x-2 px-4 py-3.5 rounded-2xl bg-[#181411] hover:bg-[#221B17] border border-stone-800 text-stone-300 hover:text-white text-sm font-semibold transition-colors"
+              className="flex items-center space-x-2 px-5 py-3.5 rounded-2xl bg-[#181411] hover:bg-[#221B17] border border-stone-800 text-stone-300 hover:text-white text-sm font-semibold transition-colors"
             >
               <Github className="w-4 h-4 text-stone-400" />
               <span>{t.showcase.viewGitHubBtn}</span>
@@ -172,13 +163,13 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
           </div>
         </section>
 
-        {/* 3. DOWNLOAD & RELEASE CENTER */}
+        {/* 3. LOCAL-FIRST AIR-GAPPED ARCHITECTURE SPOTLIGHT */}
         <section className="relative rounded-3xl p-8 bg-gradient-to-br from-[#1C1713] via-[#16120F] to-[#120E0C] border border-amber-600/40 shadow-2xl overflow-hidden">
           <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
             <div className="space-y-4 max-w-xl">
               <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-amber-950 text-amber-300 border border-amber-600/40 text-[11px] font-mono font-semibold">
-                <Monitor className="w-3.5 h-3.5 text-amber-400" />
-                <span>Windows 64-bit Native Desktop</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>100% Client-Side Air-Gapped Engine</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-display font-bold text-[#FAF6F0]">
                 {t.showcase.releaseTitle}
@@ -189,20 +180,20 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
               
               <div className="p-3.5 rounded-xl bg-[#110E0C] border border-stone-800 font-mono text-xs space-y-1.5">
                 <div className="flex justify-between text-stone-400 text-[11px]">
-                  <span>Artifact:</span>
-                  <span className="text-amber-300 font-semibold">OmniGeo-Setup-1.0.0-x64.exe</span>
+                  <span>Ingestion Engine:</span>
+                  <span className="text-amber-300 font-semibold">Manual Files &amp; Recursive Folder Tree Ingestion</span>
                 </div>
                 <div className="flex justify-between text-stone-400 text-[11px]">
-                  <span>Release Tag:</span>
-                  <span className="text-stone-200">v1.0.0 (Latest Release)</span>
+                  <span>Core Mathematics:</span>
+                  <span className="text-stone-200">PROJ 9.3 + WebAssembly SQLite Geodesy</span>
                 </div>
                 <div className="flex justify-between text-stone-400 text-[11px]">
-                  <span>License:</span>
-                  <span className="text-emerald-400">Apache 2.0 (Open Source)</span>
+                  <span>Telemetry &amp; Privacy:</span>
+                  <span className="text-emerald-400">Zero Cloud Uploads · Total Privacy</span>
                 </div>
                 <div className="flex justify-between text-stone-400 text-[11px]">
-                  <span>SmartScreen Tip:</span>
-                  <span className="text-stone-300">Click &ldquo;More info&rdquo; &rarr; &ldquo;Run anyway&rdquo;</span>
+                  <span>Format Support:</span>
+                  <span className="text-stone-300">GeoPackage, Shapefile, GeoJSON, KML, CSV</span>
                 </div>
               </div>
 
@@ -213,33 +204,20 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
 
             {/* Action Box */}
             <div className="w-full lg:w-auto flex flex-col items-center sm:items-end space-y-3 flex-shrink-0">
-              <a
-                href={exeDownloadUrl}
+              <button
+                onClick={() => onLaunchWorkbench('workspace')}
                 className="w-full sm:w-auto flex items-center justify-center space-x-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-display font-extrabold text-base shadow-2xl shadow-amber-950/60 transition-all transform hover:scale-105 active:scale-95"
               >
-                <Download className="w-5 h-5" />
-                <span>Download .EXE (x64)</span>
-              </a>
+                <Layers className="w-5 h-5" />
+                <span>{t.header.workspaceTab}</span>
+              </button>
 
-              <div className="flex items-center space-x-3 text-xs font-mono">
-                <a
-                  href={releasesUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-stone-400 hover:text-amber-300 underline flex items-center space-x-1"
-                >
-                  <span>All Release Assets</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-                <span className="text-stone-600">·</span>
-                <button
-                  onClick={() => copyToClipboard(exeDownloadUrl, 'link')}
-                  className="text-stone-400 hover:text-amber-300 flex items-center space-x-1"
-                >
-                  {copiedCmd === 'link' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  <span>{copiedCmd === 'link' ? 'Copied' : 'Copy Direct URL'}</span>
-                </button>
-              </div>
+              <button
+                onClick={() => onLaunchWorkbench('craft')}
+                className="text-xs font-mono text-stone-400 hover:text-amber-300 underline flex items-center space-x-1"
+              >
+                <span>{t.showcase.launchWebBtn} &rarr;</span>
+              </button>
             </div>
           </div>
         </section>
@@ -605,13 +583,12 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
           </div>
 
           <div className="flex items-center space-x-4">
-            <a href={exeDownloadUrl} className="text-amber-400 hover:text-white font-bold flex items-center space-x-1">
-              <Download className="w-3.5 h-3.5" />
-              <span>Windows .EXE</span>
-            </a>
-            <a href={releasesUrl} target="_blank" rel="noopener noreferrer" className="hover:text-stone-200">
-              Releases
-            </a>
+            <button 
+              onClick={() => onLaunchWorkbench('craft')} 
+              className="text-amber-400 hover:text-white font-bold flex items-center space-x-1"
+            >
+              <span>{t.showcase.launchWebBtn}</span>
+            </button>
             <a href={githubRepoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-stone-200 flex items-center space-x-1">
               <Github className="w-3.5 h-3.5" />
               <span>GitHub</span>

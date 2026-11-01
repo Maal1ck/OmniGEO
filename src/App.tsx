@@ -9,7 +9,6 @@ import {
   SchemaHarmonizerConfig, 
   SpatialDataset 
 } from './types/gis';
-import { createSampleDatasets } from './core/sampleDatasets';
 import { executeConversionJob, generateBatchManifest, resolveOutputFileName } from './core/conversionEngine';
 import { PRESET_PROFILES } from './core/presets';
 import { Header, NavTab } from './components/Header';
@@ -34,9 +33,9 @@ import { useTheme } from './core/theme';
 
 export default function App() {
   const { theme } = useTheme();
-  // Pre-load high quality sample datasets on first load
-  const [datasets, setDatasets] = useState<SpatialDataset[]>(() => createSampleDatasets());
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(() => 'demo-parcels');
+  // Work queue starts clean for user imports
+  const [datasets, setDatasets] = useState<SpatialDataset[]>([]);
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<NavTab>('craft');
 
   // Conversion settings
@@ -63,7 +62,7 @@ export default function App() {
   const [harmonizerConfig, setHarmonizerConfig] = useState<SchemaHarmonizerConfig>(() => ({
     enabled: false,
     casingMode: 'none',
-    rules: generateAutoHarmonizerRules(createSampleDatasets()),
+    rules: [],
   }));
 
   const [qaqcReport, setQaqcReport] = useState<QAQCReportData | null>(null);
@@ -108,17 +107,6 @@ export default function App() {
   const handlePreviewOnMap = (dataset: SpatialDataset) => {
     setSelectedDatasetId(dataset.id);
     setActiveTab('map');
-  };
-
-  // Load sample data
-  const handleLoadSampleData = () => {
-    const samples = createSampleDatasets();
-    setDatasets(samples);
-    setSelectedDatasetId(samples[0]?.id || null);
-    setHarmonizerConfig(prev => ({
-      ...prev,
-      rules: generateAutoHarmonizerRules(samples),
-    }));
   };
 
   // Update a single dataset from Pre-Flight Doctor
@@ -352,7 +340,7 @@ export default function App() {
 
   return (
     <div className={`flex flex-col h-screen w-screen overflow-hidden font-sans antialiased transition-colors duration-200 ${
-      theme === 'light' ? 'bg-white text-stone-900' : 'bg-[#13110E] text-[#F5EBE1]'
+      theme === 'light' ? 'bg-[#F8F6F1] text-[#1C1917]' : 'bg-[#13110E] text-[#F5EBE1]'
     }`}>
       {/* App Header */}
       <Header
@@ -404,7 +392,6 @@ export default function App() {
             selectedDatasetId={selectedDatasetId}
             setSelectedDatasetId={setSelectedDatasetId}
             onPreviewOnMap={handlePreviewOnMap}
-            onLoadSampleData={handleLoadSampleData}
             onOpenSpatialDoctor={() => setIsDoctorOpen(true)}
             onCalculateSurfaces={handleCalculateSurfaces}
             onOpenAggregationModal={() => setIsAggregationModalOpen(true)}
@@ -467,7 +454,6 @@ export default function App() {
         onClose={() => setIsCommandPaletteOpen(false)}
         setActiveTab={setActiveTab}
         onStartBatch={handleStartBatch}
-        onLoadSampleData={handleLoadSampleData}
         onSetFormat={(fmt) => setSettings(s => ({ ...s, targetFormat: fmt }))}
         onSetCRS={(code) => setSettings(s => ({ ...s, targetCRS: code }))}
         onToggleDryRun={() => setSettings(s => ({ ...s, isDryRun: !s.isDryRun }))}

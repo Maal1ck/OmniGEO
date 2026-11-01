@@ -29,6 +29,7 @@ import { SpatialDataset, BatchSettings, ConsolidationSettings } from '../types/g
 import { SurfaceUnit } from '../core/spatialAnalytics';
 import { NavTab } from './Header';
 import { useI18n } from '../core/i18n';
+import { useTheme } from '../core/theme';
 
 interface CraftStudioProps {
   datasets: SpatialDataset[];
@@ -68,6 +69,7 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
   hasCertificate,
 }) => {
   const { t, lang } = useI18n();
+  const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
@@ -268,13 +270,13 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
     },
     {
       id: 'website-showcase',
-      title: lang === 'fr' ? 'Site Web Officiel & Téléchargement .EXE' : 'Product Website & Windows .EXE Release',
+      title: lang === 'fr' ? 'Site Web Officiel & Présentation du Produit' : 'Official Product Website & Presentation',
       category: 'quality',
-      description: lang === 'fr' ? 'Découvrez la présentation complète d\'OmniGeo par Maodo et téléchargez l\'exécutable natif Windows x64.' : 'Explore the comprehensive OmniGeo by Maodo presentation website and download the standalone Windows x64 .exe release.',
+      description: lang === 'fr' ? 'Découvrez la présentation complète d\'OmniGeo par Maodo et explorez toutes ses fonctionnalités géospatiales.' : 'Explore the comprehensive OmniGeo by Maodo interactive product showcase, architecture, and geodetic features.',
       icon: Globe,
-      badge: 'Release v1.0.0',
+      badge: 'Product Tour',
       badgeColor: 'bg-amber-950 text-amber-300 border-amber-700/50',
-      actionLabel: lang === 'fr' ? 'Voir le Site / .EXE' : 'Open Website / .EXE',
+      actionLabel: lang === 'fr' ? 'Voir le Site' : 'Explore Website',
       onExecute: () => {
         setActiveTab('showcase');
       },
@@ -357,15 +359,19 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
                     const ds = datasets.find(d => d.id === e.target.value);
                     if (ds) onSelectDataset(ds);
                   }}
-                  className="bg-[#241D18] border border-stone-700/80 rounded-xl px-3 py-1.5 text-xs text-amber-300 font-mono font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
+                  className={`border rounded-xl px-3 py-1.5 text-xs font-mono font-semibold focus:outline-none focus:border-amber-500 cursor-pointer ${
+                    theme === 'light'
+                      ? 'bg-[#FAF7F2] border-[#D6CEBE] text-stone-900'
+                      : 'bg-[#241D18] border-stone-700/80 text-amber-300'
+                  }`}
                 >
                   {datasets.map(d => (
-                    <option key={d.id} value={d.id} className="bg-stone-900 text-stone-100">
+                    <option key={d.id} value={d.id} className={theme === 'light' ? 'bg-white text-stone-900' : 'bg-stone-900 text-stone-100'}>
                       {d.name} ({d.geometryType} · {d.featureCount} {t.common.features})
                     </option>
                   ))}
                 </select>
-                <span className="text-stone-500 text-[11px] font-mono">
+                <span className={`text-[11px] font-mono ${theme === 'light' ? 'text-stone-500' : 'text-stone-500'}`}>
                   CRS: {currentDataset?.detectedCRS?.code || 'WGS84'}
                 </span>
               </div>
@@ -374,13 +380,17 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
 
           {/* Search Bar */}
           <div className="relative mt-6 max-w-xl">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${theme === 'light' ? 'text-stone-400' : 'text-stone-400'}`} />
             <input
               type="text"
               placeholder={t.craft.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#13110E]/90 border border-stone-700/80 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/40 shadow-inner"
+              className={`w-full border rounded-2xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/40 shadow-inner ${
+                theme === 'light'
+                  ? 'bg-white border-[#D6CEBE] text-stone-900 placeholder-stone-400'
+                  : 'bg-[#13110E]/90 border-stone-700/80 text-stone-100 placeholder-stone-500'
+              }`}
             />
           </div>
         </div>
@@ -393,8 +403,10 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
               onClick={() => setSelectedCategory(c.id)}
               className={`px-3.5 py-1.5 rounded-xl font-medium transition-all whitespace-nowrap ${
                 selectedCategory === c.id
-                  ? 'bg-amber-600 text-stone-950 font-bold shadow-md shadow-amber-950/30'
-                  : 'bg-[#1C1714] text-stone-400 hover:text-stone-200 hover:bg-[#251E19] border border-stone-800'
+                  ? 'bg-amber-600 text-stone-950 font-bold shadow-md shadow-amber-950/20'
+                  : theme === 'light'
+                    ? 'bg-white text-stone-700 hover:text-stone-950 hover:bg-[#F2ECE3] border border-[#E2DBD0] shadow-xs'
+                    : 'bg-[#1C1714] text-stone-400 hover:text-stone-200 hover:bg-[#251E19] border border-stone-800'
               }`}
             >
               {c.label}

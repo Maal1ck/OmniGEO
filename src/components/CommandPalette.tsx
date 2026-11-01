@@ -15,8 +15,7 @@ import {
   X, 
   Stethoscope, 
   TableProperties, 
-  Award,
-  Download
+  Award
 } from 'lucide-react';
 import { NavTab } from './Header';
 
@@ -34,7 +33,6 @@ interface CommandPaletteProps {
   onClose: () => void;
   setActiveTab: (tab: NavTab) => void;
   onStartBatch: () => void;
-  onLoadSampleData: () => void;
   onSetFormat: (format: any) => void;
   onSetCRS: (crsCode: string) => void;
   onToggleDryRun: () => void;
@@ -52,7 +50,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onClose,
   setActiveTab,
   onStartBatch,
-  onLoadSampleData,
   onSetFormat,
   onSetCRS,
   onToggleDryRun,
@@ -127,13 +124,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       run: () => { setActiveTab('showcase'); onClose(); },
     },
     {
-      id: 'act-download-exe',
-      title: 'Download Windows x64 Native Installer (.exe)',
-      category: 'Action',
-      icon: <Download className="w-4 h-4 text-emerald-400" />,
-      run: () => { window.open('https://github.com/Maal1ck/OmniGEO/releases/latest/download/OmniGeo-Setup-1.0.0-x64.exe', '_blank'); onClose(); },
-    },
-    {
       id: 'act-view-github',
       title: 'Open GitHub Repository (Maal1ck/OmniGEO)',
       category: 'Action',
@@ -149,13 +139,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       icon: <Play className="w-4 h-4 text-indigo-400" />,
       shortcut: '↵',
       run: () => { onStartBatch(); onClose(); },
-    },
-    {
-      id: 'act-samples',
-      title: 'Load Sample GIS Datasets (Parcels, Sensors, Transit, Shapefiles)',
-      category: 'Action',
-      icon: <Sparkles className="w-4 h-4 text-indigo-400" />,
-      run: () => { onLoadSampleData(); onClose(); },
     },
     {
       id: 'act-dryrun',

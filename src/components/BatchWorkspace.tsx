@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { 
   UploadCloud, 
   MapPin, 
@@ -10,23 +10,34 @@ import {
   Search, 
   Eye, 
   Database, 
-  Sparkles, 
   CheckSquare, 
   Square, 
   Package, 
   Stethoscope, 
-  Compass,
+  Hexagon, 
+  Milestone, 
+  Layers, 
+  PieChart,
   FileCode,
-  Hexagon,
-  Milestone,
-  Layers,
-  Calculator,
-  PieChart
+  Sliders,
+  FolderTree,
+  Check,
+  X,
+  Info
 } from 'lucide-react';
 import { SpatialDataset } from '../types/gis';
 import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers } from '../core/formatParsers';
 import { parseGeoPackage } from '../core/geoPackageParser';
 import { useI18n } from '../core/i18n';
+import { useTheme } from '../core/theme';
+
+export interface DataTypeFilter {
+  shapefile: boolean;
+  geopackage: boolean;
+  geojson: boolean;
+  kml: boolean;
+  csv: boolean;
+}
 
 interface BatchWorkspaceProps {
   datasets: SpatialDataset[];
@@ -34,7 +45,6 @@ interface BatchWorkspaceProps {
   selectedDatasetId: string | null;
   setSelectedDatasetId: (id: string | null) => void;
   onPreviewOnMap: (dataset: SpatialDataset) => void;
-  onLoadSampleData: () => void;
   onOpenSpatialDoctor?: () => void;
   onCalculateSurfaces?: (unit: any) => void;
   onOpenAggregationModal?: () => void;
@@ -46,12 +56,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   selectedDatasetId,
   setSelectedDatasetId,
   onPreviewOnMap,
-  onLoadSampleData,
   onOpenSpatialDoctor,
-  onCalculateSurfaces,
   onOpenAggregationModal,
 }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterFormat, setFilterFormat] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -59,9 +68,35 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
   const [fileProcessingError, setFileProcessingError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(null);
 
-  // Filter datasets
+  // Ingestion settings: choice of data types & subfolder recursion
+  const [dataTypes, setDataTypes] = useState<DataTypeFilter>({
+    shapefile: true,
+    geopackage: true,
+    geojson: true,
+    kml: true,
+    csv: true,
+  });
+  const [includeSubfolders, setIncludeSubfolders] = useState<boolean>(true);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close filter dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(e.target as Node)) {
+        setIsFilterMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter datasets for display table
   const filteredDatasets = datasets.filter((d) => {
     const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       d.detectedCRS?.code.toLowerCase().includes(searchQuery.toLowerCase());
@@ -70,103 +105,244 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     return matchesSearch && matchesFormat && matchesStatus;
   });
 
-  // Calculate high-level summary metrics
+  // Calculate summary metrics
   const totalFeatures = datasets.reduce((sum, d) => sum + d.featureCount, 0);
   const totalSizeBytes = datasets.reduce((sum, d) => sum + d.sizeBytes, 0);
   const warningCount = datasets.filter(d => d.status === 'warning').length;
   const errorCount = datasets.filter(d => d.status === 'invalid').length;
+  const activeTypesCount = Object.values(dataTypes).filter(Boolean).length;
 
-  // Handle uploaded files
-  const handleFiles = async (files: FileList | File[]) => {
-    if (files.length === 0) return;
+  // Toggle single data type filter
+  const toggleDataType = (key: keyof DataTypeFilter) => {
+    setDataTypes(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const setAllDataTypes = (enable: boolean) => {
+    setDataTypes({
+      shapefile: enable,
+      geopackage: enable,
+      geojson: enable,
+      kml: enable,
+      csv: enable,
+    });
+  };
+
+  /**
+   * Recursive directory reader for drag-and-dropped folders
+   */
+  const extractFilesFromDataTransfer = async (dataTransfer: DataTransfer): Promise<File[]> => {
+    const files: File[] = [];
+    const items = Array.from(dataTransfer.items || []);
+
+    const traverseEntry = async (entry: any, path = ''): Promise<void> => {
+      if (!entry) return;
+      if (entry.isFile) {
+        const file: File = await new Promise((resolve, reject) => entry.file(resolve, reject));
+        const relativePath = path ? `${path}/${file.name}` : file.name;
+        try {
+          Object.defineProperty(file, 'webkitRelativePath', {
+            value: relativePath,
+            writable: true,
+          });
+        } catch {
+          // ignore
+        }
+        files.push(file);
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const readAllEntries = async (): Promise<any[]> => {
+          const result: any[] = [];
+          let batch: any[] = [];
+          do {
+            batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+            result.push(...batch);
+          } while (batch.length > 0);
+          return result;
+        };
+        const entries = await readAllEntries();
+        for (const child of entries) {
+          await traverseEntry(child, path ? `${path}/${entry.name}` : entry.name);
+        }
+      }
+    };
+
+    const entries = items
+      .map(item => (typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null))
+      .filter(Boolean);
+
+    if (entries.length > 0) {
+      for (const entry of entries) {
+        await traverseEntry(entry);
+      }
+    } else if (dataTransfer.files) {
+      files.push(...Array.from(dataTransfer.files));
+    }
+
+    return files;
+  };
+
+  /**
+   * Main file processing pipeline with folder awareness & data type filters
+   */
+  const handleFiles = async (files: FileList | File[], isFolderSource = false) => {
+    const rawList = Array.from(files);
+    if (rawList.length === 0) return;
+
     setIsProcessingFiles(true);
     setFileProcessingError(null);
+    setScanSuccessMessage(null);
+
     const newDatasets: SpatialDataset[] = [];
     const fileErrors: string[] = [];
-    const fileList = Array.from(files);
+    const subfolderSet = new Set<string>();
 
-    // Group files by base name to match Shapefile sidecars (.shp, .shx, .dbf, .prj)
+    // Filter files based on user-selected data types and subfolder depth
+    const eligibleFiles: File[] = [];
+
+    for (const file of rawList) {
+      const relPath = (file as any).webkitRelativePath || file.name;
+
+      // Handle subfolder filtering
+      if (isFolderSource && !includeSubfolders && relPath.includes('/')) {
+        const slashCount = (relPath.match(/\//g) || []).length;
+        if (slashCount > 1) {
+          // Exclude files in nested subfolders
+          continue;
+        }
+      }
+
+      const lastSlash = relPath.lastIndexOf('/');
+      if (lastSlash >= 0) {
+        subfolderSet.add(relPath.slice(0, lastSlash));
+      }
+
+      const fileName = lastSlash >= 0 ? relPath.slice(lastSlash + 1) : relPath;
+      const lastDot = fileName.lastIndexOf('.');
+      const ext = lastDot >= 0 ? fileName.slice(lastDot).toLowerCase() : '';
+
+      // Check against selected data types
+      const isShape = ['.shp', '.shx', '.dbf', '.prj', '.cpg', '.sbn', '.sbx', '.zip'].includes(ext);
+      const isGpkg = ext === '.gpkg';
+      const isGeoJson = ['.geojson', '.json'].includes(ext);
+      const isKml = ['.kml', '.kmz'].includes(ext);
+      const isCsv = ['.csv'].includes(ext);
+
+      if (isShape && !dataTypes.shapefile) continue;
+      if (isGpkg && !dataTypes.geopackage) continue;
+      if (isGeoJson && !dataTypes.geojson) continue;
+      if (isKml && !dataTypes.kml) continue;
+      if (isCsv && !dataTypes.csv) continue;
+
+      // Ignore non-geospatial files silently (e.g. .txt, .pdf, .xml, .DS_Store, .png)
+      if (!isShape && !isGpkg && !isGeoJson && !isKml && !isCsv) {
+        continue;
+      }
+
+      eligibleFiles.push(file);
+    }
+
+    if (eligibleFiles.length === 0) {
+      setFileProcessingError(t.workspace.noMatchingFilesInFolder);
+      setIsProcessingFiles(false);
+      return;
+    }
+
+    // Group files by directory path + base name to match Shapefile sidecars (.shp, .shx, .dbf, .prj) across subfolders
     const sidecarGroups: Record<string, { [ext: string]: File }> = {};
 
-    for (const file of fileList) {
-      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-      const baseName = file.name.slice(0, file.name.lastIndexOf('.'));
+    for (const file of eligibleFiles) {
+      const relPath = (file as any).webkitRelativePath || file.name;
+      const lastSlash = relPath.lastIndexOf('/');
+      const dirPrefix = lastSlash >= 0 ? relPath.slice(0, lastSlash) : '';
+      const fileName = lastSlash >= 0 ? relPath.slice(lastSlash + 1) : relPath;
+      const lastDot = fileName.lastIndexOf('.');
+      const ext = lastDot >= 0 ? fileName.slice(lastDot).toLowerCase() : '';
+      const baseName = lastDot >= 0 ? fileName.slice(0, lastDot) : fileName;
+      const groupKey = dirPrefix ? `${dirPrefix}/${baseName}` : baseName;
 
       if (['.shp', '.shx', '.dbf', '.prj', '.cpg', '.sbn', '.sbx'].includes(ext)) {
-        if (!sidecarGroups[baseName]) sidecarGroups[baseName] = {};
-        sidecarGroups[baseName][ext] = file;
+        if (!sidecarGroups[groupKey]) sidecarGroups[groupKey] = {};
+        sidecarGroups[groupKey][ext] = file;
       }
     }
 
     try {
-      for (let i = 0; i < fileList.length; i++) {
-        const file = fileList[i];
-        const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-        const baseName = file.name.slice(0, file.name.lastIndexOf('.'));
+      for (let i = 0; i < eligibleFiles.length; i++) {
+        const file = eligibleFiles[i];
+        const relPath = (file as any).webkitRelativePath || file.name;
+        const lastSlash = relPath.lastIndexOf('/');
+        const dirPrefix = lastSlash >= 0 ? relPath.slice(0, lastSlash) : '';
+        const fileName = lastSlash >= 0 ? relPath.slice(lastSlash + 1) : relPath;
+        const lastDot = fileName.lastIndexOf('.');
+        const ext = lastDot >= 0 ? fileName.slice(lastDot).toLowerCase() : '';
+        const baseName = lastDot >= 0 ? fileName.slice(0, lastDot) : fileName;
+        const groupKey = dirPrefix ? `${dirPrefix}/${baseName}` : baseName;
+        const displayName = dirPrefix ? `${dirPrefix}/${fileName}` : file.name;
 
+        // Skip non-.shp sidecars from creating individual rows (they are merged into the .shp dataset)
         if (['.shx', '.dbf', '.prj', '.cpg', '.sbn', '.sbx'].includes(ext)) {
-          if (!sidecarGroups[baseName]?.['.shp']) {
-            fileErrors.push(`${file.name}: select the matching .shp file to import this sidecar.`);
+          if (!sidecarGroups[groupKey]?.['.shp']) {
+            fileErrors.push(`${displayName}: please ensure the companion .shp file is also included.`);
           }
           continue;
         }
 
         try {
           if (ext === '.shp') {
-          const group = sidecarGroups[baseName] || {};
-          const shpFile = file;
-          const shxFile = group['.shx'];
-          const dbfFile = group['.dbf'];
-          const prjFile = group['.prj'];
-          const cpgFile = group['.cpg'];
+            const group = sidecarGroups[groupKey] || {};
+            const shpFile = file;
+            const shxFile = group['.shx'];
+            const dbfFile = group['.dbf'];
+            const prjFile = group['.prj'];
+            const cpgFile = group['.cpg'];
 
-          const JSZip = (await import('jszip')).default;
-          const zip = new JSZip();
-          zip.file(`${baseName}.shp`, await shpFile.arrayBuffer());
-          if (shxFile) zip.file(`${baseName}.shx`, await shxFile.arrayBuffer());
-          if (dbfFile) zip.file(`${baseName}.dbf`, await dbfFile.arrayBuffer());
-          if (prjFile) zip.file(`${baseName}.prj`, await prjFile.text());
-          if (cpgFile) zip.file(`${baseName}.cpg`, await cpgFile.text());
+            const JSZip = (await import('jszip')).default;
+            const zip = new JSZip();
+            zip.file(`${baseName}.shp`, await shpFile.arrayBuffer());
+            if (shxFile) zip.file(`${baseName}.shx`, await shxFile.arrayBuffer());
+            if (dbfFile) zip.file(`${baseName}.dbf`, await dbfFile.arrayBuffer());
+            if (prjFile) zip.file(`${baseName}.prj`, await prjFile.text());
+            if (cpgFile) zip.file(`${baseName}.cpg`, await cpgFile.text());
 
-          const zipBuf = await zip.generateAsync({ type: 'arraybuffer' });
-          const dataset = await parseShapefileZipOrBuffers(zipBuf, file.name, file.size);
+            const zipBuf = await zip.generateAsync({ type: 'arraybuffer' });
+            const dataset = await parseShapefileZipOrBuffers(zipBuf, displayName, file.size);
 
-          dataset.sidecars = [
-            { name: `${baseName}.shp`, extension: '.shp', size: shpFile.size, present: true, required: true },
-            { name: `${baseName}.shx`, extension: '.shx', size: shxFile?.size || 0, present: !!shxFile, required: true },
-            { name: `${baseName}.dbf`, extension: '.dbf', size: dbfFile?.size || 0, present: !!dbfFile, required: true },
-            { name: `${baseName}.prj`, extension: '.prj', size: prjFile?.size || 0, present: !!prjFile, required: false },
-            { name: `${baseName}.cpg`, extension: '.cpg', size: cpgFile?.size || 0, present: !!cpgFile, required: false },
-          ];
+            dataset.sidecars = [
+              { name: `${baseName}.shp`, extension: '.shp', size: shpFile.size, present: true, required: true },
+              { name: `${baseName}.shx`, extension: '.shx', size: shxFile?.size || 0, present: !!shxFile, required: true },
+              { name: `${baseName}.dbf`, extension: '.dbf', size: dbfFile?.size || 0, present: !!dbfFile, required: true },
+              { name: `${baseName}.prj`, extension: '.prj', size: prjFile?.size || 0, present: !!prjFile, required: false },
+              { name: `${baseName}.cpg`, extension: '.cpg', size: cpgFile?.size || 0, present: !!cpgFile, required: false },
+            ];
 
-          if (!shxFile || !dbfFile) {
-            dataset.validationIssues.push({
-              severity: 'warning',
-              code: 'MISSING_SIDECAR',
-              message: `Incomplete Shapefile bundle: Missing ${!shxFile ? '.shx index ' : ''}${!dbfFile ? '.dbf attributes' : ''}.`,
-            });
-            dataset.status = 'warning';
-          }
+            if (!shxFile || !dbfFile) {
+              dataset.validationIssues.push({
+                severity: 'warning',
+                code: 'MISSING_SIDECAR',
+                message: `Incomplete Shapefile bundle: Missing ${!shxFile ? '.shx index ' : ''}${!dbfFile ? '.dbf attributes' : ''}.`,
+              });
+              dataset.status = 'warning';
+            }
 
-          newDatasets.push(dataset);
+            newDatasets.push(dataset);
           } else if (ext === '.zip') {
             const buf = await file.arrayBuffer();
-            const dataset = await parseShapefileZipOrBuffers(buf, file.name, file.size);
+            const dataset = await parseShapefileZipOrBuffers(buf, displayName, file.size);
             newDatasets.push(dataset);
           } else if (ext === '.geojson' || ext === '.json') {
             const text = await file.text();
-            const dataset = parseGeoJSON(text, file.name, file.size);
+            const dataset = parseGeoJSON(text, displayName, file.size);
             newDatasets.push(dataset);
           } else if (ext === '.gpkg') {
-            const datasets = await parseGeoPackage(await file.arrayBuffer(), file.name, file.size);
-            newDatasets.push(...datasets);
+            const gpkgDatasets = await parseGeoPackage(await file.arrayBuffer(), displayName, file.size);
+            newDatasets.push(...gpkgDatasets);
           } else if (ext === '.csv') {
             const text = await file.text();
-            const dataset = parseCSV(text, file.name, file.size);
+            const dataset = parseCSV(text, displayName, file.size);
             newDatasets.push(dataset);
           } else if (ext === '.kml') {
             const text = await file.text();
-            const dataset = parseKML(text, file.name, file.size);
+            const dataset = parseKML(text, displayName, file.size);
             newDatasets.push(dataset);
           } else if (ext === '.kmz') {
             const JSZip = (await import('jszip')).default;
@@ -175,13 +351,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               entry => !entry.dir && entry.name.toLowerCase().endsWith('.kml'),
             );
             if (!kmlFile) throw new Error('The KMZ archive does not contain a KML file.');
-            newDatasets.push(parseKML(await kmlFile.async('text'), file.name, file.size));
-          } else {
-            throw new Error('This file format is not supported.');
+            newDatasets.push(parseKML(await kmlFile.async('text'), displayName, file.size));
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          fileErrors.push(`${file.name}: ${message}`);
+          fileErrors.push(`${displayName}: ${message}`);
         }
       }
 
@@ -190,7 +364,15 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         if (!selectedDatasetId && newDatasets[0]) {
           setSelectedDatasetId(newDatasets[0].id);
         }
+
+        const folderCount = Math.max(1, subfolderSet.size);
+        const summaryText = t.workspace.folderScanSummary
+          .replace('{count}', String(newDatasets.length))
+          .replace('{folders}', String(folderCount));
+        setScanSuccessMessage(summaryText);
+        setTimeout(() => setScanSuccessMessage(null), 5000);
       }
+
       if (fileErrors.length > 0) {
         setFileProcessingError(fileErrors.join('\n'));
       }
@@ -199,7 +381,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     }
   };
 
-  // Drag and Drop
+  // Drag and Drop handling (supports dropped files and dropped folders)
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -212,8 +394,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      await handleFiles(e.dataTransfer.files);
+    if (e.dataTransfer) {
+      const extractedFiles = await extractFilesFromDataTransfer(e.dataTransfer);
+      await handleFiles(extractedFiles, true);
     }
   };
 
@@ -268,6 +451,35 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-[#13110E]">
+      {/* Hidden inputs for file and directory selection */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".shp,.shx,.dbf,.prj,.cpg,.geojson,.json,.kml,.kmz,.csv,.gpkg,.zip"
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.currentTarget.files ?? []);
+          e.currentTarget.value = '';
+          void handleFiles(files, false);
+        }}
+      />
+
+      <input
+        ref={folderInputRef}
+        type="file"
+        // @ts-expect-error webkitdirectory is standard in HTML5 directory ingestion
+        webkitdirectory=""
+        directory=""
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.currentTarget.files ?? []);
+          e.currentTarget.value = '';
+          void handleFiles(files, true);
+        }}
+      />
+
       {/* Workspace Header Toolbar */}
       <div className="px-6 py-3.5 border-b border-stone-800/80 bg-[#181411]/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
         {/* Left: Summary Metrics */}
@@ -282,7 +494,6 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 {datasets.length} {t.workspace.filesCount}
               </span>
             </div>
-            {/* Unboxed Metadata Discipline */}
             <p className="text-xs text-stone-400 mt-0.5 font-mono">
               <span>{totalFeatures.toLocaleString()} {t.workspace.totalFeatures}</span>
               <span className="mx-1.5 text-stone-600">·</span>
@@ -303,7 +514,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           </div>
         </div>
 
-        {/* Right: Actions */}
+        {/* Right: Actions & Ingestion Triggers */}
         <div className="flex items-center space-x-2">
           {warningCount > 0 && onOpenSpatialDoctor && (
             <button
@@ -315,36 +526,144 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             </button>
           )}
 
-          {datasets.length === 0 && (
-            <button
-              onClick={onLoadSampleData}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-stone-950 shadow-md shadow-amber-950/40 transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{t.workspace.loadSamples}</span>
-            </button>
-          )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".shp,.shx,.dbf,.prj,.cpg,.geojson,.json,.kml,.kmz,.csv,.gpkg,.zip"
-            className="hidden"
-            onChange={(e) => {
-              const files = Array.from(e.currentTarget.files ?? []);
-              e.currentTarget.value = '';
-              void handleFiles(files);
-            }}
-          />
-
+          {/* 1. Manual File Picker Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-amber-600 hover:bg-amber-500 text-stone-950 shadow-sm shadow-amber-950/40 transition-all"
+            disabled={isProcessingFiles}
+            title="Select single or multiple GIS files manually"
+            className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold border transition-all shadow-sm active:scale-95 disabled:opacity-50 ${
+              theme === 'light'
+                ? 'bg-white hover:bg-[#F5EFE6] text-stone-900 border-[#D6CEBE]'
+                : 'bg-[#241E19] hover:bg-[#2F2620] text-stone-200 hover:text-white border-stone-700/80'
+            }`}
           >
-            <FolderPlus className="w-3.5 h-3.5" />
-            <span>{isProcessingFiles ? t.common.loading : t.workspace.addFiles}</span>
+            <FileCode className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-amber-600' : 'text-amber-400'}`} />
+            <span>{t.workspace.selectFiles}</span>
           </button>
+
+          {/* 2. Folder & Subfolder Directory Ingestion Button */}
+          <button
+            onClick={() => folderInputRef.current?.click()}
+            disabled={isProcessingFiles}
+            title="Select a whole folder and automatically ingest all geospatial files inside it and subfolders"
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 shadow-md shadow-amber-950/20 transition-all active:scale-95 disabled:opacity-50"
+          >
+            <FolderTree className="w-3.5 h-3.5 text-stone-950" />
+            <span>{isProcessingFiles ? t.common.loading : t.workspace.selectFolder}</span>
+          </button>
+
+          {/* 3. Ingestion Filters & Data Types Dropdown */}
+          <div className="relative" ref={filterMenuRef}>
+            <button
+              onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+              title="Configure data types and subfolder scanning"
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                isFilterMenuOpen || activeTypesCount < 5 || !includeSubfolders
+                  ? theme === 'light'
+                    ? 'bg-[#FEF3C7] border-[#FCD34D] text-[#92400E] font-bold shadow-xs'
+                    : 'bg-amber-950/50 border-amber-600/60 text-amber-300 font-semibold'
+                  : theme === 'light'
+                    ? 'bg-white border-[#E2DBD0] text-stone-800 hover:bg-[#F5EFE6] hover:text-stone-950 shadow-xs'
+                    : 'bg-[#1C1713] border-stone-800 text-stone-300 hover:bg-[#251E19]'
+              }`}
+            >
+              <Sliders className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-amber-700' : 'text-amber-400'}`} />
+              <span>{t.workspace.filterDataTypes}</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                theme === 'light' ? 'bg-[#EDE7DC] text-stone-800 font-bold' : 'bg-stone-800/90 text-stone-300'
+              }`}>
+                {activeTypesCount}/5
+              </span>
+            </button>
+
+            {isFilterMenuOpen && (
+              <div
+                className={`absolute right-0 top-full mt-2 w-72 rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-100 ${
+                  theme === 'light'
+                    ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-stone-400/25'
+                    : 'bg-[#181411] border-stone-800 text-stone-200 shadow-stone-950/80'
+                }`}
+              >
+                <div className={`flex items-center justify-between pb-2 border-b ${theme === 'light' ? 'border-[#EBE5DC]' : 'border-stone-800/80'}`}>
+                  <span className={`font-display font-bold text-xs flex items-center space-x-1.5 ${theme === 'light' ? 'text-amber-800' : 'text-amber-400'}`}>
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>{t.workspace.filterDataTypes}</span>
+                  </span>
+                  <div className="flex items-center space-x-2 text-[10px] font-mono">
+                    <button
+                      onClick={() => setAllDataTypes(true)}
+                      className={`${theme === 'light' ? 'text-stone-600 hover:text-amber-800' : 'text-stone-400 hover:text-amber-300'} underline cursor-pointer`}
+                    >
+                      All
+                    </button>
+                    <span className={theme === 'light' ? 'text-stone-400' : 'text-stone-600'}>·</span>
+                    <button
+                      onClick={() => setAllDataTypes(false)}
+                      className={`${theme === 'light' ? 'text-stone-600 hover:text-amber-800' : 'text-stone-400 hover:text-amber-300'} underline cursor-pointer`}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                {/* Data Types Checkboxes */}
+                <div className="py-2.5 space-y-1.5">
+                  {[
+                    { key: 'geopackage' as const, label: 'GeoPackage (.gpkg)', desc: 'OGC Vector SQLite Database' },
+                    { key: 'shapefile' as const, label: 'ESRI Shapefile (.shp / .zip)', desc: 'Bundled .shp, .shx, .dbf, .prj' },
+                    { key: 'geojson' as const, label: 'GeoJSON (.geojson, .json)', desc: 'RFC 7946 Standard' },
+                    { key: 'kml' as const, label: 'Google Earth KML / KMZ', desc: 'Placemarks & boundaries' },
+                    { key: 'csv' as const, label: 'Spatial CSV (.csv)', desc: 'Coordinate latitude/longitude tables' },
+                  ].map(item => (
+                    <label
+                      key={item.key}
+                      className={`flex items-start space-x-2.5 cursor-pointer p-1.5 rounded-lg transition-colors ${
+                        theme === 'light' ? 'hover:bg-[#F5EFE6]' : 'hover:bg-stone-800/40'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={dataTypes[item.key]}
+                        onChange={() => toggleDataType(item.key)}
+                        className={`mt-0.5 rounded text-amber-600 focus:ring-amber-500/40 cursor-pointer ${
+                          theme === 'light' ? 'border-[#A89F91] bg-white' : 'border-stone-700 bg-[#120F0D]'
+                        }`}
+                      />
+                      <div className="text-left">
+                        <div className={`text-xs font-semibold ${theme === 'light' ? 'text-stone-900' : 'text-stone-200'}`}>{item.label}</div>
+                        <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>{item.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Subfolder Toggle */}
+                <div className={`pt-2 border-t ${theme === 'light' ? 'border-[#EBE5DC]' : 'border-stone-800/80'}`}>
+                  <label className={`flex items-center justify-between cursor-pointer p-1.5 rounded-lg transition-colors ${
+                    theme === 'light' ? 'hover:bg-[#F5EFE6]' : 'hover:bg-stone-800/40'
+                  }`}>
+                    <div className="text-left">
+                      <div className={`text-xs font-semibold flex items-center space-x-1.5 ${theme === 'light' ? 'text-stone-900' : 'text-stone-200'}`}>
+                        <FolderTree className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-amber-700' : 'text-amber-400'}`} />
+                        <span>{t.workspace.includeSubfolders}</span>
+                      </div>
+                      <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>
+                        {includeSubfolders ? 'Scans all nested directory levels' : 'Scans only the root folder level'}
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={includeSubfolders}
+                      onChange={(e) => setIncludeSubfolders(e.target.checked)}
+                      className={`rounded text-amber-600 focus:ring-amber-500/40 cursor-pointer ${
+                        theme === 'light' ? 'border-[#A89F91] bg-white' : 'border-stone-700 bg-[#120F0D]'
+                      }`}
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
 
           {datasets.length > 0 && (
             <>
@@ -368,6 +687,26 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         </div>
       </div>
 
+      {/* Ingestion Success Feedback Banner */}
+      {scanSuccessMessage && (
+        <div role="status" className="mx-5 mt-3 rounded-xl border border-emerald-700/60 bg-emerald-950/40 px-4 py-2.5 text-xs text-emerald-200 animate-in fade-in-0 slide-in-from-top-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 font-medium">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{scanSuccessMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setScanSuccessMessage(null)}
+              className="text-emerald-300 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Processing Error Alert */}
       {fileProcessingError && (
         <div role="alert" className="mx-5 mt-3 rounded-xl border border-rose-700/60 bg-rose-950/40 px-4 py-3 text-xs text-rose-200">
           <div className="flex items-start justify-between gap-4">
@@ -391,21 +730,21 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
       {/* Main Drag-and-Drop Area & Table Layout */}
       <div className="flex-1 flex flex-col p-5 overflow-hidden gap-4">
-        {/* Elevated Drag and Drop Dropzone with Cartographic Feel */}
+        {/* Elevated Drag and Drop Dropzone with Ingestion Filters & Actions */}
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
+          className={`border-2 border-dashed rounded-2xl p-5 transition-all text-center ${
             isDragging
               ? 'border-amber-400 bg-amber-950/40 glow-amber'
-              : 'border-stone-800/90 hover:border-amber-600/50 bg-[#191512]/50 hover:bg-[#1E1915]/60'
+              : 'border-stone-800/90 hover:border-amber-600/50 bg-[#191512]/60 hover:bg-[#1E1915]/70'
           }`}
         >
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 max-w-4xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-5xl mx-auto">
+            {/* Left: Dropzone illustration & description */}
             <div className="flex items-center space-x-3.5 text-left">
-              <div className="p-3 bg-amber-950/70 rounded-xl text-amber-400 border border-amber-700/50 shadow-inner">
+              <div className="p-3 bg-amber-950/70 rounded-xl text-amber-400 border border-amber-700/50 shadow-inner shrink-0">
                 <UploadCloud className="w-6 h-6" />
               </div>
               <div>
@@ -418,28 +757,74 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               </div>
             </div>
 
-            {/* Moderately colorful format chips */}
-            <div className="flex items-center flex-wrap gap-2 text-[11px] font-mono">
-              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-amber-950/50 border border-amber-600/40 text-amber-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                <span>SHAPEFILE (.shp + .shx + .dbf)</span>
-              </span>
-              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-stone-800/80 border border-amber-700/40 text-amber-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                <span>GEOPACKAGE (.gpkg)</span>
-              </span>
-              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-emerald-950/50 border border-emerald-600/40 text-emerald-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>GEOJSON</span>
-              </span>
-              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-orange-950/50 border border-orange-600/40 text-orange-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-                <span>KML</span>
-              </span>
-              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-stone-850/80 border border-stone-700 text-stone-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
-                <span>CSV</span>
-              </span>
+            {/* Center: Direct Manual File & Folder Ingestion Buttons */}
+            <div className="flex items-center space-x-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-display font-bold bg-[#2A221C] hover:bg-amber-600 text-stone-200 hover:text-stone-950 border border-stone-700/80 transition-all shadow-sm"
+              >
+                <FileCode className="w-3.5 h-3.5 text-amber-400" />
+                <span>{t.workspace.selectFiles}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => folderInputRef.current?.click()}
+                className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 shadow-md shadow-amber-950/40 transition-all"
+              >
+                <FolderTree className="w-3.5 h-3.5 text-stone-950" />
+                <span>{t.workspace.selectFolder}</span>
+              </button>
+            </div>
+
+            {/* Right: Interactive Format Toggle Pills (Click to enable/disable data types) */}
+            <div className="flex items-center flex-wrap gap-1.5 text-[11px] font-mono">
+              {[
+                { key: 'shapefile' as const, label: 'SHP', color: 'border-amber-600/40 text-amber-300' },
+                { key: 'geopackage' as const, label: 'GPKG', color: 'border-amber-700/40 text-amber-200' },
+                { key: 'geojson' as const, label: 'GEOJSON', color: 'border-emerald-600/40 text-emerald-300' },
+                { key: 'kml' as const, label: 'KML', color: 'border-orange-600/40 text-orange-300' },
+                { key: 'csv' as const, label: 'CSV', color: 'border-stone-700 text-stone-300' },
+              ].map(chip => {
+                const isEnabled = dataTypes[chip.key];
+                return (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleDataType(chip.key);
+                    }}
+                    title={`Click to ${isEnabled ? 'exclude' : 'include'} ${chip.label} files`}
+                    className={`flex items-center space-x-1 px-2 py-0.5 rounded-md border transition-all ${
+                      isEnabled
+                        ? `bg-amber-950/50 ${chip.color} shadow-xs font-bold`
+                        : 'bg-stone-900/60 border-stone-800 text-stone-600 opacity-60 line-through'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${isEnabled ? 'bg-amber-400' : 'bg-stone-600'}`} />
+                    <span>{chip.label}</span>
+                  </button>
+                );
+              })}
+
+              {/* Subfolder indicator pill */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIncludeSubfolders(!includeSubfolders);
+                }}
+                title={includeSubfolders ? 'Subfolder scanning enabled' : 'Subfolder scanning disabled'}
+                className={`flex items-center space-x-1 px-2 py-0.5 rounded-md border text-[10px] transition-all ${
+                  includeSubfolders
+                    ? 'bg-emerald-950/50 border-emerald-600/40 text-emerald-300 font-semibold'
+                    : 'bg-stone-900 border-stone-800 text-stone-500'
+                }`}
+              >
+                <span>Subfolders: {includeSubfolders ? 'ON' : 'OFF'}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -463,7 +848,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             <div className="flex items-center space-x-3 text-xs text-stone-400">
               <div className="flex items-center space-x-1.5">
                 <span className="text-[11px] font-mono text-stone-500 uppercase">Format:</span>
-                {(['all', 'shapefile', 'geojson', 'kml', 'csv'] as const).map((fmt) => (
+                {(['all', 'shapefile', 'geopackage', 'geojson', 'kml', 'csv'] as const).map((fmt) => (
                   <button
                     key={fmt}
                     onClick={() => setFilterFormat(fmt)}
@@ -525,27 +910,28 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                   <th className="py-3 px-3.5 text-right">{t.workspace.colActions}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-850/60 font-mono">
+              <tbody className="divide-y divide-stone-800/70">
                 {filteredDatasets.map((d) => {
-                  const isChecked = selectedIds.has(d.id);
-                  const isCurrent = selectedDatasetId === d.id;
+                  const isSelected = selectedIds.has(d.id);
+                  const isTarget = selectedDatasetId === d.id;
 
                   return (
                     <tr
                       key={d.id}
                       onClick={() => setSelectedDatasetId(d.id)}
                       className={`cursor-pointer transition-colors ${
-                        isCurrent
-                          ? 'bg-amber-950/30 border-l-2 border-amber-500'
-                          : 'hover:bg-stone-850/50'
+                        isTarget
+                          ? 'bg-amber-950/30 text-amber-200'
+                          : 'hover:bg-stone-800/40 text-stone-300'
                       }`}
                     >
-                      <td className="py-2.5 px-3.5" onClick={(e) => { e.stopPropagation(); toggleSelectOne(d.id); }}>
-                        <button className="text-stone-400 hover:text-stone-200">
-                          {isChecked ? (
+                      {/* Checkbox */}
+                      <td className="py-2.5 px-3.5" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => toggleSelectOne(d.id)}>
+                          {isSelected ? (
                             <CheckSquare className="w-4 h-4 text-amber-400" />
                           ) : (
-                            <Square className="w-4 h-4" />
+                            <Square className="w-4 h-4 text-stone-500" />
                           )}
                         </button>
                       </td>
@@ -554,7 +940,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       <td className="py-2.5 px-3.5 font-sans font-medium text-stone-200">
                         <div className="flex items-center space-x-2">
                           <Package className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                          <span className="truncate max-w-[210px] text-[#FAF6F0] font-medium" title={d.name}>
+                          <span className="truncate max-w-[280px] text-[#FAF6F0] font-medium" title={d.name}>
                             {d.name}
                           </span>
                         </div>
@@ -649,21 +1035,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                         )}
                       </td>
 
-                      {/* Actions */}
-                      <td className="py-2.5 px-3.5 text-right">
-                        <div className="flex items-center justify-end space-x-1" onClick={(e) => e.stopPropagation()}>
-                          {onCalculateSurfaces && d.geometryType.includes('Polygon') && (
-                            <button
-                              onClick={() => {
-                                setSelectedDatasetId(d.id);
-                                onCalculateSurfaces('ha');
-                              }}
-                              title="Calculate surfaces in hectares (+surface_ha)"
-                              className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-colors"
-                            >
-                              <Calculator className="w-4 h-4" />
-                            </button>
-                          )}
+                      {/* Quick Analytical & Map Actions */}
+                      <td className="py-2.5 px-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end space-x-1.5">
                           {onOpenAggregationModal && (
                             <button
                               onClick={() => {
@@ -717,15 +1091,26 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               <Database className="w-10 h-10 mb-2 text-stone-600" />
               <p className="text-sm font-display font-semibold text-stone-300">No geospatial datasets in workspace</p>
               <p className="text-xs text-stone-400 mt-1 max-w-sm">
-                Drop your Shapefiles, GeoJSON, GeoPackage, KML, or CSV files above or load sample datasets to start batch transformations.
+                Select individual files or an entire folder with subfolders to begin batch transformations.
               </p>
-              <button
-                onClick={onLoadSampleData}
-                className="mt-4 flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-display font-bold bg-amber-600 hover:bg-amber-500 text-stone-950 shadow-md shadow-amber-950/40 transition-all"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Load Sample GIS Datasets</span>
-              </button>
+              <div className="mt-4 flex items-center space-x-2.5">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-display font-bold bg-[#2A221C] hover:bg-amber-600 text-stone-200 hover:text-stone-950 border border-stone-700/80 transition-all shadow-sm"
+                >
+                  <FileCode className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{t.workspace.selectFiles}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => folderInputRef.current?.click()}
+                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-display font-bold bg-amber-600 hover:bg-amber-500 text-stone-950 shadow-md shadow-amber-950/40 transition-all"
+                >
+                  <FolderTree className="w-3.5 h-3.5 text-stone-950" />
+                  <span>{t.workspace.selectFolder}</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

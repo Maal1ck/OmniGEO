@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   * {
@@ -122,87 +123,109 @@
 }
 
 /* ==========================================================================
-   Light Theme System (Default is dark; light theme activates on [data-theme="light"])
+   ORIGINAL PREMIUM LIGHT THEME SYSTEM
+   Architectural Warm Alabaster & Parchment Aesthetic
+   Canvas: #F8F6F1 | Cards: #FFFFFF | Inset Wells: #F2EFEA | Border: #E2DBD0
+   Primary Text: #1C1917 (Espresso) | Secondary: #44403C | Muted: #78716C
+   Accents: #B45309 / #92400E (Rich Cognac Amber)
    ========================================================================== */
 
 [data-theme="light"],
 html.light,
 body.light {
-  background-color: #FFFFFF !important;
-  color: #0F172A !important;
+  background-color: #F8F6F1 !important;
+  color: #1C1917 !important;
 }
 
 [data-theme="light"] * {
-  border-color: rgba(203, 213, 225, 0.7);
+  border-color: #E2DBD0;
 }
 
 /* Light Theme Scrollbars */
 [data-theme="light"] ::-webkit-scrollbar-track {
-  background: #F8FAFC !important;
+  background: #F2EFEA !important;
 }
 
 [data-theme="light"] ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.6) !important;
+  background: #C8BFB2 !important;
+  border-radius: 4px;
 }
 
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(217, 119, 6, 0.8) !important;
+  background: #D97706 !important;
 }
 
-/* Light Theme Base Surfaces & Background Overrides */
+/* Outer Canvas Backgrounds */
 [data-theme="light"] [class*="bg-[#13110E]"],
-[data-theme="light"] [class*="bg-[#15120F]"],
-[data-theme="light"] [class*="bg-[#16120F]"],
-[data-theme="light"] [class*="bg-[#181411]"],
-[data-theme="light"] [class*="bg-[#110E0C]"],
-[data-theme="light"] [class*="bg-[#120F0D]"],
-[data-theme="light"] [class*="bg-[#130F0D]"],
-[data-theme="light"] [class*="bg-[#14100E]"],
-[data-theme="light"] [class*="bg-[#161310]"] {
-  background-color: #FFFFFF !important;
+[data-theme="light"] [class*="bg-[#14120F]"],
+[data-theme="light"] [class*="bg-[#120F0D]"] {
+  background-color: #F8F6F1 !important;
 }
 
+/* Elevated Cards & Primary Content Surfaces */
+[data-theme="light"] [class*="bg-[#181411]"],
+[data-theme="light"] [class*="bg-[#16120F]"],
 [data-theme="light"] [class*="bg-[#1A1613]"],
 [data-theme="light"] [class*="bg-[#1C1713]"],
+[data-theme="light"] [class*="bg-[#1C1714]"],
 [data-theme="light"] [class*="bg-[#1D1714]"],
 [data-theme="light"] [class*="bg-[#1E1915]"],
 [data-theme="light"] [class*="bg-[#201A16]"],
-[data-theme="light"] [class*="bg-[#241D18]"],
+[data-theme="light"] [class*="bg-stone-900"] {
+  background-color: #FFFFFF !important;
+}
+
+/* Inset Wells, Tables thead, Code snippets & Secondary Surfaces */
+[data-theme="light"] [class*="bg-[#110E0C]"],
+[data-theme="light"] [class*="bg-[#120E0C]"],
+[data-theme="light"] [class*="bg-[#15120F]"],
+[data-theme="light"] [class*="bg-[#130F0D]"],
+[data-theme="light"] [class*="bg-stone-850"],
+[data-theme="light"] [class*="bg-stone-800"] {
+  background-color: #F2EFEA !important;
+}
+
+/* Soft Action Buttons, Inset Bars, Badges & Interactive Controls */
 [data-theme="light"] [class*="bg-[#241E19]"],
 [data-theme="light"] [class*="bg-[#251E19]"],
 [data-theme="light"] [class*="bg-[#29221C]"],
 [data-theme="light"] [class*="bg-[#2A221C]"],
-[data-theme="light"] [class*="bg-stone-900"],
-[data-theme="light"] [class*="bg-stone-850"],
-[data-theme="light"] [class*="bg-stone-800"],
-[data-theme="light"] [class*="bg-stone-750"] {
-  background-color: #F8FAFC !important;
+[data-theme="light"] [class*="bg-[#2F2620]"],
+[data-theme="light"] [class*="bg-[#28211C]"] {
+  background-color: #EDE7DC !important;
+  color: #1C1917 !important;
+  border-color: #D6CEBE !important;
 }
 
-/* Interactive Hover States in Light Mode */
+/* Interactive Hover States */
 [data-theme="light"] [class*="hover:bg-[#251E19]"]:hover,
+[data-theme="light"] [class*="hover:bg-[#241E19]"]:hover,
 [data-theme="light"] [class*="hover:bg-[#201A16]"]:hover,
 [data-theme="light"] [class*="hover:bg-[#29221C]"]:hover,
+[data-theme="light"] [class*="hover:bg-[#28211C]"]:hover,
+[data-theme="light"] [class*="hover:bg-[#2F2620]"]:hover,
 [data-theme="light"] [class*="hover:bg-[#1E1915]"]:hover,
 [data-theme="light"] [class*="hover:bg-stone-800"]:hover,
 [data-theme="light"] [class*="hover:bg-stone-850"]:hover {
-  background-color: #F1F5F9 !important;
+  background-color: #E4DCD0 !important;
+  color: #1C1917 !important;
 }
 
-/* Light Theme Borders & Dividers */
+/* Borders & Dividers */
 [data-theme="light"] [class*="border-stone-800"],
 [data-theme="light"] [class*="border-stone-700"],
 [data-theme="light"] [class*="border-stone-850"],
+[data-theme="light"] [class*="border-white/"],
 [data-theme="light"] [class*="divide-stone-850"],
 [data-theme="light"] [class*="divide-stone-800"] {
-  border-color: #E2E8F0 !important;
+  border-color: #E2DBD0 !important;
 }
 
 /* ==========================================================================
-   Light Theme Text Hierarchy & Strict High-Contrast Color Balancing
+   Text Hierarchy (Soft, Natural, WCAG AAA Readable Contrast)
    ========================================================================== */
 
-/* Primary Headings and Crisp Dominant Text */
+/* Primary Headings and Dominant Text */
 [data-theme="light"] h1,
 [data-theme="light"] h2,
 [data-theme="light"] h3,
@@ -213,66 +236,79 @@ body.light {
 [data-theme="light"] [class*="text-[#F5EBE1]"],
 [data-theme="light"] [class*="text-stone-100"],
 [data-theme="light"] [class*="text-stone-200"] {
-  color: #0F172A !important;
+  color: #1C1917 !important;
 }
 
 /* Secondary Informational Text */
 [data-theme="light"] [class*="text-stone-300"],
 [data-theme="light"] [class*="text-stone-400"] {
-  color: #334155 !important;
+  color: #44403C !important;
 }
 
-/* Muted / Tertiary Annotations */
+/* Tertiary / Muted Text & Column Subtitles */
 [data-theme="light"] [class*="text-stone-500"],
 [data-theme="light"] [class*="text-stone-600"] {
-  color: #64748B !important;
+  color: #78716C !important;
 }
 
-/* High-Contrast Amber / Bronze / Cognac (Eliminates invisible pale yellow on white) */
+/* High-Contrast Amber / Bronze / Cognac */
 [data-theme="light"] [class*="text-amber-200"],
 [data-theme="light"] [class*="text-amber-300"],
 [data-theme="light"] [class*="text-amber-400"],
 [data-theme="light"] [class*="text-yellow-200"],
 [data-theme="light"] [class*="text-yellow-300"],
 [data-theme="light"] [class*="text-yellow-400"] {
-  color: #92400E !important; /* Rich amber-800: WCAG AAA compliant */
+  color: #92400E !important;
+  font-weight: 600;
 }
 
 /* High-Contrast Orange */
 [data-theme="light"] [class*="text-orange-300"],
 [data-theme="light"] [class*="text-orange-400"] {
-  color: #C2410C !important; /* Deep terracotta orange-700 */
+  color: #9A3412 !important;
+  font-weight: 600;
 }
 
 /* High-Contrast Emerald */
 [data-theme="light"] [class*="text-emerald-200"],
 [data-theme="light"] [class*="text-emerald-300"],
 [data-theme="light"] [class*="text-emerald-400"] {
-  color: #047857 !important; /* Forest emerald-700 */
+  color: #166534 !important;
+  font-weight: 600;
 }
 
-/* High-Contrast Rose / Red */
+/* High-Contrast Rose */
 [data-theme="light"] [class*="text-rose-200"],
 [data-theme="light"] [class*="text-rose-300"],
 [data-theme="light"] [class*="text-rose-400"],
 [data-theme="light"] [class*="text-red-300"],
 [data-theme="light"] [class*="text-red-400"] {
-  color: #BE123C !important; /* Rich rose-700 */
+  color: #991B1B !important;
+  font-weight: 600;
 }
 
-/* High-Contrast Sky / Blue / Cyan */
+/* High-Contrast Sky */
 [data-theme="light"] [class*="text-sky-300"],
 [data-theme="light"] [class*="text-sky-400"],
 [data-theme="light"] [class*="text-cyan-300"],
 [data-theme="light"] [class*="text-cyan-400"] {
-  color: #0369A1 !important; /* Sky-700 */
+  color: #075985 !important;
+  font-weight: 600;
+}
+
+/* Preserve dark text on amber gradient CTA buttons */
+[data-theme="light"] button[class*="from-amber"],
+[data-theme="light"] button[class*="bg-amber-600"],
+[data-theme="light"] button[class*="from-amber"] *,
+[data-theme="light"] button[class*="bg-amber-600"] * {
+  color: #1C1917 !important;
 }
 
 /* ==========================================================================
-   Badges, Tags, and Status Indicators in Light Mode
+   Badges, Tags, and Status Indicators
    ========================================================================== */
 
-/* Amber Badges (Warm Golden Parchment with Rich Bronze Text) */
+/* Amber Badges (Warm Golden Cream with Rich Cognac Bronze Text) */
 [data-theme="light"] [class*="bg-amber-950"],
 [data-theme="light"] span[class*="bg-amber-950"] {
   background-color: #FEF3C7 !important;
@@ -280,15 +316,15 @@ body.light {
   border-color: #FCD34D !important;
 }
 
-/* Emerald Badges (Soft Mint with Deep Emerald Text) */
+/* Emerald Badges (Soft Sage Mint with Deep Forest Text) */
 [data-theme="light"] [class*="bg-emerald-950"],
 [data-theme="light"] span[class*="bg-emerald-950"] {
-  background-color: #D1FAE5 !important;
-  color: #065F46 !important;
-  border-color: #6EE7B7 !important;
+  background-color: #DCFCE7 !important;
+  color: #166534 !important;
+  border-color: #86EFAC !important;
 }
 
-/* Orange Badges (Warm Terracotta with Deep Rust Text) */
+/* Orange Badges (Warm Apricot with Deep Rust Text) */
 [data-theme="light"] [class*="bg-orange-950"],
 [data-theme="light"] span[class*="bg-orange-950"] {
   background-color: #FFEDD5 !important;
@@ -296,71 +332,147 @@ body.light {
   border-color: #FDBA74 !important;
 }
 
-/* Rose Badges (Soft Rose with Deep Burgundy Text) */
+/* Rose Badges (Soft Rose with Deep Garnet Text) */
 [data-theme="light"] [class*="bg-rose-950"],
 [data-theme="light"] span[class*="bg-rose-950"] {
-  background-color: #FFE4E6 !important;
-  color: #9F1239 !important;
-  border-color: #FDA4AF !important;
+  background-color: #FEE2E2 !important;
+  color: #991B1B !important;
+  border-color: #FCA5A5 !important;
 }
 
-/* Neutral / Stone Badges */
+/* Neutral Badges */
 [data-theme="light"] span[class*="bg-stone-900"],
 [data-theme="light"] span[class*="bg-stone-850"],
 [data-theme="light"] span[class*="bg-stone-800"] {
-  background-color: #F1F5F9 !important;
-  color: #334155 !important;
-  border-color: #CBD5E1 !important;
+  background-color: #EDE7DC !important;
+  color: #44403C !important;
+  border-color: #D6CEBE !important;
 }
 
 /* ==========================================================================
-   Form Controls (Inputs, Selects, Dropdowns, Tables)
+   ALL DROPDOWNS, MENUS & POPOVERS (Pristine, Premium, High Legibility)
    ========================================================================== */
 
-[data-theme="light"] input,
+[data-theme="light"] [role="menu"],
+[data-theme="light"] div[class*="z-50"][class*="rounded-2xl"],
+[data-theme="light"] div[class*="z-50"][class*="rounded-xl"],
+[data-theme="light"] div[class*="z-40"][class*="rounded-xl"],
+[data-theme="light"] div[class*="absolute"][class*="shadow-2xl"],
+[data-theme="light"] div[class*="absolute"][class*="shadow-xl"] {
+  background-color: #FFFFFF !important;
+  border: 1px solid #E2DBD0 !important;
+  color: #1C1917 !important;
+  box-shadow: 0 12px 32px -4px rgba(45, 35, 25, 0.12), 0 4px 12px -2px rgba(45, 35, 25, 0.06) !important;
+}
+
+/* Inner Dropdown Items & Buttons */
+[data-theme="light"] [role="menu"] button,
+[data-theme="light"] div[class*="z-50"] button,
+[data-theme="light"] div[class*="z-40"] button {
+  color: #1C1917 !important;
+}
+
+[data-theme="light"] [role="menu"] button:hover,
+[data-theme="light"] div[class*="z-50"] button:hover,
+[data-theme="light"] div[class*="z-40"] button:hover {
+  background-color: #F5EFE6 !important;
+  color: #1C1917 !important;
+}
+
+/* Dropdown Dividers */
+[data-theme="light"] [role="menu"] [class*="border-b"],
+[data-theme="light"] [role="menu"] [class*="border-t"],
+[data-theme="light"] div[class*="z-50"] [class*="border-b"],
+[data-theme="light"] div[class*="z-50"] [class*="border-t"],
+[data-theme="light"] div[class*="z-40"] [class*="border-b"],
+[data-theme="light"] div[class*="z-40"] [class*="border-t"] {
+  border-color: #EBE5DC !important;
+}
+
+/* Dropdown Sub-labels and descriptions */
+[data-theme="light"] [role="menu"] [class*="text-stone-400"],
+[data-theme="light"] div[class*="z-50"] [class*="text-stone-400"],
+[data-theme="light"] div[class*="z-40"] [class*="text-stone-400"],
+[data-theme="light"] [role="menu"] [class*="text-stone-500"],
+[data-theme="light"] div[class*="z-50"] [class*="text-stone-500"],
+[data-theme="light"] div[class*="z-40"] [class*="text-stone-500"] {
+  color: #57534E !important;
+}
+
+/* ==========================================================================
+   Form Controls (Inputs, Native Selects, Option Elements, Checkboxes)
+   ========================================================================== */
+
+[data-theme="light"] input[type="text"],
+[data-theme="light"] input[type="search"],
+[data-theme="light"] input[type="number"],
 [data-theme="light"] select,
 [data-theme="light"] textarea {
   background-color: #FFFFFF !important;
-  color: #0F172A !important;
-  border-color: #CBD5E1 !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  color: #1C1917 !important;
+  border: 1px solid #D6CEBE !important;
+  box-shadow: 0 1px 2px rgba(45, 35, 25, 0.04) !important;
 }
 
+[data-theme="light"] input:focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+  border-color: #D97706 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15) !important;
+}
+
+/* CRITICAL: Native select options styling across all operating systems */
 [data-theme="light"] select option {
   background-color: #FFFFFF !important;
-  color: #0F172A !important;
+  color: #1C1917 !important;
+}
+
+[data-theme="light"] input[type="checkbox"] {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #A89F91 !important;
+}
+
+[data-theme="light"] input[type="checkbox"]:checked {
+  background-color: #D97706 !important;
+  border-color: #D97706 !important;
 }
 
 [data-theme="light"] input::placeholder,
 [data-theme="light"] textarea::placeholder {
-  color: #94A3B8 !important;
+  color: #8C8275 !important;
 }
 
-/* Tables in Light Mode */
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
 [data-theme="light"] thead {
-  background-color: #F8FAFC !important;
-  border-color: #E2E8F0 !important;
+  background-color: #F2EFEA !important;
+  border-color: #E2DBD0 !important;
 }
 
 [data-theme="light"] thead th {
-  color: #475569 !important;
+  color: #44403C !important;
+  font-weight: 700 !important;
 }
 
 [data-theme="light"] tbody tr {
-  background-color: #FFFFFF;
+  background-color: #FFFFFF !important;
+  border-color: #EBE5DC !important;
 }
 
 [data-theme="light"] tbody tr:hover {
-  background-color: #F8FAFC !important;
+  background-color: #FAF7F2 !important;
 }
 
 [data-theme="light"] tbody tr[class*="bg-amber-950"] {
-  background-color: #FEF9C3 !important;
+  background-color: #FEF9EE !important;
   border-left-color: #D97706 !important;
 }
 
 [data-theme="light"] tbody td {
-  color: #1E293B !important;
+  color: #1C1917 !important;
 }
 
 /* ==========================================================================
@@ -369,79 +481,67 @@ body.light {
 
 /* Hero Banner: Warm Architectural Parchment Gradient */
 [data-theme="light"] div[class*="from-[#1C1713]"] {
-  background: linear-gradient(135deg, #FFFDF7 0%, #FEF3C7 50%, #FFF7ED 100%) !important;
+  background: linear-gradient(135deg, #FFFDF9 0%, #FEF7ED 40%, #FFF3DC 100%) !important;
   border-color: #FCD34D !important;
-  box-shadow: 0 10px 25px -5px rgba(217, 119, 6, 0.08), 0 8px 10px -6px rgba(217, 119, 6, 0.04) !important;
+  box-shadow: 0 10px 30px -5px rgba(217, 119, 6, 0.08), 0 4px 12px -2px rgba(45, 35, 25, 0.04) !important;
 }
 
 [data-theme="light"] div[class*="from-[#1C1713]"] h1 {
-  color: #0F172A !important;
+  color: #1C1917 !important;
 }
 
 [data-theme="light"] div[class*="from-[#1C1713]"] span[class*="bg-gradient-to-r"] {
-  background: linear-gradient(135deg, #B45309 0%, #D97706 50%, #C2410C 100%) !important;
+  background: linear-gradient(135deg, #B45309 0%, #D97706 60%, #92400E 100%) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
 }
 
 [data-theme="light"] div[class*="from-[#1C1713]"] p {
-  color: #334155 !important;
+  color: #44403C !important;
 }
 
 /* Action Cards in Craft Studio */
-[data-theme="light"] div[class*="rounded-2xl"][class*="p-5"][class*="bg-[#181411]"] {
+[data-theme="light"] div[class*="rounded-2xl"][class*="p-5"][class*="bg-[#181411]"],
+[data-theme="light"] div[class*="rounded-2xl"][class*="p-5"][class*="bg-stone-900"] {
   background-color: #FFFFFF !important;
-  border-color: #E2E8F0 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  border-color: #E2DBD0 !important;
+  box-shadow: 0 2px 8px rgba(45, 35, 25, 0.04) !important;
 }
 
 [data-theme="light"] div[class*="rounded-2xl"][class*="p-5"][class*="bg-[#181411]"]:hover {
-  border-color: #F59E0B !important;
-  box-shadow: 0 10px 20px -3px rgba(245, 158, 11, 0.12) !important;
+  border-color: #D97706 !important;
+  box-shadow: 0 10px 24px -4px rgba(217, 119, 6, 0.12) !important;
 }
 
 /* CLI command snippet boxes in light mode */
 [data-theme="light"] div[class*="p-2"][class*="rounded-lg"][class*="bg-[#110E0C]"] {
-  background-color: #F8FAFC !important;
-  border-color: #E2E8F0 !important;
-  color: #334155 !important;
+  background-color: #F2EFEA !important;
+  border-color: #E2DBD0 !important;
+  color: #44403C !important;
 }
 
 /* Bottom cheatsheet container in Craft Studio */
 [data-theme="light"] div[class*="rounded-2xl"][class*="p-5"][class*="bg-[#15120F]"] {
-  background-color: #F8FAFC !important;
-  border-color: #E2E8F0 !important;
+  background-color: #FAF7F2 !important;
+  border-color: #E2DBD0 !important;
 }
 
 [data-theme="light"] div[class*="p-2.5"][class*="rounded-xl"][class*="bg-[#1A1613]"] {
   background-color: #FFFFFF !important;
-  border-color: #E2E8F0 !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-}
-
-/* Action button inside cards */
-[data-theme="light"] button[class*="bg-[#241E19]"] {
-  background-color: #F1F5F9 !important;
-  color: #0F172A !important;
-  border: 1px solid #E2E8F0 !important;
-}
-
-[data-theme="light"] button[class*="bg-[#241E19]"]:hover {
-  background-color: #D97706 !important;
-  color: #FFFFFF !important;
-  border-color: #D97706 !important;
+  border-color: #E2DBD0 !important;
+  box-shadow: 0 1px 3px rgba(45, 35, 25, 0.04) !important;
 }
 
 /* Dropzone in Batch Workspace */
 [data-theme="light"] div[class*="border-2 border-dashed"] {
-  background-color: #FAFAFA !important;
-  border-color: #CBD5E1 !important;
+  background-color: #FFFFFF !important;
+  border-color: #D6CEBE !important;
 }
 
 [data-theme="light"] div[class*="border-2 border-dashed"]:hover {
-  background-color: #FFFDF5 !important;
-  border-color: #F59E0B !important;
+  background-color: #FDFBF7 !important;
+  border-color: #D97706 !important;
 }
 
 /* Floating Toast Notifications */
@@ -449,39 +549,33 @@ body.light {
   background-color: #FFFFFF !important;
   border-color: #F59E0B !important;
   color: #92400E !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 12px 32px -4px rgba(45, 35, 25, 0.15) !important;
 }
 
 /* Modals & Dialog Windows in Light Mode */
 [data-theme="light"] .fixed.inset-0 {
-  background-color: rgba(15, 23, 42, 0.55) !important;
+  background-color: rgba(28, 25, 23, 0.5) !important;
   backdrop-filter: blur(8px) !important;
 }
 
-[data-theme="light"] .fixed.inset-0 > div[class*="bg-[#181411]"],
-[data-theme="light"] .fixed.inset-0 > div[class*="bg-[#16120F]"],
-[data-theme="light"] .fixed.inset-0 > div[class*="bg-[#1C1714]"],
-[data-theme="light"] .fixed.inset-0 > div[class*="bg-stone-900"] {
+[data-theme="light"] .fixed.inset-0 > div[class*="rounded-2xl"],
+[data-theme="light"] .fixed.inset-0 > div[class*="rounded-3xl"] {
   background-color: #FFFFFF !important;
-  border-color: #E2E8F0 !important;
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
-  color: #0F172A !important;
+  border-color: #E2DBD0 !important;
+  box-shadow: 0 25px 60px -15px rgba(28, 25, 23, 0.25) !important;
+  color: #1C1917 !important;
 }
 
-[data-theme="light"] .fixed.inset-0 div[class*="bg-[#110E0C]"] {
-  background-color: #F8FAFC !important;
-  border-color: #E2E8F0 !important;
-  color: #0F172A !important;
-}
-
+[data-theme="light"] .fixed.inset-0 div[class*="bg-[#110E0C]"],
 [data-theme="light"] .fixed.inset-0 div[class*="bg-[#13110E]"] {
-  background-color: #FFFFFF !important;
-  color: #0F172A !important;
+  background-color: #F8F6F1 !important;
+  border-color: #E2DBD0 !important;
+  color: #1C1917 !important;
 }
 
 /* Leaflet Container in Light Mode */
 [data-theme="light"] .leaflet-container {
-  background-color: #F8FAFC !important;
+  background-color: #F4EFEA !important;
 }
 
 /* Cartographic Grid in Light Mode */
@@ -494,14 +588,12 @@ body.light {
 /* Glass Panels in Light Mode */
 [data-theme="light"] .glass-panel {
   background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid #E2E8F0 !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid #E2DBD0 !important;
+  box-shadow: 0 4px 16px rgba(45, 35, 25, 0.05) !important;
 }
 
 [data-theme="light"] .glass-card {
   background: #FFFFFF !important;
-  border: 1px solid #E2E8F0 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid #E2DBD0 !important;
+  box-shadow: 0 2px 8px rgba(45, 35, 25, 0.04) !important;
 }
-
-
