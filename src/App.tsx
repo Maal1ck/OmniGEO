@@ -114,9 +114,13 @@ export default function App() {
     setDatasets(prev => prev.map(d => d.id === updated.id ? updated : d));
   };
 
-  // Build jobs from datasets
-  const initializeJobsFromQueue = (): ConversionJob[] => {
-    return datasets.map((d) => {
+  // Build jobs from datasets (all or selective subset)
+  const initializeJobsFromQueue = (onlyDatasetIds?: string[]): ConversionJob[] => {
+    const targetDatasets = onlyDatasetIds && onlyDatasetIds.length > 0
+      ? datasets.filter(d => onlyDatasetIds.includes(d.id))
+      : datasets;
+
+    return targetDatasets.map((d) => {
       const outputFileName = resolveOutputFileName(
         d.name,
         settings.targetFormat,
@@ -144,21 +148,49 @@ export default function App() {
     });
   };
 
-  // Run Batch Processing
-  const handleStartBatch = async () => {
+  // Run Batch Processing (full or selective)
+  const handleStartBatch = async (onlyDatasetIds?: string[], specificJobIds?: string[]) => {
     if (datasets.length === 0 || isProcessing) return;
 
     cancelRequestedRef.current = false;
-    const initialJobs = initializeJobsFromQueue();
-    setJobs(initialJobs);
+
+    let initialJobs: ConversionJob[];
+    let allCurrentJobs: ConversionJob[];
+
+    if (specificJobIds && specificJobIds.length > 0) {
+      initialJobs = jobs
+        .filter(j => specificJobIds.includes(j.id))
+        .map(j => ({
+          ...j,
+          status: 'queued' as const,
+          progressPercent: 0,
+          stage: 'Queued',
+          featuresProcessed: 0,
+          logs: [],
+          outputBlob: undefined,
+          outputGeojson: undefined,
+          error: undefined,
+        }));
+      allCurrentJobs = jobs.map(j => {
+        const found = initialJobs.find(ij => ij.id === j.id);
+        return found ? found : j;
+      });
+    } else {
+      initialJobs = initializeJobsFromQueue(onlyDatasetIds);
+      allCurrentJobs = [...initialJobs];
+    }
+
+    if (initialJobs.length === 0) return;
+
+    setJobs(allCurrentJobs);
     setIsProcessing(true);
     setActiveTab('monitor');
 
     const startTime = Date.now();
-    const updatedJobs = [...initialJobs];
+    const updatedJobs = [...allCurrentJobs];
 
     // Worker queue with concurrency limit
-    const queue = [...updatedJobs];
+    const queue = [...initialJobs];
     const maxWorkers = Math.min(settings.maxConcurrentWorkers, queue.length);
 
     const worker = async () => {
@@ -395,6 +427,7 @@ export default function App() {
             onOpenSpatialDoctor={() => setIsDoctorOpen(true)}
             onCalculateSurfaces={handleCalculateSurfaces}
             onOpenAggregationModal={() => setIsAggregationModalOpen(true)}
+            onStartBatch={handleStartBatch}
           />
         )}
 

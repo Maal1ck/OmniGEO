@@ -164,40 +164,56 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
         </section>
 
         {/* 3. LOCAL-FIRST AIR-GAPPED ARCHITECTURE SPOTLIGHT */}
-        <section className="relative rounded-3xl p-8 bg-gradient-to-br from-[#1C1713] via-[#16120F] to-[#120E0C] border border-amber-600/40 shadow-2xl overflow-hidden">
+        <section className={`relative rounded-3xl p-8 border transition-all overflow-hidden ${
+          theme === 'light'
+            ? 'bg-gradient-to-br from-[#FFFDF9] via-[#FEF7ED] to-[#FFF3DC] border-[#FCD34D] text-[#1C1917] shadow-xl shadow-amber-900/5'
+            : 'bg-gradient-to-br from-[#1C1713] via-[#16120F] to-[#120E0C] border-amber-600/40 text-[#FAF6F0] shadow-2xl'
+        }`}>
           <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
             <div className="space-y-4 max-w-xl">
-              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-md bg-amber-950 text-amber-300 border border-amber-600/40 text-[11px] font-mono font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-md text-[11px] font-mono font-semibold border ${
+                theme === 'light'
+                  ? 'bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]'
+                  : 'bg-amber-950 text-amber-300 border-amber-600/40'
+              }`}>
+                <ShieldCheck className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-emerald-700' : 'text-emerald-400'}`} />
                 <span>100% Client-Side Air-Gapped Engine</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-display font-bold text-[#FAF6F0]">
+              <h2 className={`text-2xl sm:text-3xl font-display font-bold ${
+                theme === 'light' ? 'text-[#1C1917]' : 'text-[#FAF6F0]'
+              }`}>
                 {t.showcase.releaseTitle}
               </h2>
-              <p className="text-xs sm:text-sm text-stone-300 leading-relaxed font-sans">
+              <p className={`text-xs sm:text-sm leading-relaxed font-sans ${
+                theme === 'light' ? 'text-[#44403C]' : 'text-stone-300'
+              }`}>
                 {t.showcase.releaseSub}
               </p>
               
-              <div className="p-3.5 rounded-xl bg-[#110E0C] border border-stone-800 font-mono text-xs space-y-1.5">
-                <div className="flex justify-between text-stone-400 text-[11px]">
-                  <span>Ingestion Engine:</span>
-                  <span className="text-amber-300 font-semibold">Manual Files &amp; Recursive Folder Tree Ingestion</span>
+              <div className={`p-4 rounded-2xl border font-mono text-xs space-y-2 ${
+                theme === 'light'
+                  ? 'bg-white/95 border-[#E2DBD0] shadow-xs'
+                  : 'bg-[#110E0C] border-stone-800'
+              }`}>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className={theme === 'light' ? 'text-stone-600' : 'text-stone-400'}>Ingestion Engine:</span>
+                  <span className={theme === 'light' ? 'text-[#92400E] font-bold' : 'text-amber-300 font-semibold'}>Manual Files &amp; Recursive Folder Tree Ingestion</span>
                 </div>
-                <div className="flex justify-between text-stone-400 text-[11px]">
-                  <span>Core Mathematics:</span>
-                  <span className="text-stone-200">PROJ 9.3 + WebAssembly SQLite Geodesy</span>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className={theme === 'light' ? 'text-stone-600' : 'text-stone-400'}>Core Mathematics:</span>
+                  <span className={theme === 'light' ? 'text-stone-900 font-medium' : 'text-stone-200'}>PROJ 9.3 + WebAssembly SQLite Geodesy</span>
                 </div>
-                <div className="flex justify-between text-stone-400 text-[11px]">
-                  <span>Telemetry &amp; Privacy:</span>
-                  <span className="text-emerald-400">Zero Cloud Uploads · Total Privacy</span>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className={theme === 'light' ? 'text-stone-600' : 'text-stone-400'}>Telemetry &amp; Privacy:</span>
+                  <span className={theme === 'light' ? 'text-emerald-700 font-bold' : 'text-emerald-400'}>Zero Cloud Uploads · Total Privacy</span>
                 </div>
-                <div className="flex justify-between text-stone-400 text-[11px]">
-                  <span>Format Support:</span>
-                  <span className="text-stone-300">GeoPackage, Shapefile, GeoJSON, KML, CSV</span>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className={theme === 'light' ? 'text-stone-600' : 'text-stone-400'}>Format Support:</span>
+                  <span className={theme === 'light' ? 'text-stone-800 font-medium' : 'text-stone-300'}>GeoPackage, Shapefile, GeoJSON, KML, CSV, CAD (DWG/DXF), GPX</span>
                 </div>
               </div>
 
-              <p className="text-[11px] text-stone-400 font-mono">
+              <p className={`text-[11px] font-mono ${theme === 'light' ? 'text-stone-600' : 'text-stone-400'}`}>
                 {t.showcase.winReqs}
               </p>
             </div>

@@ -3,6 +3,8 @@ import { reprojectGeoJSON } from './crsEngine';
 import { createShapefileZip } from './shapefileBundle';
 import { createGeoPackageFile } from './geopackageWriter';
 import { geojsonToCSV, geojsonToKML } from './formatParsers';
+import { geojsonToDXF, geojsonToGPX } from './cadParser';
+import { geojsonToExcelBuffer } from './excelParser';
 import { getCRSByCode } from './crsDefinitions';
 
 export function resolveOutputFileName(
@@ -28,6 +30,9 @@ export function resolveOutputFileName(
     geopackage: '.gpkg',
     kml: '.kml',
     csv: '.csv',
+    cad: '.dxf',
+    gpx: '.gpx',
+    excel: '.xlsx',
     flatgeobuf: '.fgb'
   };
 
@@ -148,6 +153,21 @@ export async function executeConversionJob(
       case 'csv': {
         const csvString = geojsonToCSV(workingGeoJSON);
         outputBlob = new Blob([csvString], { type: 'text/csv;charset=utf-8' });
+        break;
+      }
+      case 'cad': {
+        const dxfString = geojsonToDXF(workingGeoJSON);
+        outputBlob = new Blob([dxfString], { type: 'application/dxf;charset=utf-8' });
+        break;
+      }
+      case 'gpx': {
+        const gpxString = geojsonToGPX(workingGeoJSON, dataset.name);
+        outputBlob = new Blob([gpxString], { type: 'application/gpx+xml;charset=utf-8' });
+        break;
+      }
+      case 'excel': {
+        const excelBuf = geojsonToExcelBuffer(workingGeoJSON);
+        outputBlob = new Blob([excelBuf.buffer as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         break;
       }
       case 'geojson':

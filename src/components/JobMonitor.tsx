@@ -18,15 +18,17 @@ import {
   Award, 
   Layers,
   Terminal,
-  Cpu
+  Cpu,
+  Loader2
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { ConversionJob, BatchManifest } from '../types/gis';
+import { useTheme } from '../core/theme';
 
 interface JobMonitorProps {
   jobs: ConversionJob[];
   isProcessing: boolean;
-  onStartBatch: () => void;
+  onStartBatch: (onlyDatasetIds?: string[], specificJobIds?: string[]) => void;
   onCancelBatch: () => void;
   onRetryFailed: () => void;
   manifest: BatchManifest | null;
@@ -52,6 +54,24 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
 }) => {
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+
+  const toggleJobSelection = (id: string) => {
+    setSelectedJobIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedJobIds.size === jobs.length) {
+      setSelectedJobIds(new Set());
+    } else {
+      setSelectedJobIds(new Set(jobs.map(j => j.id)));
+    }
+  };
 
   const total = jobs.length;
   const completed = jobs.filter(j => j.status === 'completed' || j.status === 'dry_run_passed').length;
@@ -143,14 +163,26 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
                 <span>Halt Batch</span>
               </button>
             ) : (
-              <button
-                onClick={onStartBatch}
-                disabled={jobs.length === 0}
-                className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-stone-950 shadow-lg shadow-amber-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all transform active:scale-95"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Run Batch Queue</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                {selectedJobIds.size > 0 && (
+                  <button
+                    onClick={() => onStartBatch(undefined, Array.from(selectedJobIds))}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-950/40 transition-all transform active:scale-95"
+                    title="Process only the selected jobs"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Run Selected ({selectedJobIds.size})</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => onStartBatch()}
+                  disabled={jobs.length === 0}
+                  className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-stone-950 shadow-lg shadow-amber-950/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all transform active:scale-95"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Run Batch Queue {jobs.length > 0 ? `(${jobs.length})` : ''}</span>
+                </button>
+              </div>
             )}
 
             {failed > 0 && !isProcessing && (
@@ -280,48 +312,156 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
       {/* Jobs Execution List */}
       <div className="glass-panel rounded-2xl overflow-hidden border border-stone-800">
         <div className="px-5 py-3.5 border-b border-stone-800 bg-stone-900/80 flex items-center justify-between">
-          <h2 className="text-xs font-display font-bold text-stone-200 uppercase tracking-wider">
-            Job Execution Queue & Artifacts
-          </h2>
-          <span className="text-[11px] text-stone-400 font-mono">
-            {jobs.length} jobs tracked
-          </span>
+          <div className="flex items-center space-x-3">
+            {jobs.length > 0 && (
+              <label 
+                className="flex items-center cursor-pointer"
+                title={selectedJobIds.size === jobs.length ? 'Deselect all jobs' : 'Select all jobs'}
+              >
+                <input
+                  type="checkbox"
+                  checked={jobs.length > 0 && selectedJobIds.size === jobs.length}
+                  onChange={toggleSelectAll}
+                  className="rounded border-stone-700 bg-stone-950 text-amber-500 focus:ring-amber-500/40 cursor-pointer w-4 h-4"
+                />
+              </label>
+            )}
+            <h2 className="text-xs font-display font-bold text-stone-200 uppercase tracking-wider">
+              Job Execution Queue & Artifacts
+            </h2>
+          </div>
+          <div className="flex items-center space-x-3">
+            {selectedJobIds.size > 0 && (
+              <span className="text-[11px] text-amber-400 font-mono font-semibold">
+                {selectedJobIds.size} of {jobs.length} selected
+              </span>
+            )}
+            <span className="text-[11px] text-stone-400 font-mono">
+              {jobs.length} jobs tracked
+            </span>
+          </div>
         </div>
 
         <div className="divide-y divide-stone-850/60 font-mono text-xs">
           {jobs.length > 0 ? (
             jobs.map((job) => {
               const isExpanded = expandedJobId === job.id;
+              const isSelected = selectedJobIds.has(job.id);
               return (
-                <div key={job.id} className="transition-colors hover:bg-stone-900/40">
+                <div key={job.id} className={`transition-colors ${isSelected ? 'bg-amber-950/20 hover:bg-amber-950/30' : 'hover:bg-stone-900/40'}`}>
                   <div
                     onClick={() => setExpandedJobId(isExpanded ? null : job.id)}
-                    className="p-3.5 flex items-center justify-between cursor-pointer"
+                    className="p-3.5 flex items-center justify-between cursor-pointer gap-4 min-w-0"
                   >
-                    {/* Left: Indicator, Name, Transformation */}
-                    <div className="flex items-center space-x-3">
-                      <button className="text-stone-400 hover:text-stone-200">
+                    {/* Left: Checkbox, Indicator, Name, Transformation */}
+                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          toggleJobSelection(job.id);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded border-stone-700 bg-stone-950 text-amber-500 focus:ring-amber-500/40 cursor-pointer w-4 h-4 shrink-0"
+                      />
+
+                      <button className="text-stone-400 hover:text-stone-200 shrink-0">
                         {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </button>
 
-                      <div className="space-y-0.5">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold text-[#FAF6F0] font-sans text-xs">{job.inputDatasetName}</span>
-                          <span className="text-[10px] text-stone-500">→</span>
-                          <span className="text-amber-400 font-mono text-[11px] font-semibold">{job.outputFileName}</span>
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center space-x-2 min-w-0">
+                          <span 
+                            className="font-bold text-[#FAF6F0] font-sans text-xs truncate max-w-[170px] sm:max-w-xs md:max-w-md shrink-1"
+                            title={job.inputDatasetName}
+                          >
+                            {job.inputDatasetName}
+                          </span>
+                          <span className="text-[10px] text-stone-500 shrink-0">→</span>
+                          <span 
+                            className="text-amber-400 font-mono text-[11px] font-semibold truncate max-w-[170px] sm:max-w-xs md:max-w-md shrink-1"
+                            title={job.outputFileName}
+                          >
+                            {job.outputFileName}
+                          </span>
                         </div>
-                        <div className="flex items-center space-x-2 text-[10px] text-stone-400">
-                          <span className="uppercase px-1 py-0.2 rounded bg-stone-800 text-stone-300">{job.inputFormat}</span>
-                          <span>→</span>
-                          <span className="uppercase px-1 py-0.2 rounded bg-amber-950/70 text-amber-300 border border-amber-700/40">{job.targetFormat}</span>
-                          <span>·</span>
-                          <span>{job.sourceCRS} → {job.targetCRS} ({job.crsMode})</span>
+                        <div className="flex items-center space-x-2 text-[10px] text-stone-400 truncate">
+                          <span className="uppercase px-1 py-0.2 rounded bg-stone-800 text-stone-300 shrink-0">{job.inputFormat}</span>
+                          <span className="shrink-0">→</span>
+                          <span className="uppercase px-1 py-0.2 rounded bg-amber-950/70 text-amber-300 border border-amber-700/40 shrink-0">{job.targetFormat}</span>
+                          <span className="shrink-0">·</span>
+                          <span className="truncate">{job.sourceCRS} → {job.targetCRS} ({job.crsMode})</span>
+                        </div>
+
+                        {/* Individual Process Progress Bar & Stage Status */}
+                        <div className="pt-1.5 space-y-1 max-w-md">
+                          <div className="flex items-center justify-between text-[10px] font-mono">
+                            <div className="flex items-center space-x-1.5 min-w-0 truncate">
+                              {job.status === 'running' && (
+                                <Loader2 className="w-3 h-3 text-amber-400 animate-spin shrink-0" />
+                              )}
+                              {job.status === 'completed' && (
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                              )}
+                              {job.status === 'completed_warnings' && (
+                                <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                              )}
+                              {job.status === 'failed' && (
+                                <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
+                              )}
+                              {job.status === 'queued' && (
+                                <Clock className="w-3 h-3 text-stone-500 shrink-0" />
+                              )}
+                              <span className={`truncate ${
+                                job.status === 'running' 
+                                  ? 'text-amber-300 font-semibold' 
+                                  : job.status === 'failed' 
+                                  ? 'text-rose-300' 
+                                  : 'text-stone-400'
+                              }`}>
+                                {job.stage || (job.status === 'queued' ? 'Awaiting worker thread' : 'Processed')}
+                              </span>
+                            </div>
+                            <span className="tabular-nums font-semibold shrink-0 ml-2 text-stone-300">
+                              {job.status === 'completed' || job.status === 'dry_run_passed' || job.status === 'completed_warnings'
+                                ? '100%'
+                                : job.status === 'queued'
+                                ? '0%'
+                                : `${job.progressPercent || 25}%`}
+                            </span>
+                          </div>
+
+                          <div className="h-1.5 w-full bg-stone-900 rounded-full overflow-hidden border border-stone-800/80">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                job.status === 'running'
+                                  ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-orange-400 animate-pulse shadow-sm shadow-amber-500/50'
+                                  : job.status === 'completed' || job.status === 'dry_run_passed'
+                                  ? 'bg-emerald-500'
+                                  : job.status === 'completed_warnings'
+                                  ? 'bg-amber-400'
+                                  : job.status === 'failed'
+                                  ? 'bg-rose-500'
+                                  : 'bg-stone-700 w-0'
+                              }`}
+                              style={{
+                                width: `${
+                                  job.status === 'completed' || job.status === 'dry_run_passed' || job.status === 'completed_warnings'
+                                    ? 100
+                                    : job.status === 'queued'
+                                    ? 0
+                                    : Math.max(10, job.progressPercent || 25)
+                                }%`,
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Right: Stage, Status, Duration, Download */}
-                    <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center space-x-2.5 shrink-0 ml-3" onClick={(e) => e.stopPropagation()}>
                       {/* Current Stage */}
                       <span className="hidden md:inline text-[11px] text-stone-400 font-sans">
                         {job.stage}

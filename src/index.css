@@ -479,25 +479,31 @@ body.light {
    Special Component Hero, Cards & Overlays in Light Mode
    ========================================================================== */
 
-/* Hero Banner: Warm Architectural Parchment Gradient */
-[data-theme="light"] div[class*="from-[#1C1713]"] {
+/* Hero Banner & Feature Spotlight: Warm Architectural Parchment Gradient */
+[data-theme="light"] div[class*="from-[#1C1713]"],
+[data-theme="light"] section[class*="from-[#1C1713]"] {
   background: linear-gradient(135deg, #FFFDF9 0%, #FEF7ED 40%, #FFF3DC 100%) !important;
   border-color: #FCD34D !important;
   box-shadow: 0 10px 30px -5px rgba(217, 119, 6, 0.08), 0 4px 12px -2px rgba(45, 35, 25, 0.04) !important;
 }
 
-[data-theme="light"] div[class*="from-[#1C1713]"] h1 {
+[data-theme="light"] div[class*="from-[#1C1713]"] h1,
+[data-theme="light"] section[class*="from-[#1C1713]"] h1,
+[data-theme="light"] div[class*="from-[#1C1713]"] h2,
+[data-theme="light"] section[class*="from-[#1C1713]"] h2 {
   color: #1C1917 !important;
 }
 
-[data-theme="light"] div[class*="from-[#1C1713]"] span[class*="bg-gradient-to-r"] {
+[data-theme="light"] div[class*="from-[#1C1713]"] span[class*="bg-gradient-to-r"],
+[data-theme="light"] section[class*="from-[#1C1713]"] span[class*="bg-gradient-to-r"] {
   background: linear-gradient(135deg, #B45309 0%, #D97706 60%, #92400E 100%) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
 }
 
-[data-theme="light"] div[class*="from-[#1C1713]"] p {
+[data-theme="light"] div[class*="from-[#1C1713]"] p,
+[data-theme="light"] section[class*="from-[#1C1713]"] p {
   color: #44403C !important;
 }
 

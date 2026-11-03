@@ -78,40 +78,16 @@ export function parseGeoJSON(
   };
 }
 
+import { detectCoordinateColumns } from './excelParser';
+
 /**
- * Detects coordinate columns in CSV files
+ * Detects coordinate columns in CSV files using exhaustive synonyms and normalization
  */
-export function findCSVCoordinateColumns(headers: string[]): { xCol: string; yCol: string } | null {
-  const lower = headers.map(h => h.toLowerCase().trim());
-
-  // X / Longitude candidates
-  const xCandidates = ['longitude', 'lon', 'lng', 'long', 'x', 'easting', 'coord_x', 'point_x'];
-  // Y / Latitude candidates
-  const yCandidates = ['latitude', 'lat', 'y', 'northing', 'coord_y', 'point_y'];
-
-  let foundX = '';
-  let foundY = '';
-
-  for (const cand of xCandidates) {
-    const idx = lower.indexOf(cand);
-    if (idx !== -1) {
-      foundX = headers[idx];
-      break;
-    }
+export function findCSVCoordinateColumns(headers: string[], sampleRows?: Record<string, any>[]): { xCol: string; yCol: string } | null {
+  const result = detectCoordinateColumns(headers, sampleRows);
+  if (result) {
+    return { xCol: result.xCol, yCol: result.yCol };
   }
-
-  for (const cand of yCandidates) {
-    const idx = lower.indexOf(cand);
-    if (idx !== -1) {
-      foundY = headers[idx];
-      break;
-    }
-  }
-
-  if (foundX && foundY) {
-    return { xCol: foundX, yCol: foundY };
-  }
-
   return null;
 }
 
@@ -445,3 +421,12 @@ export function geojsonToCSV(geojson: any): string {
 
   return Papa.unparse(rows);
 }
+
+export { parseCadFile, parseDxfContent, parseGpxFile } from './cadParser';
+export { 
+  inspectExcelWorkbook, 
+  geojsonToExcelBuffer, 
+  detectCoordinateColumns, 
+  EXHAUSTIVE_LON_SYNONYMS, 
+  EXHAUSTIVE_LAT_SYNONYMS 
+} from './excelParser';

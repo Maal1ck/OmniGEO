@@ -23,11 +23,15 @@ import {
   FolderTree,
   Check,
   X,
-  Info
+  Info,
+  Loader2,
+  Play
 } from 'lucide-react';
 import { SpatialDataset } from '../types/gis';
-import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers } from '../core/formatParsers';
+import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers, parseCadFile, parseGpxFile } from '../core/formatParsers';
 import { parseGeoPackage } from '../core/geoPackageParser';
+import { inspectExcelWorkbook } from '../core/excelParser';
+import { ExcelCoordinateModal, PendingExcelFile } from './ExcelCoordinateModal';
 import { useI18n } from '../core/i18n';
 import { useTheme } from '../core/theme';
 
@@ -37,6 +41,9 @@ export interface DataTypeFilter {
   geojson: boolean;
   kml: boolean;
   csv: boolean;
+  cad: boolean;
+  gpx: boolean;
+  excel: boolean;
 }
 
 interface BatchWorkspaceProps {
@@ -48,6 +55,7 @@ interface BatchWorkspaceProps {
   onOpenSpatialDoctor?: () => void;
   onCalculateSurfaces?: (unit: any) => void;
   onOpenAggregationModal?: () => void;
+  onStartBatch?: (selectedDatasetIds?: string[]) => void;
 }
 
 export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
@@ -58,6 +66,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   onPreviewOnMap,
   onOpenSpatialDoctor,
   onOpenAggregationModal,
+  onStartBatch,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -70,6 +79,20 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   const [fileProcessingError, setFileProcessingError] = useState<string | null>(null);
   const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(null);
 
+  // Excel manual mapping modal state
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+  const [pendingExcelFile, setPendingExcelFile] = useState<PendingExcelFile | null>(null);
+
+  // Subfolder confirmation modal state
+  const [pendingFolderImport, setPendingFolderImport] = useState<{
+    files: File[];
+    folderName: string;
+    rootFilesCount: number;
+    subfolderFilesCount: number;
+    subfolderCount: number;
+  } | null>(null);
+  const [alwaysPromptSubfolders, setAlwaysPromptSubfolders] = useState<boolean>(true);
+
   // Ingestion settings: choice of data types & subfolder recursion
   const [dataTypes, setDataTypes] = useState<DataTypeFilter>({
     shapefile: true,
@@ -77,6 +100,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     geojson: true,
     kml: true,
     csv: true,
+    cad: true,
+    gpx: true,
+    excel: true,
   });
   const [includeSubfolders, setIncludeSubfolders] = useState<boolean>(true);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
@@ -124,6 +150,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       geojson: enable,
       kml: enable,
       csv: enable,
+      cad: enable,
+      gpx: enable,
+      excel: enable,
     });
   };
 
@@ -184,9 +213,49 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   /**
    * Main file processing pipeline with folder awareness & data type filters
    */
-  const handleFiles = async (files: FileList | File[], isFolderSource = false) => {
+  const handleFiles = async (
+    files: FileList | File[], 
+    isFolderSource = false,
+    forcedRecursive?: boolean
+  ) => {
     const rawList = Array.from(files);
     if (rawList.length === 0) return;
+
+    // If folder ingestion and forced choice is not predetermined, check for subfolders
+    if (isFolderSource && forcedRecursive === undefined) {
+      let rootCount = 0;
+      let subfolderCount = 0;
+      const subfolderDirs = new Set<string>();
+
+      for (const file of rawList) {
+        const relPath = (file as any).webkitRelativePath || file.name;
+        const slashCount = (relPath.match(/\//g) || []).length;
+        if (slashCount > 1) {
+          subfolderCount++;
+          const lastSlash = relPath.lastIndexOf('/');
+          if (lastSlash >= 0) subfolderDirs.add(relPath.slice(0, lastSlash));
+        } else {
+          rootCount++;
+        }
+      }
+
+      // If nested subfolders were found and prompting is enabled, open the choice modal!
+      if (subfolderCount > 0 && alwaysPromptSubfolders) {
+        const firstRel = (rawList[0] as any).webkitRelativePath || '';
+        const folderName = firstRel.includes('/') ? firstRel.split('/')[0] : 'Selected Directory';
+
+        setPendingFolderImport({
+          files: rawList,
+          folderName,
+          rootFilesCount: rootCount,
+          subfolderFilesCount: subfolderCount,
+          subfolderCount: subfolderDirs.size,
+        });
+        return;
+      }
+    }
+
+    const effectiveRecursive = forcedRecursive !== undefined ? forcedRecursive : includeSubfolders;
 
     setIsProcessingFiles(true);
     setFileProcessingError(null);
@@ -203,7 +272,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       const relPath = (file as any).webkitRelativePath || file.name;
 
       // Handle subfolder filtering
-      if (isFolderSource && !includeSubfolders && relPath.includes('/')) {
+      if (isFolderSource && !effectiveRecursive && relPath.includes('/')) {
         const slashCount = (relPath.match(/\//g) || []).length;
         if (slashCount > 1) {
           // Exclude files in nested subfolders
@@ -226,15 +295,21 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       const isGeoJson = ['.geojson', '.json'].includes(ext);
       const isKml = ['.kml', '.kmz'].includes(ext);
       const isCsv = ['.csv'].includes(ext);
+      const isCad = ['.dwg', '.dxf'].includes(ext);
+      const isGpx = ext === '.gpx';
+      const isExcel = ['.xlsx', '.xls'].includes(ext);
 
       if (isShape && !dataTypes.shapefile) continue;
       if (isGpkg && !dataTypes.geopackage) continue;
       if (isGeoJson && !dataTypes.geojson) continue;
       if (isKml && !dataTypes.kml) continue;
       if (isCsv && !dataTypes.csv) continue;
+      if (isCad && !dataTypes.cad) continue;
+      if (isGpx && !dataTypes.gpx) continue;
+      if (isExcel && !dataTypes.excel) continue;
 
       // Ignore non-geospatial files silently (e.g. .txt, .pdf, .xml, .DS_Store, .png)
-      if (!isShape && !isGpkg && !isGeoJson && !isKml && !isCsv) {
+      if (!isShape && !isGpkg && !isGeoJson && !isKml && !isCsv && !isCad && !isGpx && !isExcel) {
         continue;
       }
 
@@ -352,6 +427,33 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             );
             if (!kmlFile) throw new Error('The KMZ archive does not contain a KML file.');
             newDatasets.push(parseKML(await kmlFile.async('text'), displayName, file.size));
+          } else if (ext === '.dwg' || ext === '.dxf') {
+            const buf = await file.arrayBuffer();
+            const dataset = await parseCadFile(buf, displayName, file.size);
+            newDatasets.push(dataset);
+          } else if (ext === '.gpx') {
+            const text = await file.text();
+            const dataset = parseGpxFile(text, displayName, file.size);
+            newDatasets.push(dataset);
+          } else if (ext === '.xlsx' || ext === '.xls') {
+            const buf = await file.arrayBuffer();
+            const result = inspectExcelWorkbook(buf, displayName);
+            if (result.dataset && !result.needsManualMapping) {
+              newDatasets.push(result.dataset);
+            } else {
+              setPendingExcelFile({
+                file,
+                buffer: buf,
+                sheetNames: result.sheetNames,
+                selectedSheet: result.selectedSheet,
+                headers: result.headers,
+                previewRows: result.previewRows,
+                detectedXCol: result.detectedXCol,
+                detectedYCol: result.detectedYCol,
+                totalRowCount: result.totalRowCount,
+              });
+              setIsExcelModalOpen(true);
+            }
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -456,7 +558,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".shp,.shx,.dbf,.prj,.cpg,.geojson,.json,.kml,.kmz,.csv,.gpkg,.zip"
+        accept=".shp,.shx,.dbf,.prj,.cpg,.geojson,.json,.kml,.kmz,.csv,.gpkg,.zip,.dwg,.dxf,.gpx,.xlsx,.xls"
         className="hidden"
         onChange={(e) => {
           const files = Array.from(e.currentTarget.files ?? []);
@@ -481,7 +583,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       />
 
       {/* Workspace Header Toolbar */}
-      <div className="px-6 py-3.5 border-b border-stone-800/80 bg-[#181411]/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
+      <div className="relative z-40 px-6 py-3.5 border-b border-stone-800/80 bg-[#181411]/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
         {/* Left: Summary Metrics */}
         <div className="flex items-center space-x-4">
           <div>
@@ -537,7 +639,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 : 'bg-[#241E19] hover:bg-[#2F2620] text-stone-200 hover:text-white border-stone-700/80'
             }`}
           >
-            <FileCode className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-amber-600' : 'text-amber-400'}`} />
+            {isProcessingFiles ? (
+              <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+            ) : (
+              <FileCode className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-amber-600' : 'text-amber-400'}`} />
+            )}
             <span>{t.workspace.selectFiles}</span>
           </button>
 
@@ -545,20 +651,50 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           <button
             onClick={() => folderInputRef.current?.click()}
             disabled={isProcessingFiles}
-            title="Select a whole folder and automatically ingest all geospatial files inside it and subfolders"
+            title="Select a whole folder to ingest geospatial files"
             className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 shadow-md shadow-amber-950/20 transition-all active:scale-95 disabled:opacity-50"
           >
-            <FolderTree className="w-3.5 h-3.5 text-stone-950" />
+            {isProcessingFiles ? (
+              <Loader2 className="w-3.5 h-3.5 text-stone-950 animate-spin" />
+            ) : (
+              <FolderTree className="w-3.5 h-3.5 text-stone-950" />
+            )}
             <span>{isProcessingFiles ? t.common.loading : t.workspace.selectFolder}</span>
           </button>
 
+          {/* Subfolder Mode Toggle Button in Toolbar */}
+          <button
+            type="button"
+            onClick={() => setIncludeSubfolders(!includeSubfolders)}
+            title={includeSubfolders ? "Subfolders: Scanning ALL nested subdirectories. Click to scan root only." : "Subfolders: Scanning ROOT folder only. Click to include subfolders."}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-mono border transition-all ${
+              includeSubfolders
+                ? theme === 'light'
+                  ? 'bg-[#EBF7EE] text-emerald-800 border-emerald-300 font-bold shadow-xs'
+                  : 'bg-emerald-950/60 text-emerald-300 border-emerald-600/50 font-semibold shadow-xs'
+                : theme === 'light'
+                  ? 'bg-stone-100 text-stone-700 border-stone-300'
+                  : 'bg-stone-900 text-stone-400 border-stone-800 hover:text-stone-200'
+            }`}
+          >
+            <FolderTree className={`w-3.5 h-3.5 ${includeSubfolders ? (theme === 'light' ? 'text-emerald-700' : 'text-emerald-400') : 'text-stone-500'}`} />
+            <span>Subfolders:</span>
+            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+              includeSubfolders 
+                ? 'bg-emerald-600 text-white' 
+                : 'bg-stone-700 text-stone-200'
+            }`}>
+              {includeSubfolders ? 'RECURSIVE' : 'ROOT ONLY'}
+            </span>
+          </button>
+
           {/* 3. Ingestion Filters & Data Types Dropdown */}
-          <div className="relative" ref={filterMenuRef}>
+          <div className="relative z-50" ref={filterMenuRef}>
             <button
               onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
               title="Configure data types and subfolder scanning"
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
-                isFilterMenuOpen || activeTypesCount < 5 || !includeSubfolders
+                isFilterMenuOpen || activeTypesCount < 8 || !includeSubfolders
                   ? theme === 'light'
                     ? 'bg-[#FEF3C7] border-[#FCD34D] text-[#92400E] font-bold shadow-xs'
                     : 'bg-amber-950/50 border-amber-600/60 text-amber-300 font-semibold'
@@ -572,7 +708,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
                 theme === 'light' ? 'bg-[#EDE7DC] text-stone-800 font-bold' : 'bg-stone-800/90 text-stone-300'
               }`}>
-                {activeTypesCount}/5
+                {activeTypesCount}/8
               </span>
             </button>
 
@@ -607,10 +743,13 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 </div>
 
                 {/* Data Types Checkboxes */}
-                <div className="py-2.5 space-y-1.5">
+                <div className="py-2.5 space-y-1.5 max-h-60 overflow-y-auto">
                   {[
                     { key: 'geopackage' as const, label: 'GeoPackage (.gpkg)', desc: 'OGC Vector SQLite Database' },
                     { key: 'shapefile' as const, label: 'ESRI Shapefile (.shp / .zip)', desc: 'Bundled .shp, .shx, .dbf, .prj' },
+                    { key: 'cad' as const, label: 'AutoCAD CAD (.dwg / .dxf)', desc: 'Engineering & surveying drawings' },
+                    { key: 'gpx' as const, label: 'GPS Exchange (.gpx)', desc: 'GPS waypoints, tracks, and routes' },
+                    { key: 'excel' as const, label: 'Excel Spreadsheet (.xlsx / .xls)', desc: 'Auto-detects Lon/Lat or manual mapping' },
                     { key: 'geojson' as const, label: 'GeoJSON (.geojson, .json)', desc: 'RFC 7946 Standard' },
                     { key: 'kml' as const, label: 'Google Earth KML / KMZ', desc: 'Placemarks & boundaries' },
                     { key: 'csv' as const, label: 'Spatial CSV (.csv)', desc: 'Coordinate latitude/longitude tables' },
@@ -668,13 +807,25 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           {datasets.length > 0 && (
             <>
               {selectedIds.size > 0 && (
-                <button
-                  onClick={removeSelected}
-                  className="flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-950/50 text-rose-300 border border-rose-800/60 hover:bg-rose-900/50 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>{t.workspace.removeSelected} ({selectedIds.size})</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                  {onStartBatch && (
+                    <button
+                      onClick={() => onStartBatch(Array.from(selectedIds))}
+                      className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-950/30 transition-all active:scale-95"
+                      title="Run batch processing only on the checked datasets"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Process Selected ({selectedIds.size})</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={removeSelected}
+                    className="flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-950/50 text-rose-300 border border-rose-800/60 hover:bg-rose-900/50 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{t.workspace.removeSelected} ({selectedIds.size})</span>
+                  </button>
+                </div>
               )}
               <button
                 onClick={clearAll}
@@ -686,6 +837,24 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           )}
         </div>
       </div>
+
+      {/* Active Ingestion Progress Bar Banner */}
+      {isProcessingFiles && (
+        <div role="status" className="mx-5 mt-3 rounded-xl border border-amber-600/50 bg-amber-950/40 px-4 py-2.5 text-xs text-amber-200 animate-in fade-in-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 font-medium">
+              <Loader2 className="w-4 h-4 text-amber-400 animate-spin shrink-0" />
+              <span>Scanning directories &amp; parsing geospatial vector datasets...</span>
+            </div>
+            <span className="font-mono text-[10px] text-amber-400 font-bold uppercase tracking-wider animate-pulse">
+              Active Ingestion
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-stone-900 rounded-full mt-2 overflow-hidden border border-amber-900/60 p-0.5">
+            <div className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-orange-400 animate-pulse rounded-full w-2/3" />
+          </div>
+        </div>
+      )}
 
       {/* Ingestion Success Feedback Banner */}
       {scanSuccessMessage && (
@@ -729,7 +898,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       )}
 
       {/* Main Drag-and-Drop Area & Table Layout */}
-      <div className="flex-1 flex flex-col p-5 overflow-hidden gap-4">
+      <div className="relative z-10 flex-1 flex flex-col p-5 overflow-hidden gap-4">
         {/* Elevated Drag and Drop Dropzone with Ingestion Filters & Actions */}
         <div
           onDragOver={handleDragOver}
@@ -776,6 +945,29 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 <FolderTree className="w-3.5 h-3.5 text-stone-950" />
                 <span>{t.workspace.selectFolder}</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setIncludeSubfolders(!includeSubfolders)}
+                title={includeSubfolders ? "Subfolders: Scanning ALL nested subdirectories. Click to scan root only." : "Subfolders: Scanning ROOT folder only. Click to include subfolders."}
+                className={`flex items-center space-x-1 px-3 py-2 rounded-xl text-xs font-mono font-medium border transition-all ${
+                  includeSubfolders
+                    ? theme === 'light'
+                      ? 'bg-[#EBF7EE] text-emerald-800 border-emerald-300 font-bold'
+                      : 'bg-emerald-950/60 text-emerald-300 border-emerald-600/50 font-semibold'
+                    : theme === 'light'
+                      ? 'bg-stone-100 text-stone-700 border-stone-300'
+                      : 'bg-[#2A221C] text-stone-400 border-stone-700'
+                }`}
+              >
+                <FolderTree className="w-3.5 h-3.5 shrink-0" />
+                <span>Subfolders:</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                  includeSubfolders ? 'bg-emerald-600 text-white' : 'bg-stone-700 text-stone-200'
+                }`}>
+                  {includeSubfolders ? 'ON' : 'OFF'}
+                </span>
+              </button>
             </div>
 
             {/* Right: Interactive Format Toggle Pills (Click to enable/disable data types) */}
@@ -783,6 +975,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               {[
                 { key: 'shapefile' as const, label: 'SHP', color: 'border-amber-600/40 text-amber-300' },
                 { key: 'geopackage' as const, label: 'GPKG', color: 'border-amber-700/40 text-amber-200' },
+                { key: 'cad' as const, label: 'DWG/DXF', color: 'border-blue-600/40 text-blue-300' },
+                { key: 'gpx' as const, label: 'GPX', color: 'border-teal-600/40 text-teal-300' },
+                { key: 'excel' as const, label: 'XLSX', color: 'border-emerald-500/40 text-emerald-300' },
                 { key: 'geojson' as const, label: 'GEOJSON', color: 'border-emerald-600/40 text-emerald-300' },
                 { key: 'kml' as const, label: 'KML', color: 'border-orange-600/40 text-orange-300' },
                 { key: 'csv' as const, label: 'CSV', color: 'border-stone-700 text-stone-300' },
@@ -848,7 +1043,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             <div className="flex items-center space-x-3 text-xs text-stone-400">
               <div className="flex items-center space-x-1.5">
                 <span className="text-[11px] font-mono text-stone-500 uppercase">Format:</span>
-                {(['all', 'shapefile', 'geopackage', 'geojson', 'kml', 'csv'] as const).map((fmt) => (
+                {(['all', 'shapefile', 'geopackage', 'cad', 'gpx', 'excel', 'geojson', 'kml', 'csv'] as const).map((fmt) => (
                   <button
                     key={fmt}
                     onClick={() => setFilterFormat(fmt)}
@@ -1115,6 +1310,160 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           )}
         </div>
       </div>
+
+      {/* Interactive Excel Coordinate Column Mapper Modal */}
+      <ExcelCoordinateModal
+        isOpen={isExcelModalOpen}
+        onClose={() => {
+          setIsExcelModalOpen(false);
+          setPendingExcelFile(null);
+        }}
+        pendingFile={pendingExcelFile}
+        onConfirmDataset={(newDataset) => {
+          setDatasets(prev => [...prev, newDataset]);
+          if (!selectedDatasetId) {
+            setSelectedDatasetId(newDataset.id);
+          }
+          setIsExcelModalOpen(false);
+          setPendingExcelFile(null);
+        }}
+      />
+
+      {/* Subfolder Ingestion Choice Modal */}
+      {pendingFolderImport && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in-0 duration-200">
+          <div className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden p-6 space-y-5 ${
+            theme === 'light' 
+              ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-amber-950/20' 
+              : 'bg-[#181411] border-stone-800 text-stone-100 shadow-stone-950/90'
+          }`}>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                  <FolderTree className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-sm">
+                    Folder Ingestion: Subfolders Detected
+                  </h3>
+                  <p className="text-xs text-stone-400 font-mono mt-0.5">
+                    &ldquo;{pendingFolderImport.folderName}&rdquo; contains nested directories
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingFolderImport(null)}
+                className="p-1 rounded-lg text-stone-400 hover:text-stone-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-stone-300 leading-relaxed">
+              How would you like to process geospatial datasets inside this directory tree?
+            </p>
+
+            {/* Comparison cards */}
+            <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+              <div className={`p-3 rounded-xl border ${
+                theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+              }`}>
+                <span className="text-[10px] text-stone-400 block uppercase tracking-wider">Root Level</span>
+                <span className="text-base font-bold text-amber-400 block mt-0.5">
+                  {pendingFolderImport.rootFilesCount}
+                </span>
+                <span className="text-[10px] text-stone-500 block mt-0.5">files in top folder</span>
+              </div>
+              <div className={`p-3 rounded-xl border ${
+                theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+              }`}>
+                <span className="text-[10px] text-stone-400 block uppercase tracking-wider">Subfolders</span>
+                <span className="text-base font-bold text-emerald-400 block mt-0.5">
+                  {pendingFolderImport.subfolderFilesCount}
+                </span>
+                <span className="text-[10px] text-stone-500 block mt-0.5">
+                  files across {pendingFolderImport.subfolderCount} subdirectories
+                </span>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="space-y-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const files = pendingFolderImport.files;
+                  setIncludeSubfolders(true);
+                  setPendingFolderImport(null);
+                  void handleFiles(files, true, true);
+                }}
+                className="w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all group bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-semibold shadow-md shadow-amber-950/30"
+              >
+                <div className="flex items-center space-x-3">
+                  <FolderTree className="w-5 h-5 shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold font-display">
+                      Ingest Entire Directory Tree (Include Subfolders)
+                    </div>
+                    <div className="text-[10px] opacity-80 font-mono mt-0.5">
+                      Process all {pendingFolderImport.rootFilesCount + pendingFolderImport.subfolderFilesCount} files across root and nested subfolders
+                    </div>
+                  </div>
+                </div>
+                <Check className="w-4 h-4 shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const files = pendingFolderImport.files;
+                  setIncludeSubfolders(false);
+                  setPendingFolderImport(null);
+                  void handleFiles(files, true, false);
+                }}
+                className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                  theme === 'light'
+                    ? 'bg-white border-[#D6CEBE] text-stone-800 hover:bg-stone-50'
+                    : 'bg-[#1E1915] border-stone-700 text-stone-200 hover:bg-[#27201B]'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Database className="w-5 h-5 text-stone-400 shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold font-display">
+                      Ingest Root Folder Only
+                    </div>
+                    <div className="text-[10px] text-stone-400 font-mono mt-0.5">
+                      Process only the {pendingFolderImport.rootFilesCount} files in the root folder, ignoring subdirectories
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-stone-800 flex items-center justify-between text-xs">
+              <label className="flex items-center space-x-2 text-[11px] text-stone-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={alwaysPromptSubfolders}
+                  onChange={(e) => setAlwaysPromptSubfolders(e.target.checked)}
+                  className="rounded border-stone-700 bg-stone-900 text-amber-500 focus:ring-amber-500/40"
+                />
+                <span>Always ask when subfolders are detected</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setPendingFolderImport(null)}
+                className="text-stone-400 hover:text-stone-200 text-xs px-2.5 py-1 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

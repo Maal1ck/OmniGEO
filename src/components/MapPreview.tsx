@@ -27,7 +27,11 @@ import {
   Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
-  X
+  X,
+  CheckSquare,
+  Square,
+  ZoomIn,
+  Check
 } from 'lucide-react';
 import { SpatialDataset, ConversionJob } from '../types/gis';
 import { SurfaceUnit } from '../core/spatialAnalytics';
@@ -46,13 +50,25 @@ interface MapPreviewProps {
   isOverlayOpen?: boolean;
 }
 
-const LAYER_PALETTE = [
-  { name: 'Amber', hex: '#F59E0B' },
-  { name: 'Terracotta', hex: '#EA580C' },
-  { name: 'Emerald', hex: '#10B981' },
-  { name: 'Cyan', hex: '#06B6D4' },
-  { name: 'Indigo', hex: '#6366F1' },
-  { name: 'Rose', hex: '#F43F5E' },
+export const LAYER_PALETTE = [
+  { name: 'Amber Gold', hex: '#F59E0B' },
+  { name: 'Sunset Terracotta', hex: '#EA580C' },
+  { name: 'Deep Rust', hex: '#C2410C' },
+  { name: 'Sunburst Ochre', hex: '#D97706' },
+  { name: 'Lemon Lime', hex: '#EAB308' },
+  { name: 'Chartreuse', hex: '#84CC16' },
+  { name: 'Emerald Green', hex: '#10B981' },
+  { name: 'Sage Mint', hex: '#14B8A6' },
+  { name: 'Deep Forest', hex: '#059669' },
+  { name: 'Ocean Cyan', hex: '#06B6D4' },
+  { name: 'Sky Azure', hex: '#0284C7' },
+  { name: 'Cobalt Royal', hex: '#2563EB' },
+  { name: 'Deep Indigo', hex: '#6366F1' },
+  { name: 'Amethyst Violet', hex: '#9333EA' },
+  { name: 'Fuchsia Magenta', hex: '#D946EF' },
+  { name: 'Coral Rose', hex: '#F43F5E' },
+  { name: 'Ruby Crimson', hex: '#E11D48' },
+  { name: 'Titanium Slate', hex: '#64748B' },
 ];
 
 export const MapPreview: React.FC<MapPreviewProps> = ({
@@ -68,11 +84,119 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
   const { theme } = useTheme();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const geojsonLayerRef = useRef<L.GeoJSON | null>(null);
+  const multiGeojsonLayersRef = useRef<Map<string, L.GeoJSON>>(new Map());
   const outputGeojsonLayerRef = useRef<L.GeoJSON | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
   const [basemap, setBasemap] = useState<'dark' | 'osm' | 'satellite' | 'offline_grid'>(() => theme === 'light' ? 'osm' : 'dark');
+
+  // Multi-layer visibility and per-layer style maps
+  const [visibleLayerIds, setVisibleLayerIds] = useState<Set<string>>(() => {
+    if (datasets.length > 0) {
+      return new Set(datasets.map(d => d.id));
+    }
+    return dataset ? new Set([dataset.id]) : new Set();
+  });
+
+  const [layerStyles, setLayerStyles] = useState<Record<string, { color: string; opacity: number }>>(() => {
+    const initial: Record<string, { color: string; opacity: number }> = {};
+    datasets.forEach((d, i) => {
+      initial[d.id] = {
+        color: LAYER_PALETTE[i % LAYER_PALETTE.length].hex,
+        opacity: 0.85,
+      };
+    });
+    return initial;
+  });
+
+  const [colorPickerLayerId, setColorPickerLayerId] = useState<string | null>(null);
+  const [legendTab, setLegendTab] = useState<'layers' | 'style'>('layers');
+
+  // Keep layerStyles and visibleLayerIds in sync as datasets are added or updated
+  useEffect(() => {
+    setLayerStyles(prev => {
+      const next = { ...prev };
+      let changed = false;
+      datasets.forEach((d, i) => {
+        if (!next[d.id]) {
+          next[d.id] = {
+            color: LAYER_PALETTE[i % LAYER_PALETTE.length].hex,
+            opacity: 0.85,
+          };
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+
+    setVisibleLayerIds(prev => {
+      const next = new Set(prev);
+      let changed = false;
+      datasets.forEach(d => {
+        if (!prev.has(d.id)) {
+          next.add(d.id);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [datasets]);
+
+  // Ensure inspected dataset is visible
+  useEffect(() => {
+    if (dataset && !visibleLayerIds.has(dataset.id)) {
+      setVisibleLayerIds(prev => new Set([...prev, dataset.id]));
+    }
+  }, [dataset?.id]);
+
+  // Active layer color & opacity shorthand based on inspected dataset
+  const activeLayerColor = dataset && layerStyles[dataset.id]?.color 
+    ? layerStyles[dataset.id].color 
+    : '#F59E0B';
+  const activeLayerOpacity = dataset && layerStyles[dataset.id]?.opacity !== undefined 
+    ? layerStyles[dataset.id].opacity 
+    : 0.85;
+  const isInspectionLayerVisible = dataset ? visibleLayerIds.has(dataset.id) : false;
+
+  const toggleLayerVisibility = (layerId: string) => {
+    setVisibleLayerIds(prev => {
+      const next = new Set(prev);
+      if (next.has(layerId)) {
+        next.delete(layerId);
+      } else {
+        next.add(layerId);
+      }
+      return next;
+    });
+  };
+
+  const showAllLayers = () => {
+    setVisibleLayerIds(new Set(datasets.map(d => d.id)));
+  };
+
+  const hideAllLayers = () => {
+    setVisibleLayerIds(new Set());
+  };
+
+  const updateLayerColor = (layerId: string, color: string) => {
+    setLayerStyles(prev => ({
+      ...prev,
+      [layerId]: {
+        ...(prev[layerId] || { opacity: 0.85 }),
+        color,
+      },
+    }));
+  };
+
+  const updateLayerOpacity = (layerId: string, opacity: number) => {
+    setLayerStyles(prev => ({
+      ...prev,
+      [layerId]: {
+        ...(prev[layerId] || { color: '#F59E0B' }),
+        opacity,
+      },
+    }));
+  };
 
   // Sync basemap when theme toggles
   useEffect(() => {
@@ -229,76 +353,104 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
     }
   }, [basemap]);
 
-  // Render Dataset GeoJSON on Map with customizable symbology & visibility
+  // Render Multi-Layer Dataset GeoJSON on Map with customizable symbology & visibility
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    if (geojsonLayerRef.current) {
-      map.removeLayer(geojsonLayerRef.current);
-      geojsonLayerRef.current = null;
-    }
-
     setMapProjectionError(null);
     setMapProjectionWarning(null);
-    if (!dataset || !dataset.geojson || !isLayerVisible) return;
 
-    try {
-      const sourceCRS = dataset.detectedCRS?.code;
-      if (!sourceCRS || !getCRSByCode(sourceCRS)) {
-        throw new Error(`Cannot display this layer because its source CRS (${sourceCRS || 'unknown'}) is not available.`);
+    // 1. Remove any layers that are no longer in visibleLayerIds or have been deleted
+    const currentDatasetIds = new Set(datasets.map(d => d.id));
+    multiGeojsonLayersRef.current.forEach((layer, id) => {
+      if (!visibleLayerIds.has(id) || !currentDatasetIds.has(id)) {
+        map.removeLayer(layer);
+        multiGeojsonLayersRef.current.delete(id);
+      }
+    });
+
+    // 2. Add or update layers for each visible dataset
+    datasets.forEach((d, idx) => {
+      if (!visibleLayerIds.has(d.id) || !d.geojson) return;
+
+      const style = layerStyles[d.id] || {
+        color: LAYER_PALETTE[idx % LAYER_PALETTE.length].hex,
+        opacity: 0.85,
+      };
+
+      const existingLayer = multiGeojsonLayersRef.current.get(d.id);
+      if (existingLayer) {
+        // Just update symbology properties
+        existingLayer.setStyle({
+          color: style.color,
+          weight: d.id === dataset?.id ? 2.5 : 1.5,
+          opacity: style.opacity,
+          fillColor: style.color,
+          fillOpacity: style.opacity * 0.35,
+        });
+        existingLayer.eachLayer((subLayer: any) => {
+          if (subLayer.setStyle) {
+            subLayer.setStyle({
+              color: style.color,
+              fillColor: style.color,
+              opacity: style.opacity,
+              fillOpacity: style.opacity * (subLayer.feature?.geometry?.type?.includes('Point') ? 0.9 : 0.35),
+            });
+          }
+        });
+        return;
       }
 
-      const reprojection = sourceCRS === 'EPSG:4326'
-        ? { geojson: dataset.geojson, warnings: [] as string[] }
-        : reprojectGeoJSON(dataset.geojson, sourceCRS, 'EPSG:4326');
-      const coordinateErrors = reprojection.warnings.filter(warning => warning.startsWith('Coordinate transform error:'));
-      if (coordinateErrors.length > 0) {
-        throw new Error(coordinateErrors[0]);
+      // Create new Leaflet GeoJSON layer
+      try {
+        const sourceCRS = d.detectedCRS?.code || 'EPSG:4326';
+        if (!getCRSByCode(sourceCRS)) {
+          console.warn(`Source CRS ${sourceCRS} not available for ${d.name}`);
+        }
+
+        const reprojection = sourceCRS === 'EPSG:4326'
+          ? { geojson: d.geojson, warnings: [] as string[] }
+          : reprojectGeoJSON(d.geojson, sourceCRS, 'EPSG:4326');
+
+        const newLayer = L.geoJSON(reprojection.geojson, {
+          style: () => ({
+            color: style.color,
+            weight: d.id === dataset?.id ? 2.5 : 1.5,
+            opacity: style.opacity,
+            fillColor: style.color,
+            fillOpacity: style.opacity * 0.35,
+          }),
+          pointToLayer: (feature, latlng) => {
+            return L.circleMarker(latlng, {
+              radius: d.id === dataset?.id ? 7 : 5,
+              fillColor: style.color,
+              color: '#1C1917',
+              weight: 2,
+              opacity: style.opacity,
+              fillOpacity: style.opacity * 0.9,
+            });
+          },
+          onEachFeature: (feature, fLayer) => {
+            fLayer.on({
+              click: () => {
+                onSelectDataset(d);
+                setSelectedFeatureProps(feature.properties || {});
+              },
+            });
+          },
+        }).addTo(map);
+
+        multiGeojsonLayersRef.current.set(d.id, newLayer);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`Layer render error for ${d.name}:`, err);
+        if (d.id === dataset?.id) {
+          setMapProjectionError(message);
+        }
       }
-      const approximateWarning = reprojection.warnings.find(warning => warning.includes('not bundled'));
-      if (approximateWarning) setMapProjectionWarning(approximateWarning);
-
-      const layer = L.geoJSON(reprojection.geojson, {
-        style: () => ({
-          color: layerColor,
-          weight: 2,
-          opacity: layerOpacity,
-          fillColor: layerColor,
-          fillOpacity: layerOpacity * 0.35,
-        }),
-        pointToLayer: (feature, latlng) => {
-          return L.circleMarker(latlng, {
-            radius: 6,
-            fillColor: layerColor,
-            color: '#1C1917',
-            weight: 2,
-            opacity: layerOpacity,
-            fillOpacity: layerOpacity * 0.9,
-          });
-        },
-        onEachFeature: (feature, fLayer) => {
-          fLayer.on({
-            click: () => {
-              setSelectedFeatureProps(feature.properties || {});
-            },
-          });
-        },
-      }).addTo(map);
-
-      geojsonLayerRef.current = layer;
-
-      // Fit map to layer bounds
-      const bounds = layer.getBounds();
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('Map preview render error:', err);
-      setMapProjectionError(message);
-    }
-  }, [dataset, isLayerVisible, layerColor, layerOpacity]);
+    });
+  }, [datasets, visibleLayerIds, layerStyles, dataset?.id]);
 
   // Render Processed Output comparison layer
   useEffect(() => {
@@ -356,10 +508,27 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
   const fitCurrentBounds = () => {
     const map = mapInstanceRef.current;
-    if (!map || !geojsonLayerRef.current) return;
-    const bounds = geojsonLayerRef.current.getBounds();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40] });
+    if (!map) return;
+    const groupBounds = L.latLngBounds([]);
+    multiGeojsonLayersRef.current.forEach((layer) => {
+      const b = layer.getBounds();
+      if (b.isValid()) groupBounds.extend(b);
+    });
+    if (groupBounds.isValid()) {
+      map.fitBounds(groupBounds, { padding: [40, 40] });
+    } else if (dataset && multiGeojsonLayersRef.current.has(dataset.id)) {
+      const b = multiGeojsonLayersRef.current.get(dataset.id)!.getBounds();
+      if (b.isValid()) map.fitBounds(b, { padding: [40, 40] });
+    }
+  };
+
+  const fitSingleLayerBounds = (layerId: string) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const layer = multiGeojsonLayersRef.current.get(layerId);
+    if (layer) {
+      const b = layer.getBounds();
+      if (b.isValid()) map.fitBounds(b, { padding: [40, 40], maxZoom: 16 });
     }
   };
 
@@ -430,6 +599,16 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 {dataset.detectedCRS?.code || 'EPSG:4326'}
               </span>
               <span>{dataset.featureCount} {t.common.features}</span>
+            </div>
+          )}
+
+          {/* Multi-layer Active Status Badge */}
+          {datasets.length > 1 && (
+            <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#201A16] border border-stone-800 text-stone-300 font-mono text-[11px]">
+              <Layers className="w-3 h-3 text-amber-400" />
+              <span>
+                <strong className="text-amber-400">{visibleLayerIds.size}</strong>/{datasets.length} visible
+              </span>
             </div>
           )}
         </div>
@@ -604,16 +783,19 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
       {/* Main Workspace Body: Legend Sidebar OUTSIDE Map Frame + Map Canvas Area */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
         
-        {/* DEDICATED CARTOGRAPHIC LEGEND SIDEBAR (Completely outside map frame to eliminate glitches) */}
-        {isLegendOpen && dataset && (
-          <aside className="w-72 lg:w-80 flex-shrink-0 border-r border-stone-800 bg-[#16120F] flex flex-col h-full z-10 shadow-xl overflow-y-auto">
-            {/* Legend Header */}
-            <div className="p-4 border-b border-stone-800 flex items-center justify-between bg-[#130F0D]">
+        {/* DEDICATED CARTOGRAPHIC MULTI-LAYER & LEGEND SIDEBAR (Outside map frame to eliminate Leaflet resize glitches) */}
+        {isLegendOpen && (
+          <aside className="w-80 lg:w-88 flex-shrink-0 border-r border-stone-800 bg-[#16120F] flex flex-col h-full z-10 shadow-xl overflow-y-auto">
+            {/* Sidebar Header */}
+            <div className="p-3.5 border-b border-stone-800 flex items-center justify-between bg-[#130F0D]">
               <div className="flex items-center space-x-2">
-                <Palette className="w-4 h-4 text-amber-400" />
+                <Layers className="w-4 h-4 text-amber-400" />
                 <h3 className="font-display font-bold text-stone-100 text-xs tracking-wide">
-                  {t.map.legendTitle}
+                  Multi-Layer GIS Studio
                 </h3>
+                <span className="px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-700/50 text-[10px] font-mono font-semibold">
+                  {visibleLayerIds.size}/{datasets.length}
+                </span>
               </div>
               <button
                 onClick={() => setIsLegendOpen(false)}
@@ -624,188 +806,376 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               </button>
             </div>
 
-            <div className="p-4 space-y-5 text-xs font-sans">
-              {/* Active Layer Details */}
-              <div className="p-3.5 rounded-2xl bg-[#1D1714] border border-stone-800 space-y-3 shadow-inner">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    {/* Visual Symbology Swatch */}
-                    {dataset.geometryType.includes('Polygon') ? (
-                      <div 
-                        className="w-5 h-5 rounded border border-white/80 shadow-sm"
-                        style={{ backgroundColor: layerColor, opacity: layerOpacity }}
-                        title="Polygon Fill Swatch"
-                      />
-                    ) : dataset.geometryType.includes('Line') ? (
-                      <div 
-                        className="w-6 h-1.5 rounded shadow-sm"
-                        style={{ backgroundColor: layerColor }}
-                        title="Line Stroke Swatch"
-                      />
-                    ) : (
-                      <div 
-                        className="w-4 h-4 rounded-full border-2 border-white/90 shadow-sm"
-                        style={{ backgroundColor: layerColor }}
-                        title="Point Node Swatch"
-                      />
-                    )}
-                    <div>
-                      <span className="font-display font-bold text-stone-100 text-xs block truncate max-w-[150px]">
-                        {dataset.name}
-                      </span>
-                      <span className="text-[10px] text-stone-400 font-mono">
-                        {dataset.format.toUpperCase()} · {dataset.geometryType}
-                      </span>
+            {/* Sidebar Navigation Tabs: All Layers vs Active Symbology */}
+            <div className="flex border-b border-stone-800 bg-[#130F0D] text-xs font-mono">
+              <button
+                onClick={() => setLegendTab('layers')}
+                className={`flex-1 py-2 px-3 flex items-center justify-center space-x-1.5 transition-colors border-b-2 ${
+                  legendTab === 'layers'
+                    ? 'border-amber-500 text-amber-300 font-bold bg-[#1C1714]'
+                    : 'border-transparent text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                <span>Layers ({datasets.length})</span>
+              </button>
+              <button
+                onClick={() => setLegendTab('style')}
+                className={`flex-1 py-2 px-3 flex items-center justify-center space-x-1.5 transition-colors border-b-2 ${
+                  legendTab === 'style'
+                    ? 'border-amber-500 text-amber-300 font-bold bg-[#1C1714]'
+                    : 'border-transparent text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <Palette className="w-3.5 h-3.5 text-amber-400" />
+                <span>Symbology</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Multi-Layer Manager & Stack */}
+            {legendTab === 'layers' && (
+              <div className="p-3.5 space-y-4 text-xs font-sans">
+                {/* Mass Control Toolbar */}
+                <div className="flex items-center justify-between gap-1.5 text-[11px] font-mono pb-2 border-b border-stone-800">
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      onClick={showAllLayers}
+                      className="px-2 py-1 rounded-md bg-[#241E19] hover:bg-[#2F2620] text-amber-300 border border-stone-700/80 transition-colors"
+                      title="Make all layers visible simultaneously"
+                    >
+                      Show All
+                    </button>
+                    <button
+                      onClick={hideAllLayers}
+                      className="px-2 py-1 rounded-md bg-[#241E19] hover:bg-[#2F2620] text-stone-400 hover:text-stone-200 border border-stone-700/80 transition-colors"
+                      title="Hide all layers"
+                    >
+                      Hide All
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={fitCurrentBounds}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-amber-950/70 hover:bg-amber-900/70 text-amber-300 border border-amber-600/60 transition-colors"
+                    title="Fit view to combined extent of all visible layers"
+                  >
+                    <Maximize2 className="w-3 h-3 text-amber-400" />
+                    <span>Fit Extent</span>
+                  </button>
+                </div>
+
+                {/* Layer Items Stack */}
+                <div className="space-y-2.5">
+                  {datasets.length === 0 ? (
+                    <div className="p-6 text-center text-stone-500 space-y-2">
+                      <Layers className="w-8 h-8 mx-auto text-stone-600" />
+                      <p className="text-xs">No layers loaded in workspace</p>
+                      <p className="text-[10px]">Import GIS datasets in the Workspace tab to visualize them on the canvas.</p>
+                    </div>
+                  ) : (
+                    datasets.map((d, idx) => {
+                      const isVis = visibleLayerIds.has(d.id);
+                      const isSelected = dataset?.id === d.id;
+                      const style = layerStyles[d.id] || {
+                        color: LAYER_PALETTE[idx % LAYER_PALETTE.length].hex,
+                        opacity: 0.85,
+                      };
+                      const isPickerOpen = colorPickerLayerId === d.id;
+
+                      return (
+                        <div
+                          key={d.id}
+                          className={`p-3 rounded-2xl border transition-all ${
+                            isSelected
+                              ? 'bg-[#221A15] border-amber-600/70 shadow-sm ring-1 ring-amber-500/30'
+                              : 'bg-[#181411] border-stone-800/90 hover:border-stone-700'
+                          }`}
+                        >
+                          {/* Row 1: Checkbox, Swatch, Name & Actions */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                              {/* Visibility Toggle Checkbox */}
+                              <button
+                                type="button"
+                                onClick={() => toggleLayerVisibility(d.id)}
+                                className="text-amber-400 hover:text-amber-300 shrink-0"
+                                title={isVis ? 'Hide layer on map' : 'Show layer on map'}
+                              >
+                                {isVis ? (
+                                  <CheckSquare className="w-4 h-4 text-amber-400" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-stone-600" />
+                                )}
+                              </button>
+
+                              {/* Interactive Color Swatch */}
+                              <button
+                                type="button"
+                                onClick={() => setColorPickerLayerId(isPickerOpen ? null : d.id)}
+                                style={{ backgroundColor: style.color }}
+                                className="w-4 h-4 rounded-full border border-white/70 shadow-sm shrink-0 transition-transform hover:scale-125 cursor-pointer"
+                                title="Click to pick a color for this layer"
+                              />
+
+                              {/* Layer Name & Feature Count */}
+                              <div 
+                                onClick={() => onSelectDataset(d)}
+                                className="min-w-0 flex-1 cursor-pointer"
+                                title="Click to inspect this layer"
+                              >
+                                <span className={`font-display font-bold text-xs truncate block ${
+                                  isSelected ? 'text-amber-200' : 'text-stone-200 hover:text-white'
+                                }`}>
+                                  {d.name}
+                                </span>
+                                <span className="text-[10px] text-stone-400 font-mono block">
+                                  {d.format.toUpperCase()} · {d.geometryType} · {d.featureCount} feats
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Right Actions: Zoom to layer & Inspect */}
+                            <div className="flex items-center space-x-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => fitSingleLayerBounds(d.id)}
+                                className="p-1 rounded-md text-stone-400 hover:text-amber-300 hover:bg-stone-800 transition-colors"
+                                title="Zoom map to this layer"
+                              >
+                                <ZoomIn className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Inline Color Palette Picker Popover */}
+                          {isPickerOpen && (
+                            <div className="mt-2.5 pt-2.5 border-t border-stone-800/80 animate-in fade-in-0 duration-150">
+                              <div className="flex items-center justify-between text-[10px] font-mono text-stone-400 mb-1.5">
+                                <span>Curated Palette (18 Colors):</span>
+                                <label className="flex items-center space-x-1 text-amber-400 cursor-pointer hover:underline">
+                                  <span>Custom</span>
+                                  <input
+                                    type="color"
+                                    value={style.color}
+                                    onChange={(e) => updateLayerColor(d.id, e.target.value)}
+                                    className="w-4 h-4 rounded border-0 cursor-pointer p-0 bg-transparent"
+                                  />
+                                </label>
+                              </div>
+
+                              <div className="grid grid-cols-6 gap-1.5 pt-1">
+                                {LAYER_PALETTE.map((p) => (
+                                  <button
+                                    key={p.hex}
+                                    type="button"
+                                    onClick={() => {
+                                      updateLayerColor(d.id, p.hex);
+                                      setColorPickerLayerId(null);
+                                    }}
+                                    style={{ backgroundColor: p.hex }}
+                                    className={`w-5 h-5 rounded-md transition-all ${
+                                      style.color.toLowerCase() === p.hex.toLowerCase()
+                                        ? 'ring-2 ring-white scale-110 shadow-md'
+                                        : 'opacity-80 hover:opacity-100 hover:scale-105'
+                                    }`}
+                                    title={p.name}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Per-Layer Opacity Slider */}
+                          <div className="mt-2 pt-2 border-t border-stone-800/60 flex items-center space-x-2 text-[10px] font-mono text-stone-400">
+                            <span className="shrink-0">Opacity:</span>
+                            <input
+                              type="range"
+                              min="0.1"
+                              max="1"
+                              step="0.05"
+                              value={style.opacity}
+                              onChange={(e) => updateLayerOpacity(d.id, parseFloat(e.target.value))}
+                              className="w-full accent-amber-500 cursor-pointer h-1"
+                            />
+                            <span className="tabular-nums text-stone-300 w-8 text-right font-semibold">
+                              {Math.round(style.opacity * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Active Layer Symbology & Geodesy Details */}
+            {legendTab === 'style' && dataset && (
+              <div className="p-4 space-y-5 text-xs font-sans">
+                {/* Active Layer Details */}
+                <div className="p-3.5 rounded-2xl bg-[#1D1714] border border-stone-800 space-y-3 shadow-inner">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2.5">
+                      {/* Visual Symbology Swatch */}
+                      {dataset.geometryType.includes('Polygon') ? (
+                        <div 
+                          className="w-5 h-5 rounded border border-white/80 shadow-sm"
+                          style={{ backgroundColor: activeLayerColor, opacity: activeLayerOpacity }}
+                          title="Polygon Fill Swatch"
+                        />
+                      ) : dataset.geometryType.includes('Line') ? (
+                        <div 
+                          className="w-6 h-1.5 rounded shadow-sm"
+                          style={{ backgroundColor: activeLayerColor }}
+                          title="Line Stroke Swatch"
+                        />
+                      ) : (
+                        <div 
+                          className="w-4 h-4 rounded-full border-2 border-white/90 shadow-sm"
+                          style={{ backgroundColor: activeLayerColor }}
+                          title="Point Node Swatch"
+                        />
+                      )}
+                      <div>
+                        <span className="font-display font-bold text-stone-100 text-xs block truncate max-w-[150px]">
+                          {dataset.name}
+                        </span>
+                        <span className="text-[10px] text-stone-400 font-mono">
+                          {dataset.format.toUpperCase()} · {dataset.geometryType}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Visibility Button */}
+                    <button
+                      onClick={() => toggleLayerVisibility(dataset.id)}
+                      className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-300 transition-colors"
+                      title={isInspectionLayerVisible ? 'Hide Layer on Canvas' : 'Show Layer on Canvas'}
+                    >
+                      {isInspectionLayerVisible ? <Eye className="w-4 h-4 text-amber-400" /> : <EyeOff className="w-4 h-4 text-stone-500" />}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-stone-400 font-mono pt-1 border-t border-stone-800/80">
+                    <span>{t.map.recordCount}:</span>
+                    <span className="text-stone-200 font-semibold">{dataset.featureCount} {t.common.features}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-stone-400 font-mono">
+                    <span>{t.map.datumCrs}:</span>
+                    <span className="text-amber-400 font-bold">{dataset.detectedCRS?.code || 'EPSG:4326'}</span>
+                  </div>
+
+                  {/* Expanded 18-Color Palette Swatches */}
+                  <div className="pt-2 border-t border-stone-800/80 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] font-mono text-stone-400">
+                      <span className="uppercase font-semibold">{t.map.symbologyColor}:</span>
+                      <label className="flex items-center space-x-1 text-amber-400 cursor-pointer hover:underline">
+                        <span>Custom Color</span>
+                        <input
+                          type="color"
+                          value={activeLayerColor}
+                          onChange={(e) => updateLayerColor(dataset.id, e.target.value)}
+                          className="w-4 h-4 rounded border-0 cursor-pointer p-0 bg-transparent"
+                        />
+                      </label>
+                    </div>
+                    
+                    <div className="grid grid-cols-6 gap-1.5 pt-1">
+                      {LAYER_PALETTE.map(p => (
+                        <button
+                          key={p.hex}
+                          onClick={() => updateLayerColor(dataset.id, p.hex)}
+                          style={{ backgroundColor: p.hex }}
+                          className={`w-6 h-6 rounded-md transition-all ${
+                            activeLayerColor.toLowerCase() === p.hex.toLowerCase() 
+                              ? 'scale-115 ring-2 ring-white shadow-md' 
+                              : 'opacity-70 hover:opacity-100 hover:scale-105'
+                          }`}
+                          title={p.name}
+                        />
+                      ))}
                     </div>
                   </div>
 
-                  {/* Visibility Button */}
-                  <button
-                    onClick={() => setIsLayerVisible(!isLayerVisible)}
-                    className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-300 transition-colors"
-                    title={isLayerVisible ? 'Hide Layer on Canvas' : 'Show Layer on Canvas'}
-                  >
-                    {isLayerVisible ? <Eye className="w-4 h-4 text-amber-400" /> : <EyeOff className="w-4 h-4 text-stone-500" />}
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-stone-400 font-mono pt-1 border-t border-stone-800/80">
-                  <span>{t.map.recordCount}:</span>
-                  <span className="text-stone-200 font-semibold">{dataset.featureCount} {t.common.features}</span>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-stone-400 font-mono">
-                  <span>{t.map.datumCrs}:</span>
-                  <span className="text-amber-400 font-bold">{dataset.detectedCRS?.code || 'EPSG:4326'}</span>
-                </div>
-
-                {/* Color Palette Swatches */}
-                <div className="pt-2 border-t border-stone-800/80 space-y-1.5">
-                  <span className="text-[10px] text-stone-400 uppercase font-mono font-semibold block">
-                    {t.map.symbologyColor}:
-                  </span>
-                  <div className="flex items-center space-x-2 pt-0.5">
-                    {LAYER_PALETTE.map(p => (
-                      <button
-                        key={p.hex}
-                        onClick={() => setLayerColor(p.hex)}
-                        style={{ backgroundColor: p.hex }}
-                        className={`w-5 h-5 rounded-full transition-transform ${
-                          layerColor === p.hex ? 'scale-125 ring-2 ring-white shadow-md' : 'opacity-70 hover:opacity-100'
-                        }`}
-                        title={p.name}
-                      />
-                    ))}
+                  {/* Fill Opacity Slider */}
+                  <div className="pt-2 border-t border-stone-800/80 space-y-1.5">
+                    <div className="flex justify-between text-[10px] text-stone-400 font-mono">
+                      <span>{t.map.fillOpacity}:</span>
+                      <span className="text-amber-400 font-bold">{Math.round(activeLayerOpacity * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1"
+                      step="0.05"
+                      value={activeLayerOpacity}
+                      onChange={(e) => updateLayerOpacity(dataset.id, parseFloat(e.target.value))}
+                      className="w-full accent-amber-500 cursor-pointer h-1.5"
+                    />
                   </div>
                 </div>
 
-                {/* Fill Opacity Slider */}
-                <div className="pt-2 border-t border-stone-800/80 space-y-1.5">
-                  <div className="flex justify-between text-[10px] text-stone-400 font-mono">
-                    <span>{t.map.fillOpacity}:</span>
-                    <span className="text-amber-400 font-bold">{Math.round(layerOpacity * 100)}%</span>
+                {/* Reprojected Comparison Layer Legend if active */}
+                {showOutputCompare && processedJob && (
+                  <div className="p-3.5 rounded-2xl bg-orange-950/30 border border-orange-700/50 space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-5 h-3.5 rounded border-2 border-dashed border-orange-400 bg-orange-500/30" />
+                      <span className="font-display font-bold text-orange-200 text-xs">
+                        {t.map.targetReprojection}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-orange-300 font-mono">
+                      Target CRS: <span className="font-bold text-orange-400">{processedJob.targetCRS}</span>
+                    </div>
+                    <p className="text-[10px] text-stone-400 leading-relaxed font-sans">
+                      {t.map.conformalDrift}
+                    </p>
                   </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1"
-                    step="0.05"
-                    value={layerOpacity}
-                    onChange={(e) => setLayerOpacity(parseFloat(e.target.value))}
-                    className="w-full accent-amber-500 cursor-pointer h-1.5"
-                  />
-                </div>
-              </div>
-
-              {/* Reprojected Comparison Layer Legend if active */}
-              {showOutputCompare && processedJob && (
-                <div className="p-3.5 rounded-2xl bg-orange-950/30 border border-orange-700/50 space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-5 h-3.5 rounded border-2 border-dashed border-orange-400 bg-orange-500/30" />
-                    <span className="font-display font-bold text-orange-200 text-xs">
-                      {t.map.targetReprojection}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-orange-300 font-mono">
-                    Target CRS: <span className="font-bold text-orange-400">{processedJob.targetCRS}</span>
-                  </div>
-                  <p className="text-[10px] text-stone-400 leading-relaxed font-sans">
-                    {t.map.conformalDrift}
-                  </p>
-                </div>
-              )}
-
-              {/* Quick Actions in Legend Dock */}
-              <div className="space-y-2 pt-2 border-t border-stone-800">
-                <span className="text-[10px] text-stone-400 uppercase font-mono font-semibold block">
-                  {t.map.quickActions}:
-                </span>
-                
-                {onCalculateSurfaces && dataset.geometryType.includes('Polygon') && (
-                  <button
-                    onClick={() => onCalculateSurfaces('ha')}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border border-stone-800 transition-colors"
-                  >
-                    <span className="flex items-center space-x-2">
-                      <Calculator className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{t.craft.calcHaBtn}</span>
-                    </span>
-                    <span className="font-mono text-[10px] text-amber-400 font-bold">+column</span>
-                  </button>
                 )}
 
-                {onOpenAggregationModal && (
-                  <button
-                    onClick={onOpenAggregationModal}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-orange-300 border border-stone-800 transition-colors"
-                  >
-                    <span className="flex items-center space-x-2">
-                      <PieChart className="w-3.5 h-3.5 text-orange-400" />
-                      <span>{t.map.aggregateBtn}</span>
-                    </span>
-                    <span className="font-mono text-[10px] text-orange-400 font-bold">Group Σ</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={fitCurrentBounds}
-                  className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border border-stone-800 transition-colors"
-                >
-                  <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{t.map.zoomExtent}</span>
-                </button>
-              </div>
-
-              {/* Other Loaded Datasets in Workspace */}
-              {datasets.length > 1 && (
+                {/* Quick Actions in Legend Dock */}
                 <div className="space-y-2 pt-2 border-t border-stone-800">
                   <span className="text-[10px] text-stone-400 uppercase font-mono font-semibold block">
-                    {t.map.allLayers} ({datasets.length}):
+                    {t.map.quickActions}:
                   </span>
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                    {datasets.map(d => (
-                      <div
-                        key={d.id}
-                        onClick={() => onSelectDataset(d)}
-                        className={`p-2 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                          dataset.id === d.id
-                            ? 'bg-amber-950/60 border-amber-600/70 text-amber-300'
-                            : 'bg-[#181411] border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700'
-                        }`}
-                      >
-                        <div className="truncate max-w-[180px]">
-                          <span className="font-semibold block truncate text-[11px]">{d.name}</span>
-                          <span className="text-[9px] font-mono opacity-80">{d.geometryType} · {d.featureCount} feats</span>
-                        </div>
-                        {dataset.id === d.id && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  
+                  {onCalculateSurfaces && dataset.geometryType.includes('Polygon') && (
+                    <button
+                      onClick={() => onCalculateSurfaces('ha')}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border border-stone-800 transition-colors"
+                    >
+                      <span className="flex items-center space-x-2">
+                        <Calculator className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{t.craft.calcHaBtn}</span>
+                      </span>
+                      <span className="font-mono text-[10px] text-amber-400 font-bold">+column</span>
+                    </button>
+                  )}
+
+                  {onOpenAggregationModal && (
+                    <button
+                      onClick={onOpenAggregationModal}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-orange-300 border border-stone-800 transition-colors"
+                    >
+                      <span className="flex items-center space-x-2">
+                        <PieChart className="w-3.5 h-3.5 text-orange-400" />
+                        <span>{t.map.aggregateBtn}</span>
+                      </span>
+                      <span className="font-mono text-[10px] text-orange-400 font-bold">Group Σ</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={fitCurrentBounds}
+                    className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border border-stone-800 transition-colors"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{t.map.zoomExtent}</span>
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </aside>
         )}
 

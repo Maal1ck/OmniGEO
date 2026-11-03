@@ -90,12 +90,36 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
       borderColor: 'border-orange-500',
     },
     {
+      id: 'cad',
+      name: 'AutoCAD CAD (.dxf / .dwg)',
+      ext: '.dxf / .dwg',
+      desc: 'Industry-standard vector CAD interchange (AutoCAD DXF/DWG) for civil engineers, surveyors, and architects.',
+      accentColor: 'blue',
+      borderColor: 'border-blue-500',
+    },
+    {
+      id: 'gpx',
+      name: 'GPS Exchange Format',
+      ext: '.gpx',
+      desc: 'Open XML standard for handheld GPS receivers, field surveying waypoints, routes, and geospatial tracking tracks.',
+      accentColor: 'teal',
+      borderColor: 'border-teal-500',
+    },
+    {
       id: 'csv',
       name: 'Spatial Coordinates CSV',
       ext: '.csv',
       desc: 'Tabular comma-separated values with explicit longitude/latitude and complete attribute columns.',
       accentColor: 'stone',
       borderColor: 'border-stone-500',
+    },
+    {
+      id: 'excel',
+      name: 'Microsoft Excel (.xlsx)',
+      ext: '.xlsx',
+      desc: 'Spreadsheet workbook with longitude/latitude coordinates, geometry types, and all attribute properties.',
+      accentColor: 'emerald',
+      borderColor: 'border-emerald-500',
     },
   ];
 

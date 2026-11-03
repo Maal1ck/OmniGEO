@@ -1,4 +1,4 @@
-export type SupportedFormat = 'geojson' | 'shapefile' | 'geopackage' | 'kml' | 'csv' | 'flatgeobuf';
+export type SupportedFormat = 'geojson' | 'shapefile' | 'geopackage' | 'kml' | 'csv' | 'cad' | 'gpx' | 'excel' | 'flatgeobuf';
 
 export type GeometryType = 
   | 'Point' 
