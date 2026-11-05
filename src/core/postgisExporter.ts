@@ -12,6 +12,7 @@ export interface PostgisExportOptions {
   port?: number;
   database?: string;
   username?: string;
+  password?: string;
 }
 
 /**
@@ -197,8 +198,9 @@ export function generatePsqlCommand(options: PostgisExportOptions, sqlFileName: 
   const host = options.host || 'localhost';
   const port = options.port || 5432;
   const user = options.username || 'postgres';
-  const db = options.database || 'geodb';
-  return `psql -h ${host} -p ${port} -U ${user} -d ${db} -f "${sqlFileName}"`;
+  const db = options.database || 'gisdb';
+  const passPrefix = options.password ? `PGPASSWORD="${options.password}" ` : '';
+  return `${passPrefix}psql -h ${host} -p ${port} -U ${user} -d ${db} -f "${sqlFileName}"`;
 }
 
 /**
@@ -212,12 +214,13 @@ export function generateOgr2ogrCommand(
   const host = options.host || 'localhost';
   const port = options.port || 5432;
   const user = options.username || 'postgres';
-  const db = options.database || 'geodb';
+  const db = options.database || 'gisdb';
+  const pass = options.password ? options.password : 'YOUR_PASSWORD';
   const schema = sanitizeSqlIdentifier(options.schemaName || 'public');
   const table = sanitizeSqlIdentifier(options.tableName || datasetName);
   const geomCol = sanitizeSqlIdentifier(options.geomColumnName || 'geom');
 
-  return `ogr2ogr -f "PostgreSQL" PG:"host=${host} port=${port} dbname=${db} user=${user} password=YOUR_PASSWORD active_schema=${schema}" "${sourceGeojsonFile}" -nln "${table}" -overwrite -lco GEOMETRY_NAME=${geomCol} -lco SPATIAL_INDEX=GIST`;
+  return `ogr2ogr -f "PostgreSQL" PG:"host=${host} port=${port} dbname=${db} user=${user} password=${pass} active_schema=${schema}" "${sourceGeojsonFile}" -nln "${table}" -overwrite -lco GEOMETRY_NAME=${geomCol} -lco SPATIAL_INDEX=GIST`;
 }
 
 /**
@@ -227,7 +230,8 @@ export function generatePythonScript(dataset: SpatialDataset, options: PostgisEx
   const host = options.host || 'localhost';
   const port = options.port || 5432;
   const user = options.username || 'postgres';
-  const db = options.database || 'geodb';
+  const db = options.database || 'gisdb';
+  const pass = options.password ? options.password : 'YOUR_PASSWORD';
   const schema = sanitizeSqlIdentifier(options.schemaName || 'public');
   const table = sanitizeSqlIdentifier(options.tableName || dataset.name);
 
@@ -238,7 +242,7 @@ from sqlalchemy import create_engine
 gdf = gpd.read_file("${dataset.originalFileName}")
 
 # 2. Establish PostgreSQL / PostGIS Engine
-connection_url = "postgresql://${user}:YOUR_PASSWORD@${host}:${port}/${db}"
+connection_url = "postgresql://${user}:${pass}@${host}:${port}/${db}"
 engine = create_engine(connection_url)
 
 # 3. Export to PostGIS with spatial index

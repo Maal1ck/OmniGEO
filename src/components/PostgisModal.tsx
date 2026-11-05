@@ -11,7 +11,13 @@ import {
   CheckCircle2, 
   ExternalLink,
   Sliders,
-  Sparkles
+  Sparkles,
+  Key,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  FileText,
+  Play
 } from 'lucide-react';
 import { SpatialDataset } from '../types/gis';
 import { 
@@ -48,7 +54,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
   const activeDataset = datasets.find(d => d.id === selectedDatasetId) || datasets[0];
 
-  const [activeTab, setActiveTab] = useState<'sql' | 'cli' | 'python'>('sql');
+  const [activeTab, setActiveTab] = useState<'pgadmin' | 'sql' | 'cli' | 'python'>('pgadmin');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   // Configuration options
@@ -64,6 +70,8 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
   const [port, setPort] = useState<number>(5432);
   const [database, setDatabase] = useState<string>('gisdb');
   const [username, setUsername] = useState<string>('postgres');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
 
   // Update table name and SRID if dataset changes
   React.useEffect(() => {
@@ -85,7 +93,8 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
     port,
     database,
     username,
-  }), [schemaName, tableName, geomColumnName, srid, dropTable, createSpatialIndex, host, port, database, username]);
+    password: password.trim() ? password : undefined,
+  }), [schemaName, tableName, geomColumnName, srid, dropTable, createSpatialIndex, host, port, database, username, password]);
 
   const generatedSql = useMemo(() => {
     if (!activeDataset) return '';
@@ -283,10 +292,21 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center space-x-1 border-b border-stone-200 dark:border-stone-800">
+          <div className="flex items-center space-x-1 border-b border-stone-200 dark:border-stone-800 overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('pgadmin')}
+              className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'pgadmin'
+                  ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                  : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-300'
+              }`}
+            >
+              <Database className="w-4 h-4 text-amber-500" />
+              <span>pgAdmin 4 Workflow</span>
+            </button>
             <button
               onClick={() => setActiveTab('sql')}
-              className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+              className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'sql'
                   ? 'border-amber-500 text-amber-600 dark:text-amber-400'
                   : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-300'
@@ -297,18 +317,18 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('cli')}
-              className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+              className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'cli'
                   ? 'border-amber-500 text-amber-600 dark:text-amber-400'
                   : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-300'
               }`}
             >
               <Terminal className="w-4 h-4" />
-              <span>CLI Pipelines (psql & GDAL ogr2ogr)</span>
+              <span>CLI Pipelines (psql & ogr2ogr)</span>
             </button>
             <button
               onClick={() => setActiveTab('python')}
-              className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+              className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'python'
                   ? 'border-amber-500 text-amber-600 dark:text-amber-400'
                   : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-300'
@@ -318,6 +338,143 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
               <span>Python (GeoPandas & SQLAlchemy)</span>
             </button>
           </div>
+
+          {/* Tab 0: pgAdmin 4 Workflow & Security Explanation */}
+          {activeTab === 'pgadmin' && (
+            <div className="space-y-4">
+              {/* Security architecture card explaining why passwords are not requested by the web app */}
+              <div className={`p-4 rounded-xl border ${
+                theme === 'light'
+                  ? 'bg-amber-50/60 border-amber-200 text-amber-950'
+                  : 'bg-amber-950/20 border-amber-800/40 text-amber-200'
+              }`}>
+                <div className="flex items-start space-x-3">
+                  <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-xs">
+                    <div className="font-semibold text-sm flex items-center space-x-2">
+                      <span>Why doesn&apos;t OmniGeo ask for your pgAdmin password?</span>
+                      <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                        Zero-Trust Security
+                      </span>
+                    </div>
+                    <p className="leading-relaxed opacity-90">
+                      OmniGeo operates <strong>100% client-side in your browser</strong>. Web browsers are strictly prevented from opening raw TCP socket connections to local or remote PostgreSQL servers on port 5432, and web applications should <strong>never</strong> intercept or store your pgAdmin master password or database credentials.
+                    </p>
+                    <div className="pt-1 text-[11px] font-mono opacity-85 grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div>
+                        <strong>pgAdmin Master Password:</strong> Unlocks your local pgAdmin GUI app and saved connection vault on your machine.
+                      </div>
+                      <div>
+                        <strong>PostgreSQL User Password:</strong> Authenticates the database user (e.g., <code className="font-bold">postgres</code>) directly inside pgAdmin or CLI.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step-by-step pgAdmin import guide */}
+              <div className="space-y-3">
+                <div className="text-xs font-mono font-bold uppercase tracking-wider text-stone-500 flex items-center justify-between">
+                  <span>How to Import into pgAdmin in 3 Simple Clicks</span>
+                  <span className="text-[11px] font-normal normal-case text-amber-600 dark:text-amber-400">
+                    No command line required
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  {/* Step 1 */}
+                  <div className={`p-3.5 rounded-xl border flex flex-col justify-between ${
+                    theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#14100E] border-stone-800'
+                  }`}>
+                    <div>
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-mono font-bold text-xs flex items-center justify-center">1</span>
+                        <span className="font-semibold text-stone-900 dark:text-stone-100">Open Query Tool</span>
+                      </div>
+                      <p className="text-stone-600 dark:text-stone-400 text-[11px] leading-relaxed">
+                        Launch <strong>pgAdmin 4</strong> and unlock your server with your master password. Right-click your target database (e.g. <code className="font-mono text-amber-600 dark:text-amber-400">{database}</code>) and choose <strong>Query Tool</strong>.
+                      </p>
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-stone-200 dark:border-stone-800 text-[10px] font-mono text-stone-400">
+                      Menu: Tools &gt; Query Tool
+                    </div>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className={`p-3.5 rounded-xl border flex flex-col justify-between ${
+                    theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#14100E] border-stone-800'
+                  }`}>
+                    <div>
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-mono font-bold text-xs flex items-center justify-center">2</span>
+                        <span className="font-semibold text-stone-900 dark:text-stone-100">Load the SQL Script</span>
+                      </div>
+                      <p className="text-stone-600 dark:text-stone-400 text-[11px] leading-relaxed">
+                        In pgAdmin&apos;s Query Tool, click the <strong>Open File (📁)</strong> icon or paste the SQL from OmniGeo. The script contains the table schema, SRID {srid} validation, and geometries.
+                      </p>
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-stone-200 dark:border-stone-800">
+                      <button
+                        onClick={handleDownloadSql}
+                        className="w-full py-1 px-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-[11px] flex items-center justify-center space-x-1"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Download {tableName}.sql</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className={`p-3.5 rounded-xl border flex flex-col justify-between ${
+                    theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#14100E] border-stone-800'
+                  }`}>
+                    <div>
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-mono font-bold text-xs flex items-center justify-center">3</span>
+                        <span className="font-semibold text-stone-900 dark:text-stone-100">Execute & Visualize</span>
+                      </div>
+                      <p className="text-stone-600 dark:text-stone-400 text-[11px] leading-relaxed">
+                        Press <strong>Execute (▶ or F5)</strong>. PostGIS creates <code className="font-mono text-amber-600 dark:text-amber-400">{schemaName}.{tableName}</code> with {createSpatialIndex ? 'a GIST spatial index' : 'features'}. Click the eye icon next to the <code className="font-mono">geom</code> column to view geometries on pgAdmin&apos;s map!
+                      </p>
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-stone-200 dark:border-stone-800">
+                      <button
+                        onClick={() => copyToClipboard(generatedSql, 'sql')}
+                        className={`w-full py-1 px-2 rounded-lg border font-semibold text-[11px] flex items-center justify-center space-x-1 ${
+                          copiedSection === 'sql'
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : theme === 'light' ? 'bg-stone-100 hover:bg-stone-200 text-stone-800 border-stone-300' : 'bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700'
+                        }`}
+                      >
+                        {copiedSection === 'sql' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedSection === 'sql' ? 'Copied SQL!' : 'Copy SQL Directly'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SQL Preview collapse/peek */}
+              <div className={`p-3.5 rounded-xl border ${
+                theme === 'light' ? 'bg-stone-50/80 border-[#E2DBD0]' : 'bg-[#100D0B] border-stone-800'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-mono font-bold uppercase text-stone-500">
+                    SQL Preview for pgAdmin ({activeDataset?.featureCount || 0} features)
+                  </span>
+                  <span className="text-[10px] font-mono text-stone-400">
+                    Standard PostGIS DDL & INSERT
+                  </span>
+                </div>
+                <div className={`p-3 rounded-lg font-mono text-xs max-h-40 overflow-y-auto border whitespace-pre select-all ${
+                  theme === 'light' ? 'bg-white border-stone-200 text-stone-800' : 'bg-black border-stone-800 text-stone-300'
+                }`}>
+                  {generatedSql.split('\n').slice(0, 20).join('\n')}
+                  {generatedSql.split('\n').length > 20 && `\n-- ... and ${generatedSql.split('\n').length - 20} more lines`}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Tab 1: SQL Dump */}
           {activeTab === 'sql' && (
@@ -361,8 +518,8 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
           {/* Tab 2: CLI Pipelines */}
           {activeTab === 'cli' && (
             <div className="space-y-4">
-              {/* Connection Host/Port Config */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl border bg-stone-500/5 border-stone-500/20 text-xs">
+              {/* Connection Host/Port Config with optional Password */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 rounded-xl border bg-stone-500/5 border-stone-500/20 text-xs">
                 <div>
                   <span className="text-stone-500 font-mono text-[10px] uppercase block">Host</span>
                   <input
@@ -398,6 +555,26 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full bg-transparent border-b border-stone-400 font-mono py-0.5 focus:outline-none"
                   />
+                </div>
+                <div>
+                  <span className="text-stone-500 font-mono text-[10px] uppercase block">Password (Optional)</span>
+                  <div className="relative flex items-center">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-transparent border-b border-stone-400 font-mono py-0.5 pr-6 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-0 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -458,30 +635,92 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
           {/* Tab 3: Python GeoPandas Script */}
           {activeTab === 'python' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-stone-500">
-                  Ready-to-run Python automated script using GeoPandas & SQLAlchemy:
-                </span>
-                <button
-                  onClick={() => copyToClipboard(pythonSnippet, 'python')}
-                  className={`flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
-                    copiedSection === 'python'
-                      ? 'bg-emerald-600 text-white border-emerald-600'
-                      : theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-800 hover:bg-stone-100' : 'bg-[#201A16] border-stone-700 text-stone-200 hover:bg-stone-800'
-                  }`}
-                >
-                  {copiedSection === 'python' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedSection === 'python' ? 'Copied Python Script!' : 'Copy Python Code'}</span>
-                </button>
+            <div className="space-y-4">
+              {/* Optional connection bar in python tab as well */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 rounded-xl border bg-stone-500/5 border-stone-500/20 text-xs">
+                <div>
+                  <span className="text-stone-500 font-mono text-[10px] uppercase block">Host</span>
+                  <input
+                    type="text"
+                    value={host}
+                    onChange={(e) => setHost(e.target.value)}
+                    className="w-full bg-transparent border-b border-stone-400 font-mono py-0.5 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <span className="text-stone-500 font-mono text-[10px] uppercase block">Port</span>
+                  <input
+                    type="number"
+                    value={port}
+                    onChange={(e) => setPort(parseInt(e.target.value, 10) || 5432)}
+                    className="w-full bg-transparent border-b border-stone-400 font-mono py-0.5 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <span className="text-stone-500 font-mono text-[10px] uppercase block">Database</span>
+                  <input
+                    type="text"
+                    value={database}
+                    onChange={(e) => setDatabase(e.target.value)}
+                    className="w-full bg-transparent border-b border-stone-400 font-mono py-0.5 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <span className="text-stone-500 font-mono text-[10px] uppercase block">Username</span>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full bg-transparent border-b border-stone-400 font-mono py-0.5 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <span className="text-stone-500 font-mono text-[10px] uppercase block">Password (Optional)</span>
+                  <div className="relative flex items-center">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-transparent border-b border-stone-400 font-mono py-0.5 pr-6 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-0 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className={`p-4 rounded-xl font-mono text-xs max-h-72 overflow-y-auto border whitespace-pre select-all ${
-                theme === 'light'
-                  ? 'bg-white border-[#E2DBD0] text-stone-800'
-                  : 'bg-[#100D0B] border-stone-800 text-stone-300'
-              }`}>
-                {pythonSnippet}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-stone-500">
+                    Ready-to-run Python automated script using GeoPandas & SQLAlchemy:
+                  </span>
+                  <button
+                    onClick={() => copyToClipboard(pythonSnippet, 'python')}
+                    className={`flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                      copiedSection === 'python'
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-800 hover:bg-stone-100' : 'bg-[#201A16] border-stone-700 text-stone-200 hover:bg-stone-800'
+                    }`}
+                  >
+                    {copiedSection === 'python' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSection === 'python' ? 'Copied Python Script!' : 'Copy Python Code'}</span>
+                  </button>
+                </div>
+
+                <div className={`p-4 rounded-xl font-mono text-xs max-h-72 overflow-y-auto border whitespace-pre select-all ${
+                  theme === 'light'
+                    ? 'bg-white border-[#E2DBD0] text-stone-800'
+                    : 'bg-[#100D0B] border-stone-800 text-stone-300'
+                }`}>
+                  {pythonSnippet}
+                </div>
               </div>
             </div>
           )}

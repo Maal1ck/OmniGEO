@@ -25,13 +25,16 @@ import {
   X,
   Info,
   Loader2,
-  Play
+  Play,
+  Globe,
+  Edit3
 } from 'lucide-react';
-import { SpatialDataset } from '../types/gis';
+import { SpatialDataset, CRSInfo } from '../types/gis';
 import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers, parseCadFile, parseGpxFile } from '../core/formatParsers';
 import { parseGeoPackage } from '../core/geoPackageParser';
 import { inspectExcelWorkbook } from '../core/excelParser';
 import { ExcelCoordinateModal, PendingExcelFile } from './ExcelCoordinateModal';
+import { CRSModal } from './CRSModal';
 import { useI18n } from '../core/i18n';
 import { useTheme } from '../core/theme';
 
@@ -86,6 +89,61 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   // Excel manual mapping modal state
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [pendingExcelFile, setPendingExcelFile] = useState<PendingExcelFile | null>(null);
+
+  // CRS calibration modal states
+  const [crsModalTarget, setCrsModalTarget] = useState<SpatialDataset | null>(null);
+  const [isSingleCrsModalOpen, setIsSingleCrsModalOpen] = useState(false);
+  const [isBatchCrsModalOpen, setIsBatchCrsModalOpen] = useState(false);
+
+  const handleOpenCRSModalForDataset = (dataset: SpatialDataset) => {
+    setCrsModalTarget(dataset);
+    setIsSingleCrsModalOpen(true);
+  };
+
+  const handleApplyCRSToDataset = (selectedCrs: CRSInfo) => {
+    if (!crsModalTarget) return;
+    const targetId = crsModalTarget.id;
+    setDatasets(prev => prev.map(d => {
+      if (d.id === targetId) {
+        const cleanedIssues = d.validationIssues.filter(i =>
+          !i.message.toLowerCase().includes('crs') &&
+          !i.message.toLowerCase().includes('spatial reference') &&
+          !i.message.toLowerCase().includes('projection')
+        );
+        return {
+          ...d,
+          detectedCRS: selectedCrs,
+          crsStatus: 'verified' as const,
+          validationIssues: cleanedIssues,
+          status: cleanedIssues.length === 0 ? 'ready' : (cleanedIssues.some(x => x.severity === 'error') ? 'invalid' : 'warning'),
+        };
+      }
+      return d;
+    }));
+    setIsSingleCrsModalOpen(false);
+    setCrsModalTarget(null);
+  };
+
+  const handleBatchApplyCRS = (selectedCrs: CRSInfo) => {
+    setDatasets(prev => prev.map(d => {
+      if (selectedIds.has(d.id)) {
+        const cleanedIssues = d.validationIssues.filter(i =>
+          !i.message.toLowerCase().includes('crs') &&
+          !i.message.toLowerCase().includes('spatial reference') &&
+          !i.message.toLowerCase().includes('projection')
+        );
+        return {
+          ...d,
+          detectedCRS: selectedCrs,
+          crsStatus: 'verified' as const,
+          validationIssues: cleanedIssues,
+          status: cleanedIssues.length === 0 ? 'ready' : (cleanedIssues.some(x => x.severity === 'error') ? 'invalid' : 'warning'),
+        };
+      }
+      return d;
+    }));
+    setIsBatchCrsModalOpen(false);
+  };
 
   // Subfolder confirmation modal state
   const [pendingFolderImport, setPendingFolderImport] = useState<{
@@ -844,6 +902,20 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
               {selectedIds.size > 0 && (
                 <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsBatchCrsModalOpen(true)}
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                      theme === 'light'
+                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 font-bold'
+                        : 'bg-amber-950/50 hover:bg-amber-900/60 text-amber-300 border-amber-700/60 font-semibold'
+                    }`}
+                    title="Assign or calibrate CRS for all checked datasets"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Assign CRS ({selectedIds.size})</span>
+                  </button>
+
                   {onStartBatch && (
                     <button
                       onClick={() => onStartBatch(Array.from(selectedIds))}
@@ -1062,21 +1134,31 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
         {/* Filter and Search Bar */}
         {datasets.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-stone-900/80 p-2.5 rounded-xl border border-stone-800">
+          <div className={`flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-xl border transition-all ${
+            theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-stone-900/80 border-stone-800'
+          }`}>
             {/* Search */}
             <div className="relative min-w-[260px]">
-              <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 ${
+                theme === 'light' ? 'text-stone-400' : 'text-stone-400'
+              }`} />
               <input
                 type="text"
                 placeholder={t.workspace.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#13110E] border border-stone-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500 transition-colors"
+                className={`w-full rounded-lg pl-9 pr-3 py-1.5 text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/40 border ${
+                  theme === 'light'
+                    ? 'bg-white border-[#D5CDBD] text-stone-900 placeholder-stone-500 focus:border-amber-600'
+                    : 'bg-[#13110E] border-stone-800 text-stone-100 placeholder-stone-500 focus:border-amber-500'
+                }`}
               />
             </div>
 
             {/* Filter buttons */}
-            <div className="flex items-center space-x-3 text-xs text-stone-400">
+            <div className={`flex items-center space-x-3 text-xs ${
+              theme === 'light' ? 'text-stone-600' : 'text-stone-400'
+            }`}>
               <div className="flex items-center space-x-1.5">
                 <span className="text-[11px] font-mono text-stone-500 uppercase">Format:</span>
                 {(['all', 'shapefile', 'geopackage', 'cad', 'gpx', 'excel', 'geojson', 'kml', 'csv'] as const).map((fmt) => (
@@ -1085,7 +1167,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                     onClick={() => setFilterFormat(fmt)}
                     className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
                       filterFormat === fmt
-                        ? 'bg-amber-600 text-stone-950 font-bold shadow-sm'
+                        ? 'bg-amber-600 text-white font-bold shadow-xs'
+                        : theme === 'light'
+                        ? 'text-stone-700 hover:text-stone-950 hover:bg-[#EFE8DD]'
                         : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
                     }`}
                   >
@@ -1094,7 +1178,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 ))}
               </div>
 
-              <div className="h-4 w-px bg-stone-800" />
+              <div className={`h-4 w-px ${theme === 'light' ? 'bg-[#DDD5C7]' : 'bg-stone-800'}`} />
 
               <div className="flex items-center space-x-1.5">
                 <span className="text-[11px] font-mono text-stone-500 uppercase">Status:</span>
@@ -1104,7 +1188,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                     onClick={() => setFilterStatus(st)}
                     className={`px-2 py-0.5 rounded-md text-[11px] font-medium capitalize transition-colors ${
                       filterStatus === st
-                        ? 'bg-stone-750 text-amber-300 font-semibold border border-stone-700'
+                        ? theme === 'light'
+                          ? 'bg-amber-100 text-amber-900 font-bold border border-amber-300'
+                          : 'bg-stone-750 text-amber-300 font-semibold border border-stone-700'
+                        : theme === 'light'
+                        ? 'text-stone-700 hover:text-stone-950 hover:bg-[#EFE8DD]'
                         : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
                     }`}
                   >
@@ -1117,15 +1205,23 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         )}
 
         {/* Datasets Table */}
-        <div className="flex-1 overflow-y-auto border border-stone-800/90 rounded-2xl bg-stone-900/30 backdrop-blur-sm">
+        <div className={`flex-1 overflow-y-auto rounded-2xl border transition-all ${
+          theme === 'light'
+            ? 'border-[#E2DBD0] bg-white shadow-xs'
+            : 'border-stone-800/90 bg-stone-900/30 backdrop-blur-sm'
+        }`}>
           {filteredDatasets.length > 0 ? (
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-[#181411] border-b border-stone-800 z-10 text-stone-400 font-semibold uppercase tracking-wider text-[11px]">
+              <thead className={`sticky top-0 z-10 font-semibold uppercase tracking-wider text-[11px] border-b ${
+                theme === 'light'
+                  ? 'bg-[#F7F3EC] border-[#E2DBD0] text-stone-700'
+                  : 'bg-[#181411] border-stone-800 text-stone-400'
+              }`}>
                 <tr>
                   <th className="py-3 px-3.5 w-8">
                     <button onClick={toggleSelectAll} className="text-stone-400 hover:text-stone-200">
                       {selectedIds.size === filteredDatasets.length && filteredDatasets.length > 0 ? (
-                        <CheckSquare className="w-4 h-4 text-amber-400" />
+                        <CheckSquare className="w-4 h-4 text-amber-500" />
                       ) : (
                         <Square className="w-4 h-4" />
                       )}
@@ -1141,7 +1237,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                   <th className="py-3 px-3.5 text-right">{t.workspace.colActions}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-800/70">
+              <tbody className={`divide-y ${theme === 'light' ? 'divide-[#EFE9DF]' : 'divide-stone-800/70'}`}>
                 {filteredDatasets.map((d) => {
                   const isSelected = selectedIds.has(d.id);
                   const isTarget = selectedDatasetId === d.id;
@@ -1152,7 +1248,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       onClick={() => setSelectedDatasetId(d.id)}
                       className={`cursor-pointer transition-colors ${
                         isTarget
-                          ? 'bg-amber-950/30 text-amber-200'
+                          ? theme === 'light'
+                            ? 'bg-amber-100/70 text-stone-900 font-medium'
+                            : 'bg-amber-950/30 text-amber-200'
+                          : theme === 'light'
+                          ? 'hover:bg-[#FAF6F0] text-stone-800'
                           : 'hover:bg-stone-800/40 text-stone-300'
                       }`}
                     >
@@ -1160,18 +1260,22 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       <td className="py-2.5 px-3.5" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => toggleSelectOne(d.id)}>
                           {isSelected ? (
-                            <CheckSquare className="w-4 h-4 text-amber-400" />
+                            <CheckSquare className="w-4 h-4 text-amber-500" />
                           ) : (
-                            <Square className="w-4 h-4 text-stone-500" />
+                            <Square className="w-4 h-4 text-stone-400" />
                           )}
                         </button>
                       </td>
 
                       {/* Name */}
-                      <td className="py-2.5 px-3.5 font-sans font-medium text-stone-200">
+                      <td className={`py-2.5 px-3.5 font-sans font-medium ${
+                        theme === 'light' ? 'text-stone-900' : 'text-stone-200'
+                      }`}>
                         <div className="flex items-center space-x-2">
-                          <Package className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                          <span className="truncate max-w-[280px] text-[#FAF6F0] font-medium" title={d.name}>
+                          <Package className="w-4 h-4 text-amber-500 shrink-0" />
+                          <span className={`truncate max-w-[280px] font-medium ${
+                            theme === 'light' ? 'text-stone-900' : 'text-[#FAF6F0]'
+                          }`} title={d.name}>
                             {d.name}
                           </span>
                         </div>
@@ -1180,7 +1284,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       {/* Format & Sidecars */}
                       <td className="py-2.5 px-3.5 font-sans">
                         <div className="flex items-center space-x-1.5 flex-wrap">
-                          <span className="px-1.5 py-0.5 rounded bg-stone-800 text-[10px] font-mono font-semibold text-stone-200 uppercase border border-stone-700">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold uppercase border ${
+                            theme === 'light'
+                              ? 'bg-[#EFE8DC] text-stone-800 border-[#DDD3C2]'
+                              : 'bg-stone-800 text-stone-200 border-stone-700'
+                          }`}>
                             {d.format}
                           </span>
                           {/* Sidecar indicators for shapefiles */}
@@ -1190,13 +1298,19 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                               title={`${sc.name}: ${sc.present ? 'Present' : 'Missing'}`}
                               className={`text-[9px] font-mono px-1 py-0.2 rounded border flex items-center space-x-0.5 ${
                                 sc.present
-                                  ? 'bg-emerald-950/50 border-emerald-600/40 text-emerald-300'
+                                  ? theme === 'light'
+                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                                    : 'bg-emerald-950/50 border-emerald-600/40 text-emerald-300'
                                   : sc.required
-                                  ? 'bg-rose-950/60 border-rose-600/60 text-rose-300 animate-pulse'
+                                  ? theme === 'light'
+                                    ? 'bg-rose-50 border-rose-300 text-rose-800 animate-pulse'
+                                    : 'bg-rose-950/60 border-rose-600/60 text-rose-300 animate-pulse'
+                                  : theme === 'light'
+                                  ? 'bg-stone-100 border-stone-300 text-stone-500'
                                   : 'bg-stone-800 border-stone-700 text-stone-500'
                               }`}
                             >
-                              <span className={`w-1 h-1 rounded-full ${sc.present ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                              <span className={`w-1 h-1 rounded-full ${sc.present ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                               <span>{sc.extension}</span>
                             </span>
                           ))}
@@ -1204,39 +1318,77 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       </td>
 
                       {/* Geometry */}
-                      <td className="py-2.5 px-3.5 text-stone-300 font-sans">
+                      <td className={`py-2.5 px-3.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>
                         <div className="flex items-center space-x-1.5">
                           {renderGeometryIcon(d.geometryType)}
-                          <span className="text-[11px] text-stone-200">{d.geometryType}</span>
+                          <span className={`text-[11px] ${theme === 'light' ? 'text-stone-800 font-medium' : 'text-stone-200'}`}>
+                            {d.geometryType}
+                          </span>
                         </div>
                       </td>
 
                       {/* Feature Count */}
-                      <td className="py-2.5 px-3.5 text-stone-200 font-mono tabular-nums">
+                      <td className={`py-2.5 px-3.5 font-mono tabular-nums ${
+                        theme === 'light' ? 'text-stone-900 font-medium' : 'text-stone-200'
+                      }`}>
                         {d.featureCount.toLocaleString()}
                       </td>
 
-                      {/* CRS */}
-                      <td className="py-2.5 px-3.5">
+                      {/* Interactive CRS */}
+                      <td className="py-2.5 px-3.5" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center space-x-1.5">
-                          <span className="font-mono text-xs text-amber-300 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-700/50">
-                            {d.detectedCRS?.code || 'Undefined'}
-                          </span>
-                          <span
-                            title={`CRS Status: ${d.crsStatus}`}
-                            className={`w-1.5 h-1.5 rounded-full ${
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCRSModalForDataset(d)}
+                            title={`CRS: ${d.detectedCRS?.code || 'None'} - ${d.detectedCRS?.name || 'Missing'}\nStatus: ${d.crsStatus}\nClick to calibrate or reassign.`}
+                            className={`group inline-flex items-center space-x-1.5 font-mono text-xs px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                               d.crsStatus === 'verified'
-                                ? 'bg-emerald-400'
+                                ? theme === 'light'
+                                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-500 shadow-2xs'
+                                  : 'bg-emerald-950/60 text-emerald-300 border-emerald-700/60 hover:bg-emerald-900/60 hover:border-emerald-500 shadow-2xs'
                                 : d.crsStatus === 'assumed'
-                                ? 'bg-amber-400'
-                                : 'bg-rose-400'
+                                ? theme === 'light'
+                                  ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 hover:border-amber-500 shadow-2xs'
+                                  : 'bg-amber-950/60 text-amber-300 border-amber-700/60 hover:bg-amber-900/60 hover:border-amber-500 shadow-2xs'
+                                : theme === 'light'
+                                ? 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100 hover:border-rose-500 shadow-2xs animate-pulse font-bold'
+                                : 'bg-rose-950/70 text-rose-300 border-rose-600/70 hover:bg-rose-900/70 hover:border-rose-500 shadow-2xs animate-pulse font-bold'
+                            }`}
+                          >
+                            <Globe className={`w-3.5 h-3.5 shrink-0 ${
+                              d.crsStatus === 'verified'
+                                ? 'text-emerald-500'
+                                : d.crsStatus === 'assumed'
+                                ? 'text-amber-500'
+                                : 'text-rose-500'
+                            }`} />
+                            <span className="font-semibold">
+                              {d.detectedCRS?.code || 'Assign CRS'}
+                            </span>
+                            {d.detectedCRS?.name && (
+                              <span className="hidden xl:inline text-[10px] opacity-75 max-w-[130px] truncate" title={d.detectedCRS.name}>
+                                · {d.detectedCRS.name}
+                              </span>
+                            )}
+                            <Edit3 className="w-2.5 h-2.5 opacity-40 group-hover:opacity-100 transition-opacity ml-0.5" />
+                          </button>
+                          <span
+                            title={`CRS Status: ${d.crsStatus} (${d.crsStatus === 'verified' ? 'Verified Projection' : d.crsStatus === 'assumed' ? 'Assumed Fallback' : 'Missing CRS'})`}
+                            className={`w-2 h-2 rounded-full shrink-0 ${
+                              d.crsStatus === 'verified'
+                                ? 'bg-emerald-500 ring-2 ring-emerald-500/20'
+                                : d.crsStatus === 'assumed'
+                                ? 'bg-amber-500 ring-2 ring-amber-500/20'
+                                : 'bg-rose-500 ring-2 ring-rose-500/20'
                             }`}
                           />
                         </div>
                       </td>
 
                       {/* Size */}
-                      <td className="py-2.5 px-3.5 text-stone-400 font-mono text-[11px] tabular-nums">
+                      <td className={`py-2.5 px-3.5 font-mono text-[11px] tabular-nums ${
+                        theme === 'light' ? 'text-stone-600' : 'text-stone-400'
+                      }`}>
                         {(d.sizeBytes / 1024).toFixed(1)} KB
                       </td>
 
@@ -1509,6 +1661,25 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           </div>
         </div>
       )}
+
+      {/* Single Dataset CRS Calibration Modal */}
+      <CRSModal
+        isOpen={isSingleCrsModalOpen}
+        onClose={() => {
+          setIsSingleCrsModalOpen(false);
+          setCrsModalTarget(null);
+        }}
+        selectedCRS={crsModalTarget?.detectedCRS?.code || 'EPSG:4326'}
+        onSelectCRS={handleApplyCRSToDataset}
+      />
+
+      {/* Batch Selected Datasets CRS Calibration Modal */}
+      <CRSModal
+        isOpen={isBatchCrsModalOpen}
+        onClose={() => setIsBatchCrsModalOpen(false)}
+        selectedCRS="EPSG:26192"
+        onSelectCRS={handleBatchApplyCRS}
+      />
     </div>
   );
 };
