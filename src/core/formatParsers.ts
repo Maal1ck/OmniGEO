@@ -3,7 +3,9 @@ import shp from 'shpjs';
 import JSZip from 'jszip';
 import { AttributeField, CRSInfo, GeometryType, SidecarFile, SpatialDataset, SupportedFormat } from '../types/gis';
 import { detectCRSFromPRJ, getCRSByCode } from './crsDefinitions';
+import { detectCRSFromCoordinates, detectCRSFromGeoJSONMember, detectCRSFromPRJRobust } from './crsDetection';
 import { computeGeoJSONBounds, detectGeometryType, validateDatasetGeometries } from './geometryValidation';
+
 
 /**
  * Extracts schema attribute fields from GeoJSON features
@@ -53,11 +55,23 @@ export function parseGeoJSON(
     features: json.type === 'Feature' ? [json] : [{ type: 'Feature', geometry: json, properties: {} }],
   };
 
-  const detectedCRS = getCRSByCode('EPSG:4326');
+  const crsFromMember = detectCRSFromGeoJSONMember(json.crs);
   const bounds = computeGeoJSONBounds(geojson);
+  const coordResult = detectCRSFromCoordinates(bounds, crsFromMember);
+  const detectedCRS = coordResult.detectedCRS;
+  const crsStatus = coordResult.crsStatus;
+
   const geometryType = detectGeometryType(geojson);
   const fields = extractSchemaFields(geojson);
-  const validationIssues = validateDatasetGeometries(geojson, 'EPSG:4326');
+  const validationIssues = validateDatasetGeometries(geojson, detectedCRS?.code);
+
+  if (crsStatus === 'missing') {
+    validationIssues.push({
+      severity: 'warning',
+      code: 'PROJECTED_COORDINATES_DETECTED',
+      message: coordResult.confidenceReason,
+    });
+  }
 
   return {
     id: `ds-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -68,7 +82,7 @@ export function parseGeoJSON(
     featureCount: geojson.features.length,
     geometryType,
     detectedCRS,
-    crsStatus: 'verified',
+    crsStatus,
     bounds,
     fields,
     geojson,
@@ -132,16 +146,25 @@ export function parseCSV(
     features,
   };
 
-  const detectedCRS = getCRSByCode('EPSG:4326');
   const bounds = computeGeoJSONBounds(geojson);
+  const coordResult = detectCRSFromCoordinates(bounds);
+  const detectedCRS = coordResult.detectedCRS;
+  const crsStatus = coordCols ? coordResult.crsStatus : 'missing';
+
   const fields = extractSchemaFields(geojson);
-  const validationIssues = validateDatasetGeometries(geojson, 'EPSG:4326');
+  const validationIssues = validateDatasetGeometries(geojson, detectedCRS?.code);
 
   if (!coordCols) {
     validationIssues.push({
       severity: 'warning',
       code: 'NO_COORDINATE_COLS',
       message: 'Could not auto-detect Longitude/Latitude columns. Please configure CSV spatial columns in Conversion Lab.',
+    });
+  } else if (coordResult.crsStatus === 'missing') {
+    validationIssues.push({
+      severity: 'warning',
+      code: 'PROJECTED_COORDINATES_DETECTED',
+      message: coordResult.confidenceReason,
     });
   }
 
@@ -154,7 +177,7 @@ export function parseCSV(
     featureCount: features.length,
     geometryType: 'Point',
     detectedCRS,
-    crsStatus: coordCols ? 'assumed' : 'missing',
+    crsStatus,
     bounds,
     fields,
     geojson,
@@ -291,26 +314,37 @@ export async function parseShapefileZipOrBuffers(
 ): Promise<SpatialDataset> {
   const zip = await JSZip.loadAsync(zipBuffer);
   const prjFile = Object.values(zip.files).find(f => !f.dir && f.name.toLowerCase().endsWith('.prj'));
-  let detectedCRS = getCRSByCode('EPSG:4326');
-  let crsStatus: SpatialDataset['crsStatus'] = 'assumed';
-  let shapefileBuffer = zipBuffer;
+  let prjCRS: CRSInfo | null = null;
 
   if (prjFile) {
-    const fromPrj = detectCRSFromPRJ(await prjFile.async('text'));
-    if (fromPrj) {
-      detectedCRS = fromPrj;
-      crsStatus = 'verified';
-      zip.remove(prjFile.name);
-      shapefileBuffer = await zip.generateAsync({ type: 'arraybuffer' });
-    }
+    const prjText = await prjFile.async('text');
+    prjCRS = detectCRSFromPRJRobust(prjText);
+    // Always remove PRJ so shpjs outputs raw coordinate numbers without incomplete proj4 transforms
+    zip.remove(prjFile.name);
   }
 
+  const shapefileBuffer = await zip.generateAsync({ type: 'arraybuffer' });
   const parsed = await (shp as any)(shapefileBuffer);
   const geojson = Array.isArray(parsed) ? parsed[0] : parsed;
   const bounds = computeGeoJSONBounds(geojson);
+
+  const coordResult = detectCRSFromCoordinates(bounds, prjCRS);
+  const detectedCRS = coordResult.detectedCRS;
+  const crsStatus = prjCRS ? 'verified' : coordResult.crsStatus;
+
   const geometryType = detectGeometryType(geojson);
   const fields = extractSchemaFields(geojson);
   const validationIssues = validateDatasetGeometries(geojson, detectedCRS?.code);
+
+  if (crsStatus === 'missing') {
+    validationIssues.push({
+      severity: 'warning',
+      code: 'UNVERIFIED_PROJECTED_CRS',
+      message: prjFile
+        ? `PRJ file present but CRS was ambiguous. ${coordResult.confidenceReason}`
+        : `No .prj sidecar found. ${coordResult.confidenceReason}`,
+    });
+  }
 
   return {
     id: `ds-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,

@@ -12,7 +12,8 @@ import {
   TableProperties,
   ShieldCheck,
   CheckCircle2,
-  Sliders
+  Sliders,
+  Database
 } from 'lucide-react';
 import { BatchSettings, ConsolidationSettings, SupportedFormat } from '../types/gis';
 import { COMMON_CRS_LIST, getCRSByCode } from '../core/crsDefinitions';
@@ -30,6 +31,8 @@ interface ConversionLabProps {
   onOpenSchemaHarmonizer: () => void;
   onOpenSpatialDoctor: () => void;
   harmonizerRulesCount: number;
+  onOpenConcatenationModal?: () => void;
+  onOpenPostgisModal?: () => void;
 }
 
 export const ConversionLab: React.FC<ConversionLabProps> = ({
@@ -43,6 +46,8 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
   onOpenSchemaHarmonizer,
   onOpenSpatialDoctor,
   harmonizerRulesCount,
+  onOpenConcatenationModal,
+  onOpenPostgisModal,
 }) => {
   const { t } = useI18n();
   const currentCRS = getCRSByCode(settings.targetCRS) || COMMON_CRS_LIST[0];
@@ -533,6 +538,31 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                   <span>Harmonizer {harmonizerRulesCount > 0 && `(${harmonizerRulesCount})`}</span>
                 </button>
               </div>
+
+              {(onOpenConcatenationModal || onOpenPostgisModal) && (
+                <div className="flex items-center space-x-2 pt-2 border-t border-stone-800">
+                  {onOpenConcatenationModal && (
+                    <button
+                      type="button"
+                      onClick={onOpenConcatenationModal}
+                      className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl bg-[#1C1713] hover:bg-[#251E19] text-amber-400 border border-amber-600/40 text-xs font-semibold transition-all"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Concatenate Layers</span>
+                    </button>
+                  )}
+                  {onOpenPostgisModal && (
+                    <button
+                      type="button"
+                      onClick={onOpenPostgisModal}
+                      className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl bg-[#1C1713] hover:bg-[#251E19] text-indigo-400 border border-indigo-600/40 text-xs font-semibold transition-all"
+                    >
+                      <Database className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>PostGIS / SQL</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -56,6 +56,8 @@ interface BatchWorkspaceProps {
   onCalculateSurfaces?: (unit: any) => void;
   onOpenAggregationModal?: () => void;
   onStartBatch?: (selectedDatasetIds?: string[]) => void;
+  onOpenConcatenationModal?: (initialSelectedIds?: string[]) => void;
+  onOpenPostgisModal?: (datasetId?: string) => void;
 }
 
 export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
@@ -67,6 +69,8 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   onOpenSpatialDoctor,
   onOpenAggregationModal,
   onStartBatch,
+  onOpenConcatenationModal,
+  onOpenPostgisModal,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -806,6 +810,38 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
           {datasets.length > 0 && (
             <>
+              {datasets.length >= 2 && onOpenConcatenationModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenConcatenationModal(selectedIds.size >= 2 ? Array.from(selectedIds) : undefined)}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                    theme === 'light'
+                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border-amber-700/50'
+                  }`}
+                  title="Concatenate and merge multiple layers into a single dataset by mapping attributes"
+                >
+                  <Layers className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Concatenate{selectedIds.size >= 2 ? ` (${selectedIds.size})` : ''}</span>
+                </button>
+              )}
+
+              {onOpenPostgisModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenPostgisModal(selectedIds.size === 1 ? Array.from(selectedIds)[0] : undefined)}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                    theme === 'light'
+                      ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-300'
+                      : 'bg-indigo-950/40 hover:bg-indigo-900/50 text-indigo-300 border-indigo-700/50'
+                  }`}
+                  title="Export layer(s) to PostgreSQL / PostGIS database"
+                >
+                  <Database className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>PostGIS Export</span>
+                </button>
+              )}
+
               {selectedIds.size > 0 && (
                 <div className="flex items-center space-x-2">
                   {onStartBatch && (
@@ -1255,6 +1291,15 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                               className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-colors"
                             >
                               <Stethoscope className="w-4 h-4" />
+                            </button>
+                          )}
+                          {onOpenPostgisModal && (
+                            <button
+                              onClick={() => onOpenPostgisModal(d.id)}
+                              title="Export to PostgreSQL / PostGIS database"
+                              className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-indigo-400 transition-colors"
+                            >
+                              <Database className="w-4 h-4" />
                             </button>
                           )}
                           <button

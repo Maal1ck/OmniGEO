@@ -15,7 +15,8 @@ import {
   X, 
   Stethoscope, 
   TableProperties, 
-  Award
+  Award,
+  Database
 } from 'lucide-react';
 import { NavTab } from './Header';
 
@@ -43,6 +44,8 @@ interface CommandPaletteProps {
   onOpenAuditCertificate: () => void;
   onCalculateSurfaces?: (unit: any) => void;
   onOpenAggregationModal?: () => void;
+  onOpenConcatenationModal?: () => void;
+  onOpenPostgisModal?: () => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
@@ -58,6 +61,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onOpenSpatialDoctor,
   onOpenSchemaHarmonizer,
   onOpenAuditCertificate,
+  onOpenConcatenationModal,
+  onOpenPostgisModal,
 }) => {
   const [query, setQuery] = useState('');
 
@@ -167,6 +172,20 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       category: 'Action',
       icon: <Award className="w-4 h-4 text-emerald-400" />,
       run: () => { onOpenAuditCertificate(); onClose(); },
+    },
+    {
+      id: 'act-concat',
+      title: 'Open Layer Concatenation & Column Mapping Tool',
+      category: 'Action',
+      icon: <Layers className="w-4 h-4 text-amber-400" />,
+      run: () => { onOpenConcatenationModal?.(); onClose(); },
+    },
+    {
+      id: 'act-postgis',
+      title: 'Open PostgreSQL / PostGIS Integration Assistant',
+      category: 'Action',
+      icon: <Database className="w-4 h-4 text-indigo-400" />,
+      run: () => { onOpenPostgisModal?.(); onClose(); },
     },
     {
       id: 'act-python',

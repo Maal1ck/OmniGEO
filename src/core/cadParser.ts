@@ -1,5 +1,6 @@
 import { AttributeField, CRSInfo, GeometryType, SpatialDataset } from '../types/gis';
 import { getCRSByCode } from './crsDefinitions';
+import { detectCRSFromCoordinates } from './crsDetection';
 import { computeGeoJSONBounds, detectGeometryType, validateDatasetGeometries } from './geometryValidation';
 import { extractSchemaFields } from './formatParsers';
 
@@ -311,11 +312,22 @@ export async function parseCadFile(
     }
   }
 
-  const detectedCRS = getCRSByCode('EPSG:4326');
   const bounds = computeGeoJSONBounds(geojson);
+  const coordResult = detectCRSFromCoordinates(bounds);
+  const detectedCRS = coordResult.detectedCRS;
+  crsStatus = coordResult.crsStatus;
+
   const geometryType = detectGeometryType(geojson);
   const fields = extractSchemaFields(geojson);
-  const validationIssues = validateDatasetGeometries(geojson, 'EPSG:4326');
+  const validationIssues = validateDatasetGeometries(geojson, detectedCRS?.code);
+
+  if (crsStatus === 'missing') {
+    validationIssues.push({
+      severity: 'warning',
+      code: 'PROJECTED_CAD_COORDINATES',
+      message: `AutoCAD drawing has projected metric coordinates. ${coordResult.confidenceReason}`,
+    });
+  }
 
   return {
     id: `ds-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,

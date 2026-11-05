@@ -25,6 +25,8 @@ import { SpatialDoctorModal } from './components/SpatialDoctorModal';
 import { SchemaHarmonizerModal } from './components/SchemaHarmonizerModal';
 import { AuditCertificateModal } from './components/AuditCertificateModal';
 import { AggregationModal } from './components/AggregationModal';
+import { ConcatenationModal } from './components/ConcatenationModal';
+import { PostgisModal } from './components/PostgisModal';
 import { generateAutoHarmonizerRules, applySchemaHarmonization } from './core/schemaHarmonizer';
 import { createMultiLayerGeoPackage, generateQgisProjectXml, bundleConsolidatedHandoff } from './core/multiLayerGpkg';
 import { generateQAQCReportData } from './core/auditCertificate';
@@ -82,6 +84,30 @@ export default function App() {
   const [isHarmonizerOpen, setIsHarmonizerOpen] = useState(false);
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [isAggregationModalOpen, setIsAggregationModalOpen] = useState(false);
+  const [isConcatenationModalOpen, setIsConcatenationModalOpen] = useState(false);
+  const [isPostgisModalOpen, setIsPostgisModalOpen] = useState(false);
+  const [concatenationInitialIds, setConcatenationInitialIds] = useState<string[]>([]);
+  const [postgisTargetDatasetId, setPostgisTargetDatasetId] = useState<string | null>(null);
+
+  const handleAddConcatenatedDataset = (newDataset: SpatialDataset) => {
+    setDatasets(prev => [newDataset, ...prev]);
+    setSelectedDatasetId(newDataset.id);
+    setActiveTab('workspace');
+  };
+
+  const handleOpenConcatenationModal = (initialSelectedIds?: string[]) => {
+    if (initialSelectedIds && initialSelectedIds.length > 0) {
+      setConcatenationInitialIds(initialSelectedIds);
+    } else {
+      setConcatenationInitialIds([]);
+    }
+    setIsConcatenationModalOpen(true);
+  };
+
+  const handleOpenPostgisModal = (datasetId?: string) => {
+    setPostgisTargetDatasetId(datasetId || selectedDatasetId || null);
+    setIsPostgisModalOpen(true);
+  };
 
   // Surface calculation handler - appends new column to dataset
   const handleCalculateSurfaces = (unit: SurfaceUnit = 'ha') => {
@@ -392,6 +418,8 @@ export default function App() {
         onStartBatch={handleStartBatch}
         selectedPresetId={selectedPresetId}
         onSelectPreset={handleSelectPreset}
+        onOpenConcatenationModal={() => handleOpenConcatenationModal()}
+        onOpenPostgisModal={() => handleOpenPostgisModal()}
       />
 
       {/* Main Work Area Views */}
@@ -414,6 +442,8 @@ export default function App() {
             onOpenAggregationModal={() => setIsAggregationModalOpen(true)}
             onStartBatch={handleStartBatch}
             hasCertificate={!!qaqcReport}
+            onOpenConcatenationModal={() => handleOpenConcatenationModal()}
+            onOpenPostgisModal={() => handleOpenPostgisModal()}
           />
         )}
 
@@ -428,6 +458,8 @@ export default function App() {
             onCalculateSurfaces={handleCalculateSurfaces}
             onOpenAggregationModal={() => setIsAggregationModalOpen(true)}
             onStartBatch={handleStartBatch}
+            onOpenConcatenationModal={handleOpenConcatenationModal}
+            onOpenPostgisModal={handleOpenPostgisModal}
           />
         )}
 
@@ -443,6 +475,8 @@ export default function App() {
             onOpenSchemaHarmonizer={() => setIsHarmonizerOpen(true)}
             onOpenSpatialDoctor={() => setIsDoctorOpen(true)}
             harmonizerRulesCount={harmonizerConfig.rules.length}
+            onOpenConcatenationModal={() => handleOpenConcatenationModal()}
+            onOpenPostgisModal={() => handleOpenPostgisModal()}
           />
         )}
 
@@ -495,6 +529,8 @@ export default function App() {
         onOpenSpatialDoctor={() => setIsDoctorOpen(true)}
         onOpenSchemaHarmonizer={() => setIsHarmonizerOpen(true)}
         onOpenAuditCertificate={() => setIsCertificateOpen(true)}
+        onOpenConcatenationModal={() => handleOpenConcatenationModal()}
+        onOpenPostgisModal={() => handleOpenPostgisModal()}
       />
 
       {/* Python Architecture & Packaging Modal */}
@@ -541,6 +577,23 @@ export default function App() {
         onClose={() => setIsAggregationModalOpen(false)}
         dataset={selectedDataset}
         onUpdateDataset={handleUpdateDataset}
+      />
+
+      {/* Layer Concatenation & Column Mapping Tool */}
+      <ConcatenationModal
+        isOpen={isConcatenationModalOpen}
+        onClose={() => setIsConcatenationModalOpen(false)}
+        datasets={datasets}
+        onAddConcatenatedDataset={handleAddConcatenatedDataset}
+        initialSelectedIds={concatenationInitialIds}
+      />
+
+      {/* PostgreSQL / PostGIS Integration Assistant */}
+      <PostgisModal
+        isOpen={isPostgisModalOpen}
+        onClose={() => setIsPostgisModalOpen(false)}
+        datasets={datasets}
+        defaultDatasetId={postgisTargetDatasetId}
       />
     </div>
   );

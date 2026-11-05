@@ -23,7 +23,8 @@ import {
   Copy, 
   Check, 
   Sliders,
-  Play
+  Play,
+  Database
 } from 'lucide-react';
 import { SpatialDataset, BatchSettings, ConsolidationSettings } from '../types/gis';
 import { SurfaceUnit } from '../core/spatialAnalytics';
@@ -48,6 +49,8 @@ interface CraftStudioProps {
   onOpenAggregationModal: () => void;
   onStartBatch: () => void;
   hasCertificate: boolean;
+  onOpenConcatenationModal?: () => void;
+  onOpenPostgisModal?: () => void;
 }
 
 export const CraftStudio: React.FC<CraftStudioProps> = ({
@@ -67,6 +70,8 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
   onOpenAggregationModal,
   onStartBatch,
   hasCertificate,
+  onOpenConcatenationModal,
+  onOpenPostgisModal,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -209,6 +214,41 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
         setSettings(s => ({ ...s, targetFormat: 'shapefile' }));
         setActiveTab('lab');
         showToast(t.craft.shpToast);
+      },
+    },
+    {
+      id: 'concatenate-layers',
+      title: 'Concatenate Layers with Column Mapping',
+      category: 'packaging',
+      description: 'Merge multiple vector layers into a single harmonized dataset with custom attribute mapping and CRS alignment.',
+      icon: Layers,
+      badge: 'Multi-Layer Fusion',
+      badgeColor: 'bg-amber-950 text-amber-300 border-amber-700/50',
+      actionLabel: 'Open Concatenation Studio',
+      onExecute: () => {
+        if (onOpenConcatenationModal) {
+          onOpenConcatenationModal();
+        } else {
+          setActiveTab('workspace');
+        }
+      },
+    },
+    {
+      id: 'postgis-integration',
+      title: 'PostgreSQL / PostGIS Exporter & Pipeline',
+      category: 'packaging',
+      description: 'Generate automated SQL schema, typed geometries, GIST indexing, and copyable psql / ogr2ogr CLI ingestion pipelines.',
+      icon: Database,
+      badge: 'PostGIS 3.x Spatial',
+      badgeColor: 'bg-indigo-950 text-indigo-300 border-indigo-700/50',
+      cliCommand: 'ogr2ogr -f "PostgreSQL" PG:"dbname=gisdb user=postgres" input.geojson -nln target_table',
+      actionLabel: 'Open PostGIS Assistant',
+      onExecute: () => {
+        if (onOpenPostgisModal) {
+          onOpenPostgisModal();
+        } else {
+          setActiveTab('workspace');
+        }
       },
     },
     {

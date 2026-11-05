@@ -268,39 +268,14 @@ function findTopLevelEPSGAuthority(wkt: string): string | null {
   return null;
 }
 
+import { detectCRSFromPRJRobust } from './crsDetection';
+
 /**
- * Inspect .prj file string to identify the likely EPSG code
+ * Inspect .prj file string to identify the likely EPSG code using robust PRJ parser
  */
 export function detectCRSFromPRJ(prjContent: string): CRSInfo | null {
-  if (!prjContent) return null;
-  const upper = prjContent.toUpperCase();
-
-  const authorityCode = findTopLevelEPSGAuthority(prjContent);
-  if (authorityCode) {
-    return getCRSByCode(`EPSG:${authorityCode}`);
-  }
-
-  if (upper.includes('WGS_1984_WEB_MERCATOR') || upper.includes('PSEUDO_MERCATOR') || upper.includes('WEB_MERCATOR')) {
-    return getCRSByCode('EPSG:3857');
-  }
-  if (upper.includes('BRITISH_NATIONAL_GRID') || upper.includes('OSGB_1936')) {
-    return getCRSByCode('EPSG:27700');
-  }
-  if (upper.includes('RGF93') || upper.includes('LAMBERT_93') || upper.includes('LAMBERT-93')) {
-    return getCRSByCode('EPSG:2154');
-  }
-  if (upper.includes('ETRS_1989_UTM_ZONE_32N') || upper.includes('ETRS89 / UTM ZONE 32N')) {
-    return getCRSByCode('EPSG:25832');
-  }
-  if (upper.includes('CONUS_ALBERS') || upper.includes('USA_CONTIGUOUS_ALBERS')) {
-    return getCRSByCode('EPSG:5070');
-  }
-  if (upper.includes('LONG ISLAND') && upper.includes('NEW YORK')) {
-    return getCRSByCode('EPSG:2263');
-  }
-  if (upper.includes('GCS_WGS_1984') || upper.includes('GEOGCS["WGS 84"') || upper.includes('DATUM["WGS_1984"')) {
-    return getCRSByCode('EPSG:4326');
-  }
-
-  return null;
+  return detectCRSFromPRJRobust(prjContent);
 }
+
+export { detectCRSFromPRJRobust, detectCRSFromCoordinates, detectCRSFromGeoJSONMember } from './crsDetection';
+
