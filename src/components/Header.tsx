@@ -24,7 +24,8 @@ import {
   Moon,
   Globe,
   Check,
-  Database
+  Database,
+  BookOpen
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { BatchSettings, PresetProfile } from '../types/gis';
@@ -251,7 +252,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
             title={t.header.showcaseTab}
           >
-            <Globe className="w-3.5 h-3.5" />
+            <BookOpen className="w-3.5 h-3.5" />
             <span className="hidden xl:inline">{t.header.showcaseTab}</span>
           </button>
         </nav>

@@ -269,16 +269,26 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
     setIsDraggingSwipe(false);
   };
 
-  // Initialize Map
+  // Africa Continental Geodetic Extent
+  const AFRICA_BOUNDS: L.LatLngBoundsLiteral = [
+    [-35.5, -18.0], // Cape Agulhas / South Atlantic
+    [37.5, 52.0],   // Mediterranean / Horn of Africa
+  ];
+  const AFRICA_CENTER: [number, number] = [3.5, 20.0];
+
+  // Initialize Map with Africa Continental View
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
       const map = L.map(mapContainerRef.current, {
-        center: [51.505, -0.09],
-        zoom: 13,
+        center: AFRICA_CENTER,
+        zoom: 3.5,
         zoomControl: false,
       });
+
+      // Frame the entire African continent initially
+      map.fitBounds(AFRICA_BOUNDS, { padding: [20, 20] });
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
       mapInstanceRef.current = map;
@@ -506,6 +516,13 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
     }
   }, [showOutputCompare, processedJob]);
 
+  // Reset to Africa view
+  const resetToAfrica = () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    map.fitBounds(AFRICA_BOUNDS, { padding: [20, 20], animate: true });
+  };
+
   const fitCurrentBounds = () => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -515,10 +532,16 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
       if (b.isValid()) groupBounds.extend(b);
     });
     if (groupBounds.isValid()) {
-      map.fitBounds(groupBounds, { padding: [40, 40] });
+      map.fitBounds(groupBounds, { padding: [40, 40], animate: true });
     } else if (dataset && multiGeojsonLayersRef.current.has(dataset.id)) {
       const b = multiGeojsonLayersRef.current.get(dataset.id)!.getBounds();
-      if (b.isValid()) map.fitBounds(b, { padding: [40, 40] });
+      if (b.isValid()) {
+        map.fitBounds(b, { padding: [40, 40], animate: true });
+      } else {
+        resetToAfrica();
+      }
+    } else {
+      resetToAfrica();
     }
   };
 
@@ -528,7 +551,123 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
     const layer = multiGeojsonLayersRef.current.get(layerId);
     if (layer) {
       const b = layer.getBounds();
-      if (b.isValid()) map.fitBounds(b, { padding: [40, 40], maxZoom: 16 });
+      if (b.isValid()) {
+        map.fitBounds(b, { padding: [40, 40], maxZoom: 16, animate: true });
+      }
+    }
+  };
+
+  // Auto-Zoom: Africa first until data is added, then smoothly zooms to data extent
+  const lastFittedKeyRef = useRef<string>('');
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (datasets.length === 0) {
+      resetToAfrica();
+      lastFittedKeyRef.current = '';
+      return;
+    }
+
+    const currentKey = datasets.map(d => `${d.id}:${d.featureCount}`).join('|');
+    if (currentKey !== lastFittedKeyRef.current) {
+      lastFittedKeyRef.current = currentKey;
+      const timer = setTimeout(() => {
+        fitCurrentBounds();
+      }, 180);
+      return () => clearTimeout(timer);
+    }
+  }, [datasets]);
+
+  // Temporary feature highlight layer reference
+  const featureHighlightRef = useRef<L.Layer | null>(null);
+
+  // Zoom to specific feature clicked in attribute table
+  const zoomToFeature = (feature: any, rowIdx: number) => {
+    const map = mapInstanceRef.current;
+    if (!map || !feature) return;
+
+    setSelectedFeatureProps(feature.properties || {});
+
+    try {
+      const sourceCRS = dataset?.detectedCRS?.code || 'EPSG:4326';
+      let geo = feature;
+      if (sourceCRS !== 'EPSG:4326' && getCRSByCode(sourceCRS)) {
+        const rep = reprojectGeoJSON({ type: 'FeatureCollection', features: [feature] }, sourceCRS, 'EPSG:4326');
+        if (rep.geojson.features && rep.geojson.features[0]) {
+          geo = rep.geojson.features[0];
+        }
+      }
+
+      // Remove previous feature highlight
+      if (featureHighlightRef.current) {
+        map.removeLayer(featureHighlightRef.current);
+        featureHighlightRef.current = null;
+      }
+
+      const tempLayer = L.geoJSON(geo, {
+        style: {
+          color: '#F59E0B',
+          weight: 4,
+          fillColor: '#F59E0B',
+          fillOpacity: 0.6,
+        },
+        pointToLayer: (_f, latlng) => {
+          return L.circleMarker(latlng, {
+            radius: 10,
+            fillColor: '#F59E0B',
+            color: '#FFFFFF',
+            weight: 3,
+            fillOpacity: 0.95,
+          });
+        }
+      }).addTo(map);
+
+      featureHighlightRef.current = tempLayer;
+
+      // Auto-remove highlight layer after 4 seconds
+      setTimeout(() => {
+        if (featureHighlightRef.current === tempLayer) {
+          map.removeLayer(tempLayer);
+          featureHighlightRef.current = null;
+        }
+      }, 4000);
+
+      const bounds = tempLayer.getBounds();
+      if (bounds.isValid()) {
+        const isPoint = geo.geometry?.type === 'Point' || geo.geometry?.type === 'MultiPoint';
+        const center = bounds.getCenter();
+
+        if (isPoint) {
+          map.setView(center, 16, { animate: true });
+        } else {
+          map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17, animate: true });
+        }
+
+        // Display brief interactive popup at the feature's location
+        const propKeys = Object.keys(feature.properties || {}).slice(0, 4);
+        const propRows = propKeys.map(k => `
+          <div style="display:flex; justify-content:space-between; gap:10px; font-size:11px; padding:1px 0;">
+            <span style="color:#78716c; font-family:sans-serif;">${k}:</span>
+            <span style="font-family:monospace; font-weight:600; color:#1c1917;">${String(feature.properties[k])}</span>
+          </div>
+        `).join('');
+
+        L.popup({ autoClose: true, closeOnClick: true, offset: [0, -8] })
+          .setLatLng(center)
+          .setContent(`
+            <div style="font-family: sans-serif; font-size: 11px; padding: 4px; min-width: 150px; color: #1c1917;">
+              <div style="font-weight: bold; font-family: monospace; border-bottom: 1px solid #e7e5e4; padding-bottom: 3px; margin-bottom: 4px; color: #d97706; display:flex; justify-content:space-between;">
+                <span>Feature #${rowIdx + 1}</span>
+                <span style="font-size:10px; color:#78716c;">${geo.geometry?.type || 'Geometry'}</span>
+              </div>
+              ${propRows || '<div style="color:#a8a29e; font-style:italic;">No attributes</div>'}
+            </div>
+          `)
+          .openOn(map);
+      }
+    } catch (err) {
+      console.error('Failed to zoom to feature:', err);
     }
   };
 
@@ -556,37 +695,49 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-hidden bg-[#13110E] text-[#F5EBE1]">
+    <div className={`flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-hidden transition-colors ${
+      theme === 'light' ? 'bg-[#FAF8F5] text-stone-900' : 'bg-[#13110E] text-[#F5EBE1]'
+    }`}>
       {/* Top Map Control Bar */}
-      <div className="h-12 border-b border-stone-800 bg-[#181411] px-4 flex items-center justify-between text-xs flex-shrink-0">
+      <div className={`h-12 border-b px-4 flex items-center justify-between text-xs flex-shrink-0 transition-colors ${
+        theme === 'light' ? 'border-[#E2DBD0] bg-[#FAF8F5]' : 'border-stone-800 bg-[#181411]'
+      }`}>
         <div className="flex items-center space-x-3">
           {/* Toggle Legend Sidebar Outside Map Frame */}
           <button
             onClick={() => setIsLegendOpen(!isLegendOpen)}
             className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
               isLegendOpen
-                ? 'bg-amber-950/80 border-amber-500/80 text-amber-300 font-semibold shadow-sm'
-                : 'bg-stone-850 border-stone-700 text-stone-300 hover:bg-stone-800'
+                ? (theme === 'light'
+                    ? 'bg-amber-100/80 border-amber-400 text-amber-900 font-bold shadow-xs'
+                    : 'bg-amber-950/80 border-amber-500/80 text-amber-300 font-semibold shadow-sm')
+                : (theme === 'light'
+                    ? 'bg-white border-[#D6CEBE] text-stone-700 hover:bg-[#F2ECE3]'
+                    : 'bg-stone-850 border-stone-700 text-stone-300 hover:bg-stone-800')
             }`}
             title="Toggle Cartographic Legend Sidebar (Outside Map Frame)"
           >
-            {isLegendOpen ? <PanelLeftClose className="w-3.5 h-3.5 text-amber-400" /> : <PanelLeftOpen className="w-3.5 h-3.5 text-stone-400" />}
+            {isLegendOpen ? <PanelLeftClose className="w-3.5 h-3.5 text-amber-500" /> : <PanelLeftOpen className="w-3.5 h-3.5 text-stone-400" />}
             <span>{isLegendOpen ? t.map.hideLegend : t.map.showLegend}</span>
           </button>
 
           {/* Dataset Switcher */}
           <div className="flex items-center space-x-2">
-            <span className="text-stone-400 font-medium">{t.map.layerLabel}:</span>
+            <span className={`font-medium ${theme === 'light' ? 'text-stone-600' : 'text-stone-400'}`}>{t.map.layerLabel}:</span>
             <select
               value={dataset?.id || ''}
               onChange={(e) => {
                 const found = datasets.find(d => d.id === e.target.value);
                 if (found) onSelectDataset(found);
               }}
-              className="bg-[#13110E] border border-stone-700 rounded-lg px-2.5 py-1 text-stone-100 font-medium focus:border-amber-500 focus:outline-none max-w-xs truncate cursor-pointer"
+              className={`border rounded-lg px-2.5 py-1 font-medium focus:border-amber-500 focus:outline-none max-w-xs truncate cursor-pointer text-xs ${
+                theme === 'light'
+                  ? 'bg-white border-[#D6CEBE] text-stone-900'
+                  : 'bg-[#13110E] border-stone-700 text-stone-100'
+              }`}
             >
               {datasets.map((d) => (
-                <option key={d.id} value={d.id} className="bg-stone-900 text-stone-100">
+                <option key={d.id} value={d.id} className={theme === 'light' ? 'bg-white text-stone-900' : 'bg-stone-900 text-stone-100'}>
                   {d.name} ({d.geometryType}, {d.featureCount} {t.common.features})
                 </option>
               ))}
@@ -594,8 +745,14 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
           </div>
 
           {dataset && (
-            <div className="hidden sm:flex items-center space-x-2 text-stone-400 font-mono text-xs">
-              <span className="px-2 py-0.5 rounded-md bg-amber-950/80 text-amber-300 border border-amber-700/50">
+            <div className={`hidden sm:flex items-center space-x-2 font-mono text-xs ${
+              theme === 'light' ? 'text-stone-600' : 'text-stone-400'
+            }`}>
+              <span className={`px-2 py-0.5 rounded-md border ${
+                theme === 'light'
+                  ? 'bg-amber-100 text-amber-900 border-amber-300 font-semibold'
+                  : 'bg-amber-950/80 text-amber-300 border-amber-700/50'
+              }`}>
                 {dataset.detectedCRS?.code || 'EPSG:4326'}
               </span>
               <span>{dataset.featureCount} {t.common.features}</span>
@@ -604,10 +761,14 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
           {/* Multi-layer Active Status Badge */}
           {datasets.length > 1 && (
-            <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#201A16] border border-stone-800 text-stone-300 font-mono text-[11px]">
-              <Layers className="w-3 h-3 text-amber-400" />
+            <div className={`hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border font-mono text-[11px] ${
+              theme === 'light'
+                ? 'bg-white border-[#E2DBD0] text-stone-700'
+                : 'bg-[#201A16] border-stone-800 text-stone-300'
+            }`}>
+              <Layers className="w-3 h-3 text-amber-500" />
               <span>
-                <strong className="text-amber-400">{visibleLayerIds.size}</strong>/{datasets.length} visible
+                <strong className={theme === 'light' ? 'text-amber-700' : 'text-amber-400'}>{visibleLayerIds.size}</strong>/{datasets.length} visible
               </span>
             </div>
           )}
@@ -615,12 +776,40 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
         {/* Map View & Analytical Controls */}
         <div className="flex items-center space-x-2">
+          {/* Zoom to Africa Button */}
+          <button
+            onClick={resetToAfrica}
+            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+              theme === 'light'
+                ? 'bg-white border-[#D6CEBE] text-stone-700 hover:bg-[#F2ECE3]'
+                : 'bg-stone-850 border-stone-700 text-stone-200 hover:bg-stone-800'
+            }`}
+            title="Reset Map View to Africa Continent"
+          >
+            <Globe className="w-3.5 h-3.5 text-amber-500" />
+            <span>Africa</span>
+          </button>
+
+          {/* Zoom to extent */}
+          <button
+            onClick={fitCurrentBounds}
+            className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg transition-colors border text-xs ${
+              theme === 'light'
+                ? 'bg-white hover:bg-stone-100 text-stone-800 border-[#D6CEBE]'
+                : 'bg-stone-850 hover:bg-stone-800 text-stone-200 border-stone-700'
+            }`}
+            title="Zoom to layer extent"
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
+            <span>{t.map.extentBtn}</span>
+          </button>
+
           {/* Calculate Surface Button Dropdown */}
           {onCalculateSurfaces && (
             <div className="relative" ref={surfaceMenuRef}>
               <button
                 onClick={() => setIsSurfaceMenuOpen(!isSurfaceMenuOpen)}
-                className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold transition-all shadow-sm text-xs"
+                className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold transition-all shadow-sm text-xs"
                 title="Calculate geodesic surface area as new column"
               >
                 <Calculator className="w-3.5 h-3.5" />
@@ -704,23 +893,17 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
           {onOpenAggregationModal && (
             <button
               onClick={onOpenAggregationModal}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#241E19] hover:bg-[#2C241E] text-orange-300 border border-orange-600/50 text-xs font-semibold transition-all shadow-sm"
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all shadow-sm ${
+                theme === 'light'
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                  : 'bg-[#241E19] hover:bg-[#2C241E] text-orange-300 border-orange-600/50'
+              }`}
               title="Aggregate fields by category & append summary columns"
             >
-              <PieChart className="w-3.5 h-3.5 text-orange-400" />
+              <PieChart className="w-3.5 h-3.5 text-amber-500" />
               <span className="hidden sm:inline">{t.map.aggregateBtn}</span>
             </button>
           )}
-
-          {/* Zoom to extent */}
-          <button
-            onClick={fitCurrentBounds}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-stone-850 hover:bg-stone-800 text-stone-200 transition-colors border border-stone-700 text-xs"
-            title="Zoom to layer extent"
-          >
-            <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-            <span>{t.map.extentBtn}</span>
-          </button>
 
           {/* Compare toggle if output exists */}
           {processedJob?.outputGeojson && (
@@ -733,7 +916,9 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
                 isSwipeMode
                   ? 'bg-amber-500 text-stone-950 font-bold border-amber-400 shadow-md'
-                  : 'bg-stone-850 border-stone-700 text-amber-300 hover:bg-stone-800'
+                  : (theme === 'light'
+                      ? 'bg-white border-[#D6CEBE] text-amber-800 hover:bg-stone-100'
+                      : 'bg-stone-850 border-stone-700 text-amber-300 hover:bg-stone-800')
               }`}
               title="Interactive side-by-side swipe comparison curtain"
             >
@@ -743,11 +928,15 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
           )}
 
           {/* Basemap Switcher */}
-          <div className="flex items-center bg-[#13110E] border border-stone-800 rounded-lg p-0.5">
+          <div className={`flex items-center border rounded-lg p-0.5 ${
+            theme === 'light' ? 'bg-[#F2ECE3] border-[#E2DBD0]' : 'bg-[#13110E] border-stone-800'
+          }`}>
             <button
               onClick={() => setBasemap('dark')}
               className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-                basemap === 'dark' ? 'bg-amber-600 text-stone-950 font-bold' : 'text-stone-400 hover:text-stone-200'
+                basemap === 'dark'
+                  ? 'bg-amber-600 text-white font-bold shadow-xs'
+                  : (theme === 'light' ? 'text-stone-600 hover:text-stone-900' : 'text-stone-400 hover:text-stone-200')
               }`}
             >
               {t.map.basemapDark}
@@ -755,7 +944,9 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             <button
               onClick={() => setBasemap('osm')}
               className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-                basemap === 'osm' ? 'bg-amber-600 text-stone-950 font-bold' : 'text-stone-400 hover:text-stone-200'
+                basemap === 'osm'
+                  ? 'bg-amber-600 text-white font-bold shadow-xs'
+                  : (theme === 'light' ? 'text-stone-600 hover:text-stone-900' : 'text-stone-400 hover:text-stone-200')
               }`}
             >
               {t.map.basemapOsm}
@@ -763,7 +954,9 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             <button
               onClick={() => setBasemap('satellite')}
               className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-                basemap === 'satellite' ? 'bg-amber-600 text-stone-950 font-bold' : 'text-stone-400 hover:text-stone-200'
+                basemap === 'satellite'
+                  ? 'bg-amber-600 text-white font-bold shadow-xs'
+                  : (theme === 'light' ? 'text-stone-600 hover:text-stone-900' : 'text-stone-400 hover:text-stone-200')
               }`}
             >
               {t.map.basemapSatellite}
@@ -771,7 +964,9 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             <button
               onClick={() => setBasemap('offline_grid')}
               className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-                basemap === 'offline_grid' ? 'bg-amber-600 text-stone-950 font-bold' : 'text-stone-400 hover:text-stone-200'
+                basemap === 'offline_grid'
+                  ? 'bg-amber-600 text-white font-bold shadow-xs'
+                  : (theme === 'light' ? 'text-stone-600 hover:text-stone-900' : 'text-stone-400 hover:text-stone-200')
               }`}
             >
               {t.map.basemapGrid}
@@ -785,21 +980,37 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
         
         {/* DEDICATED CARTOGRAPHIC MULTI-LAYER & LEGEND SIDEBAR (Outside map frame to eliminate Leaflet resize glitches) */}
         {isLegendOpen && (
-          <aside className="w-80 lg:w-88 flex-shrink-0 border-r border-stone-800 bg-[#16120F] flex flex-col h-full z-10 shadow-xl overflow-y-auto">
+          <aside className={`w-80 lg:w-88 flex-shrink-0 border-r flex flex-col h-full z-10 shadow-xl overflow-y-auto transition-colors ${
+            theme === 'light'
+              ? 'border-[#E2DBD0] bg-[#FAF8F5] text-stone-900'
+              : 'border-stone-800 bg-[#16120F] text-[#F5EBE1]'
+          }`}>
             {/* Sidebar Header */}
-            <div className="p-3.5 border-b border-stone-800 flex items-center justify-between bg-[#130F0D]">
+            <div className={`p-3.5 border-b flex items-center justify-between transition-colors ${
+              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3]' : 'border-stone-800 bg-[#130F0D]'
+            }`}>
               <div className="flex items-center space-x-2">
-                <Layers className="w-4 h-4 text-amber-400" />
-                <h3 className="font-display font-bold text-stone-100 text-xs tracking-wide">
+                <Layers className="w-4 h-4 text-amber-500" />
+                <h3 className={`font-display font-bold text-xs tracking-wide ${
+                  theme === 'light' ? 'text-stone-900' : 'text-stone-100'
+                }`}>
                   Multi-Layer GIS Studio
                 </h3>
-                <span className="px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-700/50 text-[10px] font-mono font-semibold">
+                <span className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-semibold ${
+                  theme === 'light'
+                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    : 'bg-amber-950/80 text-amber-300 border-amber-700/50'
+                }`}>
                   {visibleLayerIds.size}/{datasets.length}
                 </span>
               </div>
               <button
                 onClick={() => setIsLegendOpen(false)}
-                className="p-1 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors"
+                className={`p-1 rounded-lg transition-colors ${
+                  theme === 'light'
+                    ? 'text-stone-500 hover:text-stone-900 hover:bg-stone-200'
+                    : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                }`}
                 title={t.map.hideLegend}
               >
                 <X className="w-4 h-4" />
@@ -807,27 +1018,37 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             </div>
 
             {/* Sidebar Navigation Tabs: All Layers vs Active Symbology */}
-            <div className="flex border-b border-stone-800 bg-[#130F0D] text-xs font-mono">
+            <div className={`flex border-b text-xs font-mono transition-colors ${
+              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3]' : 'border-stone-800 bg-[#130F0D]'
+            }`}>
               <button
                 onClick={() => setLegendTab('layers')}
                 className={`flex-1 py-2 px-3 flex items-center justify-center space-x-1.5 transition-colors border-b-2 ${
                   legendTab === 'layers'
-                    ? 'border-amber-500 text-amber-300 font-bold bg-[#1C1714]'
-                    : 'border-transparent text-stone-400 hover:text-stone-200'
+                    ? (theme === 'light'
+                        ? 'border-amber-600 text-amber-800 font-bold bg-white'
+                        : 'border-amber-500 text-amber-300 font-bold bg-[#1C1714]')
+                    : (theme === 'light'
+                        ? 'border-transparent text-stone-600 hover:text-stone-950'
+                        : 'border-transparent text-stone-400 hover:text-stone-200')
                 }`}
               >
-                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                <Layers className="w-3.5 h-3.5 text-amber-500" />
                 <span>Layers ({datasets.length})</span>
               </button>
               <button
                 onClick={() => setLegendTab('style')}
                 className={`flex-1 py-2 px-3 flex items-center justify-center space-x-1.5 transition-colors border-b-2 ${
                   legendTab === 'style'
-                    ? 'border-amber-500 text-amber-300 font-bold bg-[#1C1714]'
-                    : 'border-transparent text-stone-400 hover:text-stone-200'
+                    ? (theme === 'light'
+                        ? 'border-amber-600 text-amber-800 font-bold bg-white'
+                        : 'border-amber-500 text-amber-300 font-bold bg-[#1C1714]')
+                    : (theme === 'light'
+                        ? 'border-transparent text-stone-600 hover:text-stone-950'
+                        : 'border-transparent text-stone-400 hover:text-stone-200')
                 }`}
               >
-                <Palette className="w-3.5 h-3.5 text-amber-400" />
+                <Palette className="w-3.5 h-3.5 text-amber-500" />
                 <span>Symbology</span>
               </button>
             </div>
@@ -836,18 +1057,28 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             {legendTab === 'layers' && (
               <div className="p-3.5 space-y-4 text-xs font-sans">
                 {/* Mass Control Toolbar */}
-                <div className="flex items-center justify-between gap-1.5 text-[11px] font-mono pb-2 border-b border-stone-800">
+                <div className={`flex items-center justify-between gap-1.5 text-[11px] font-mono pb-2 border-b ${
+                  theme === 'light' ? 'border-stone-200' : 'border-stone-800'
+                }`}>
                   <div className="flex items-center space-x-1.5">
                     <button
                       onClick={showAllLayers}
-                      className="px-2 py-1 rounded-md bg-[#241E19] hover:bg-[#2F2620] text-amber-300 border border-stone-700/80 transition-colors"
+                      className={`px-2 py-1 rounded-md border transition-colors ${
+                        theme === 'light'
+                          ? 'bg-white hover:bg-stone-100 text-stone-800 border-stone-300'
+                          : 'bg-[#241E19] hover:bg-[#2F2620] text-amber-300 border-stone-700/80'
+                      }`}
                       title="Make all layers visible simultaneously"
                     >
                       Show All
                     </button>
                     <button
                       onClick={hideAllLayers}
-                      className="px-2 py-1 rounded-md bg-[#241E19] hover:bg-[#2F2620] text-stone-400 hover:text-stone-200 border border-stone-700/80 transition-colors"
+                      className={`px-2 py-1 rounded-md border transition-colors ${
+                        theme === 'light'
+                          ? 'bg-white hover:bg-stone-100 text-stone-600 border-stone-300'
+                          : 'bg-[#241E19] hover:bg-[#2F2620] text-stone-400 hover:text-stone-200 border-stone-700/80'
+                      }`}
                       title="Hide all layers"
                     >
                       Hide All
@@ -856,10 +1087,14 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
                   <button
                     onClick={fitCurrentBounds}
-                    className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-amber-950/70 hover:bg-amber-900/70 text-amber-300 border border-amber-600/60 transition-colors"
+                    className={`flex items-center space-x-1 px-2.5 py-1 rounded-md border transition-colors ${
+                      theme === 'light'
+                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 font-semibold'
+                        : 'bg-amber-950/70 hover:bg-amber-900/70 text-amber-300 border-amber-600/60'
+                    }`}
                     title="Fit view to combined extent of all visible layers"
                   >
-                    <Maximize2 className="w-3 h-3 text-amber-400" />
+                    <Maximize2 className="w-3 h-3 text-amber-500" />
                     <span>Fit Extent</span>
                   </button>
                 </div>
@@ -868,8 +1103,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 <div className="space-y-2.5">
                   {datasets.length === 0 ? (
                     <div className="p-6 text-center text-stone-500 space-y-2">
-                      <Layers className="w-8 h-8 mx-auto text-stone-600" />
-                      <p className="text-xs">No layers loaded in workspace</p>
+                      <Layers className="w-8 h-8 mx-auto text-stone-400" />
+                      <p className="text-xs font-medium">No layers loaded in workspace</p>
                       <p className="text-[10px]">Import GIS datasets in the Workspace tab to visualize them on the canvas.</p>
                     </div>
                   ) : (
@@ -887,8 +1122,12 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                           key={d.id}
                           className={`p-3 rounded-2xl border transition-all ${
                             isSelected
-                              ? 'bg-[#221A15] border-amber-600/70 shadow-sm ring-1 ring-amber-500/30'
-                              : 'bg-[#181411] border-stone-800/90 hover:border-stone-700'
+                              ? (theme === 'light'
+                                  ? 'bg-amber-50/80 border-amber-400 shadow-xs ring-1 ring-amber-400/40 text-stone-900'
+                                  : 'bg-[#221A15] border-amber-600/70 shadow-sm ring-1 ring-amber-500/30 text-[#FAF6F0]')
+                              : (theme === 'light'
+                                  ? 'bg-white border-[#E2DBD0] hover:border-amber-300 text-stone-800'
+                                  : 'bg-[#181411] border-stone-800/90 hover:border-stone-700 text-stone-300')
                           }`}
                         >
                           {/* Row 1: Checkbox, Swatch, Name & Actions */}
@@ -898,13 +1137,13 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => toggleLayerVisibility(d.id)}
-                                className="text-amber-400 hover:text-amber-300 shrink-0"
+                                className="text-amber-500 hover:text-amber-600 shrink-0"
                                 title={isVis ? 'Hide layer on map' : 'Show layer on map'}
                               >
                                 {isVis ? (
-                                  <CheckSquare className="w-4 h-4 text-amber-400" />
+                                  <CheckSquare className="w-4 h-4 text-amber-500" />
                                 ) : (
-                                  <Square className="w-4 h-4 text-stone-600" />
+                                  <Square className={`w-4 h-4 ${theme === 'light' ? 'text-stone-400' : 'text-stone-600'}`} />
                                 )}
                               </button>
 
@@ -924,11 +1163,15 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                                 title="Click to inspect this layer"
                               >
                                 <span className={`font-display font-bold text-xs truncate block ${
-                                  isSelected ? 'text-amber-200' : 'text-stone-200 hover:text-white'
+                                  isSelected
+                                    ? (theme === 'light' ? 'text-amber-900' : 'text-amber-200')
+                                    : (theme === 'light' ? 'text-stone-900 hover:text-amber-800' : 'text-stone-200 hover:text-white')
                                 }`}>
                                   {d.name}
                                 </span>
-                                <span className="text-[10px] text-stone-400 font-mono block">
+                                <span className={`text-[10px] font-mono block ${
+                                  theme === 'light' ? 'text-stone-500' : 'text-stone-400'
+                                }`}>
                                   {d.format.toUpperCase()} · {d.geometryType} · {d.featureCount} feats
                                 </span>
                               </div>
@@ -939,7 +1182,11 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => fitSingleLayerBounds(d.id)}
-                                className="p-1 rounded-md text-stone-400 hover:text-amber-300 hover:bg-stone-800 transition-colors"
+                                className={`p-1 rounded-md transition-colors ${
+                                  theme === 'light'
+                                    ? 'text-stone-500 hover:text-amber-700 hover:bg-stone-100'
+                                    : 'text-stone-400 hover:text-amber-300 hover:bg-stone-800'
+                                }`}
                                 title="Zoom map to this layer"
                               >
                                 <ZoomIn className="w-3.5 h-3.5" />
@@ -949,10 +1196,14 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
                           {/* Inline Color Palette Picker Popover */}
                           {isPickerOpen && (
-                            <div className="mt-2.5 pt-2.5 border-t border-stone-800/80 animate-in fade-in-0 duration-150">
-                              <div className="flex items-center justify-between text-[10px] font-mono text-stone-400 mb-1.5">
+                            <div className={`mt-2.5 pt-2.5 border-t animate-in fade-in-0 duration-150 ${
+                              theme === 'light' ? 'border-stone-200' : 'border-stone-800/80'
+                            }`}>
+                              <div className={`flex items-center justify-between text-[10px] font-mono mb-1.5 ${
+                                theme === 'light' ? 'text-stone-600' : 'text-stone-400'
+                              }`}>
                                 <span>Curated Palette (18 Colors):</span>
-                                <label className="flex items-center space-x-1 text-amber-400 cursor-pointer hover:underline">
+                                <label className="flex items-center space-x-1 text-amber-600 hover:underline cursor-pointer">
                                   <span>Custom</span>
                                   <input
                                     type="color"
@@ -985,9 +1236,11 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                             </div>
                           )}
 
-                          {/* Per-Layer Opacity Slider */}
-                          <div className="mt-2 pt-2 border-t border-stone-800/60 flex items-center space-x-2 text-[10px] font-mono text-stone-400">
-                            <span className="shrink-0">Opacity:</span>
+                          {/* Per-Layer Opacity Slider - Fully Themed for Light and Dark Modes */}
+                          <div className={`mt-2 pt-2 border-t flex items-center space-x-2 text-[10px] font-mono transition-colors ${
+                            theme === 'light' ? 'border-stone-200 text-stone-700' : 'border-stone-800/60 text-stone-400'
+                          }`}>
+                            <span className="shrink-0 font-medium">Opacity:</span>
                             <input
                               type="range"
                               min="0.1"
@@ -995,9 +1248,13 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                               step="0.05"
                               value={style.opacity}
                               onChange={(e) => updateLayerOpacity(d.id, parseFloat(e.target.value))}
-                              className="w-full accent-amber-500 cursor-pointer h-1"
+                              className={`w-full accent-amber-600 cursor-pointer h-1.5 rounded-lg ${
+                                theme === 'light' ? 'bg-stone-200' : 'bg-stone-800'
+                              }`}
                             />
-                            <span className="tabular-nums text-stone-300 w-8 text-right font-semibold">
+                            <span className={`tabular-nums w-8 text-right font-semibold ${
+                              theme === 'light' ? 'text-stone-900' : 'text-stone-300'
+                            }`}>
                               {Math.round(style.opacity * 100)}%
                             </span>
                           </div>
@@ -1013,7 +1270,11 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             {legendTab === 'style' && dataset && (
               <div className="p-4 space-y-5 text-xs font-sans">
                 {/* Active Layer Details */}
-                <div className="p-3.5 rounded-2xl bg-[#1D1714] border border-stone-800 space-y-3 shadow-inner">
+                <div className={`p-3.5 rounded-2xl border space-y-3 transition-colors ${
+                  theme === 'light'
+                    ? 'bg-white border-[#E2DBD0] shadow-xs text-stone-900'
+                    : 'bg-[#1D1714] border-stone-800 shadow-inner text-[#FAF6F0]'
+                }`}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-2.5">
                       {/* Visual Symbology Swatch */}
@@ -1037,10 +1298,14 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                         />
                       )}
                       <div>
-                        <span className="font-display font-bold text-stone-100 text-xs block truncate max-w-[150px]">
+                        <span className={`font-display font-bold text-xs block truncate max-w-[150px] ${
+                          theme === 'light' ? 'text-stone-900' : 'text-stone-100'
+                        }`}>
                           {dataset.name}
                         </span>
-                        <span className="text-[10px] text-stone-400 font-mono">
+                        <span className={`text-[10px] font-mono ${
+                          theme === 'light' ? 'text-stone-500' : 'text-stone-400'
+                        }`}>
                           {dataset.format.toUpperCase()} · {dataset.geometryType}
                         </span>
                       </div>
@@ -1049,28 +1314,42 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     {/* Visibility Button */}
                     <button
                       onClick={() => toggleLayerVisibility(dataset.id)}
-                      className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-300 transition-colors"
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        theme === 'light'
+                          ? 'hover:bg-stone-100 text-stone-500 hover:text-amber-700'
+                          : 'hover:bg-stone-800 text-stone-400 hover:text-amber-300'
+                      }`}
                       title={isInspectionLayerVisible ? 'Hide Layer on Canvas' : 'Show Layer on Canvas'}
                     >
-                      {isInspectionLayerVisible ? <Eye className="w-4 h-4 text-amber-400" /> : <EyeOff className="w-4 h-4 text-stone-500" />}
+                      {isInspectionLayerVisible ? <Eye className="w-4 h-4 text-amber-500" /> : <EyeOff className="w-4 h-4 text-stone-400" />}
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-stone-400 font-mono pt-1 border-t border-stone-800/80">
+                  <div className={`flex items-center justify-between text-[11px] font-mono pt-1 border-t ${
+                    theme === 'light' ? 'border-stone-200 text-stone-600' : 'border-stone-800/80 text-stone-400'
+                  }`}>
                     <span>{t.map.recordCount}:</span>
-                    <span className="text-stone-200 font-semibold">{dataset.featureCount} {t.common.features}</span>
+                    <span className={`font-semibold ${theme === 'light' ? 'text-stone-900' : 'text-stone-200'}`}>
+                      {dataset.featureCount} {t.common.features}
+                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-stone-400 font-mono">
+                  <div className={`flex items-center justify-between text-[11px] font-mono ${
+                    theme === 'light' ? 'border-stone-200 text-stone-600' : 'border-stone-800/80 text-stone-400'
+                  }`}>
                     <span>{t.map.datumCrs}:</span>
-                    <span className="text-amber-400 font-bold">{dataset.detectedCRS?.code || 'EPSG:4326'}</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-bold">{dataset.detectedCRS?.code || 'EPSG:4326'}</span>
                   </div>
 
                   {/* Expanded 18-Color Palette Swatches */}
-                  <div className="pt-2 border-t border-stone-800/80 space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px] font-mono text-stone-400">
+                  <div className={`pt-2 border-t space-y-1.5 ${
+                    theme === 'light' ? 'border-stone-200' : 'border-stone-800/80'
+                  }`}>
+                    <div className={`flex items-center justify-between text-[10px] font-mono ${
+                      theme === 'light' ? 'text-stone-600' : 'text-stone-400'
+                    }`}>
                       <span className="uppercase font-semibold">{t.map.symbologyColor}:</span>
-                      <label className="flex items-center space-x-1 text-amber-400 cursor-pointer hover:underline">
+                      <label className="flex items-center space-x-1 text-amber-600 dark:text-amber-400 cursor-pointer hover:underline">
                         <span>Custom Color</span>
                         <input
                           type="color"
@@ -1089,7 +1368,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                           style={{ backgroundColor: p.hex }}
                           className={`w-6 h-6 rounded-md transition-all ${
                             activeLayerColor.toLowerCase() === p.hex.toLowerCase() 
-                              ? 'scale-115 ring-2 ring-white shadow-md' 
+                              ? 'scale-115 ring-2 ring-stone-900 dark:ring-white shadow-md' 
                               : 'opacity-70 hover:opacity-100 hover:scale-105'
                           }`}
                           title={p.name}
@@ -1098,11 +1377,15 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     </div>
                   </div>
 
-                  {/* Fill Opacity Slider */}
-                  <div className="pt-2 border-t border-stone-800/80 space-y-1.5">
-                    <div className="flex justify-between text-[10px] text-stone-400 font-mono">
+                  {/* Fill Opacity Slider - Fully Themed for Light Mode */}
+                  <div className={`pt-2 border-t space-y-1.5 ${
+                    theme === 'light' ? 'border-stone-200' : 'border-stone-800/80'
+                  }`}>
+                    <div className={`flex justify-between text-[10px] font-mono ${
+                      theme === 'light' ? 'text-stone-700 font-medium' : 'text-stone-400'
+                    }`}>
                       <span>{t.map.fillOpacity}:</span>
-                      <span className="text-amber-400 font-bold">{Math.round(activeLayerOpacity * 100)}%</span>
+                      <span className="text-amber-600 dark:text-amber-400 font-bold">{Math.round(activeLayerOpacity * 100)}%</span>
                     </div>
                     <input
                       type="range"
@@ -1111,66 +1394,94 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                       step="0.05"
                       value={activeLayerOpacity}
                       onChange={(e) => updateLayerOpacity(dataset.id, parseFloat(e.target.value))}
-                      className="w-full accent-amber-500 cursor-pointer h-1.5"
+                      className={`w-full accent-amber-600 cursor-pointer h-1.5 rounded-lg ${
+                        theme === 'light' ? 'bg-stone-200' : 'bg-stone-800'
+                      }`}
                     />
                   </div>
                 </div>
 
                 {/* Reprojected Comparison Layer Legend if active */}
                 {showOutputCompare && processedJob && (
-                  <div className="p-3.5 rounded-2xl bg-orange-950/30 border border-orange-700/50 space-y-2">
+                  <div className={`p-3.5 rounded-2xl border space-y-2 ${
+                    theme === 'light'
+                      ? 'bg-amber-50/70 border-amber-300 text-stone-900'
+                      : 'bg-orange-950/30 border-orange-700/50 text-[#FAF6F0]'
+                  }`}>
                     <div className="flex items-center space-x-2">
-                      <div className="w-5 h-3.5 rounded border-2 border-dashed border-orange-400 bg-orange-500/30" />
-                      <span className="font-display font-bold text-orange-200 text-xs">
+                      <div className="w-5 h-3.5 rounded border-2 border-dashed border-orange-500 bg-orange-500/30" />
+                      <span className={`font-display font-bold text-xs ${
+                        theme === 'light' ? 'text-amber-900' : 'text-orange-200'
+                      }`}>
                         {t.map.targetReprojection}
                       </span>
                     </div>
-                    <div className="text-[11px] text-orange-300 font-mono">
-                      Target CRS: <span className="font-bold text-orange-400">{processedJob.targetCRS}</span>
+                    <div className={`text-[11px] font-mono ${
+                      theme === 'light' ? 'text-stone-700' : 'text-orange-300'
+                    }`}>
+                      Target CRS: <span className="font-bold text-amber-700 dark:text-orange-400">{processedJob.targetCRS}</span>
                     </div>
-                    <p className="text-[10px] text-stone-400 leading-relaxed font-sans">
+                    <p className={`text-[10px] leading-relaxed font-sans ${
+                      theme === 'light' ? 'text-stone-600' : 'text-stone-400'
+                    }`}>
                       {t.map.conformalDrift}
                     </p>
                   </div>
                 )}
 
-                {/* Quick Actions in Legend Dock */}
-                <div className="space-y-2 pt-2 border-t border-stone-800">
-                  <span className="text-[10px] text-stone-400 uppercase font-mono font-semibold block">
+                {/* Quick Actions in Legend Dock - Theme Aware */}
+                <div className={`space-y-2 pt-2 border-t ${
+                  theme === 'light' ? 'border-stone-200' : 'border-stone-800'
+                }`}>
+                  <span className={`text-[10px] uppercase font-mono font-semibold block ${
+                    theme === 'light' ? 'text-stone-500' : 'text-stone-400'
+                  }`}>
                     {t.map.quickActions}:
                   </span>
                   
                   {onCalculateSurfaces && dataset.geometryType.includes('Polygon') && (
                     <button
                       onClick={() => onCalculateSurfaces('ha')}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border border-stone-800 transition-colors"
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-colors ${
+                        theme === 'light'
+                          ? 'bg-white hover:bg-stone-50 text-stone-800 hover:text-amber-800 border-[#D6CEBE]'
+                          : 'bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border-stone-800'
+                      }`}
                     >
                       <span className="flex items-center space-x-2">
-                        <Calculator className="w-3.5 h-3.5 text-amber-400" />
+                        <Calculator className="w-3.5 h-3.5 text-amber-500" />
                         <span>{t.craft.calcHaBtn}</span>
                       </span>
-                      <span className="font-mono text-[10px] text-amber-400 font-bold">+column</span>
+                      <span className="font-mono text-[10px] text-amber-600 dark:text-amber-400 font-bold">+column</span>
                     </button>
                   )}
 
                   {onOpenAggregationModal && (
                     <button
                       onClick={onOpenAggregationModal}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-orange-300 border border-stone-800 transition-colors"
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-colors ${
+                        theme === 'light'
+                          ? 'bg-white hover:bg-stone-50 text-stone-800 hover:text-orange-800 border-[#D6CEBE]'
+                          : 'bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-orange-300 border-stone-800'
+                      }`}
                     >
                       <span className="flex items-center space-x-2">
-                        <PieChart className="w-3.5 h-3.5 text-orange-400" />
+                        <PieChart className="w-3.5 h-3.5 text-orange-500" />
                         <span>{t.map.aggregateBtn}</span>
                       </span>
-                      <span className="font-mono text-[10px] text-orange-400 font-bold">Group Σ</span>
+                      <span className="font-mono text-[10px] text-orange-600 dark:text-orange-400 font-bold">Group Σ</span>
                     </button>
                   )}
 
                   <button
                     onClick={fitCurrentBounds}
-                    className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-xl bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border border-stone-800 transition-colors"
+                    className={`w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-xl border transition-colors ${
+                      theme === 'light'
+                        ? 'bg-white hover:bg-stone-50 text-stone-800 hover:text-amber-800 border-[#D6CEBE]'
+                        : 'bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border-stone-800'
+                    }`}
                   >
-                    <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
+                    <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
                     <span>{t.map.zoomExtent}</span>
                   </button>
                 </div>
@@ -1269,16 +1580,24 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
           </div>
 
           {/* Bottom Drawer: Attribute Table, Metadata & Validation */}
-          <div className="h-64 border-t border-stone-800 bg-[#161310] flex flex-col flex-shrink-0">
+          <div className={`h-64 border-t flex flex-col flex-shrink-0 transition-colors ${
+            theme === 'light' ? 'border-[#E2DBD0] bg-[#FAF8F5]' : 'border-stone-800 bg-[#161310]'
+          }`}>
             {/* Tabs header */}
-            <div className="flex items-center justify-between px-4 h-10 border-b border-stone-800 bg-[#110E0C]">
+            <div className={`flex items-center justify-between px-4 h-10 border-b transition-colors ${
+              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3]' : 'border-stone-800 bg-[#110E0C]'
+            }`}>
               <div className="flex items-center space-x-1">
                 <button
                   onClick={() => setActiveBottomTab('attributes')}
                   className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                     activeBottomTab === 'attributes'
-                      ? 'bg-stone-800 text-amber-300 font-semibold'
-                      : 'text-stone-400 hover:text-stone-200'
+                      ? (theme === 'light'
+                          ? 'bg-white text-amber-800 font-bold shadow-xs'
+                          : 'bg-stone-800 text-amber-300 font-semibold')
+                      : (theme === 'light'
+                          ? 'text-stone-600 hover:text-stone-900'
+                          : 'text-stone-400 hover:text-stone-200')
                   }`}
                 >
                   <Table className="w-3.5 h-3.5" />
@@ -1289,8 +1608,12 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   onClick={() => setActiveBottomTab('metadata')}
                   className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                     activeBottomTab === 'metadata'
-                      ? 'bg-stone-800 text-amber-300 font-semibold'
-                      : 'text-stone-400 hover:text-stone-200'
+                      ? (theme === 'light'
+                          ? 'bg-white text-amber-800 font-bold shadow-xs'
+                          : 'bg-stone-800 text-amber-300 font-semibold')
+                      : (theme === 'light'
+                          ? 'text-stone-600 hover:text-stone-900'
+                          : 'text-stone-400 hover:text-stone-200')
                   }`}
                 >
                   <Info className="w-3.5 h-3.5" />
@@ -1301,11 +1624,15 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   onClick={() => setActiveBottomTab('validation')}
                   className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                     activeBottomTab === 'validation'
-                      ? 'bg-stone-800 text-amber-300 font-semibold'
-                      : 'text-stone-400 hover:text-stone-200'
+                      ? (theme === 'light'
+                          ? 'bg-white text-amber-800 font-bold shadow-xs'
+                          : 'bg-stone-800 text-amber-300 font-semibold')
+                      : (theme === 'light'
+                          ? 'text-stone-600 hover:text-stone-900'
+                          : 'text-stone-400 hover:text-stone-200')
                   }`}
                 >
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
                   <span>{t.map.validationTab} ({dataset?.validationIssues.length || 0})</span>
                 </button>
               </div>
@@ -1314,21 +1641,31 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={exportTableCSV}
-                    className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-stone-850 hover:bg-stone-800 text-stone-300 text-xs transition-colors border border-stone-700"
+                    className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs transition-colors border ${
+                      theme === 'light'
+                        ? 'bg-white hover:bg-stone-100 text-stone-700 border-stone-300'
+                        : 'bg-stone-850 hover:bg-stone-800 text-stone-300 border-stone-700'
+                    }`}
                     title={t.common.exportCsv}
                   >
-                    <Download className="w-3 h-3 text-amber-400" />
+                    <Download className="w-3 h-3 text-amber-500" />
                     <span className="hidden sm:inline">{t.common.exportCsv}</span>
                   </button>
 
                   <div className="relative">
-                    <Search className="w-3 h-3 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <Search className={`w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 ${
+                      theme === 'light' ? 'text-stone-400' : 'text-stone-400'
+                    }`} />
                     <input
                       type="text"
                       placeholder={t.map.filterRowsPlaceholder}
                       value={attributeSearch}
                       onChange={(e) => setAttributeSearch(e.target.value)}
-                      className="bg-[#13110E] border border-stone-700 rounded-md px-2 pl-7 py-0.5 text-xs text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500"
+                      className={`border rounded-md px-2 pl-7 py-0.5 text-xs focus:outline-none focus:border-amber-500 ${
+                        theme === 'light'
+                          ? 'bg-white border-[#D6CEBE] text-stone-900 placeholder-stone-400'
+                          : 'bg-[#13110E] border-stone-700 text-stone-100 placeholder-stone-500'
+                      }`}
                     />
                   </div>
                 </div>
@@ -1341,42 +1678,69 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 <div className="w-full overflow-x-auto">
                   {dataset?.fields && dataset.fields.length > 0 ? (
                     <table className="w-full text-left text-xs border-collapse">
-                      <thead className="sticky top-0 bg-[#110E0C] border-b border-stone-800 font-mono text-stone-400 text-[11px]">
+                      <thead className={`sticky top-0 border-b font-mono text-[11px] ${
+                        theme === 'light'
+                          ? 'bg-[#EAE4DA] border-stone-300 text-stone-700'
+                          : 'bg-[#110E0C] border-stone-800 text-stone-400'
+                      }`}>
                         <tr>
                           <th className="py-2.5 px-3 w-12 text-stone-500">#</th>
                           {dataset.fields.map(f => {
                             const isCalculatedCol = f.name.startsWith('surface_') || f.name.startsWith('count_by_') || f.name.includes('_by_');
                             return (
                               <th key={f.name} className="py-2.5 px-3 whitespace-nowrap">
-                                <span className={`font-bold ${isCalculatedCol ? 'text-amber-300' : 'text-stone-200'}`}>
+                                <span className={`font-bold ${
+                                  isCalculatedCol 
+                                    ? (theme === 'light' ? 'text-amber-800' : 'text-amber-300')
+                                    : (theme === 'light' ? 'text-stone-900' : 'text-stone-200')
+                                }`}>
                                   {f.name}
                                 </span>
                                 {isCalculatedCol && (
-                                  <span className="ml-1 px-1 py-0.2 rounded text-[8px] bg-amber-950 text-amber-400 border border-amber-600/50 uppercase">
+                                  <span className={`ml-1 px-1 py-0.2 rounded text-[8px] uppercase font-bold border ${
+                                    theme === 'light'
+                                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                      : 'bg-amber-950 text-amber-400 border-amber-600/50'
+                                  }`}>
                                     CALC
                                   </span>
                                 )}
-                                <span className="ml-1 text-[9px] text-stone-500 uppercase">({f.type})</span>
+                                <span className={`ml-1 text-[9px] uppercase ${
+                                  theme === 'light' ? 'text-stone-500' : 'text-stone-500'
+                                }`}>({f.type})</span>
                               </th>
                             );
                           })}
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-stone-850/60 font-mono text-[11px]">
+                      <tbody className={`divide-y font-mono text-[11px] ${
+                        theme === 'light' ? 'divide-stone-200' : 'divide-stone-850/60'
+                      }`}>
                         {filteredFeatures.slice(0, 100).map((f: any, idx: number) => (
                           <tr
                             key={idx}
-                            onClick={() => setSelectedFeatureProps(f.properties || {})}
-                            className="hover:bg-stone-850/40 cursor-pointer"
+                            onClick={() => zoomToFeature(f, idx)}
+                            className={`cursor-pointer transition-colors group ${
+                              theme === 'light'
+                                ? 'hover:bg-amber-50/80 text-stone-900'
+                                : 'hover:bg-stone-850/60 text-stone-200'
+                            }`}
+                            title="Click to zoom to this feature on the map"
                           >
-                            <td className="py-2 px-3 text-stone-500 tabular-nums">{idx + 1}</td>
+                            <td className={`py-2 px-3 tabular-nums ${theme === 'light' ? 'text-stone-500 group-hover:text-amber-800' : 'text-stone-500 group-hover:text-amber-400'}`}>
+                              {idx + 1}
+                            </td>
                             {dataset.fields.map(field => {
                               const isCalculatedCol = field.name.startsWith('surface_') || field.name.startsWith('count_by_') || field.name.includes('_by_');
                               const val = f.properties?.[field.name];
                               return (
                                 <td 
                                   key={field.name} 
-                                  className={`py-2 px-3 max-w-xs truncate tabular-nums ${isCalculatedCol ? 'text-amber-300 font-semibold' : 'text-stone-300'}`}
+                                  className={`py-2 px-3 max-w-xs truncate tabular-nums ${
+                                    isCalculatedCol 
+                                      ? (theme === 'light' ? 'text-amber-700 font-bold' : 'text-amber-300 font-semibold')
+                                      : (theme === 'light' ? 'text-stone-800' : 'text-stone-300')
+                                  }`}
                                 >
                                   {val !== undefined && val !== null ? String(val) : '-'}
                                 </td>

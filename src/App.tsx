@@ -511,6 +511,10 @@ export default function App() {
         {activeTab === 'showcase' && (
           <ShowcaseWebsite
             onLaunchWorkbench={(tab) => setActiveTab(tab || 'craft')}
+            onOpenConcatenation={() => handleOpenConcatenationModal()}
+            onOpenPostgis={() => handleOpenPostgisModal()}
+            onOpenDoctor={() => setIsDoctorOpen(true)}
+            onOpenCRSModal={() => setIsCRSModalOpen(true)}
           />
         )}
       </main>

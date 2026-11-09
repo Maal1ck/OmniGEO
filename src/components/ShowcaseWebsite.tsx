@@ -5,15 +5,12 @@
 
 import React, { useState } from 'react';
 import { 
-  ExternalLink, 
-  Github, 
   Sparkles, 
   ShieldCheck, 
   Globe, 
   Layers, 
   Stethoscope, 
   Calculator, 
-  Award, 
   TableProperties, 
   Terminal, 
   Cpu, 
@@ -27,7 +24,19 @@ import {
   Flame,
   FileCheck,
   Maximize2,
-  HardDrive
+  HardDrive,
+  Database,
+  Search,
+  BookOpen,
+  FolderArchive,
+  Workflow,
+  HelpCircle,
+  Lightbulb,
+  Compass,
+  FileSpreadsheet,
+  Download,
+  ExternalLink,
+  Github
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { useI18n } from '../core/i18n';
@@ -36,13 +45,23 @@ import { NavTab } from './Header';
 
 interface ShowcaseWebsiteProps {
   onLaunchWorkbench: (tab?: NavTab) => void;
+  onOpenConcatenation?: () => void;
+  onOpenPostgis?: () => void;
+  onOpenDoctor?: () => void;
+  onOpenCRSModal?: () => void;
 }
 
-export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbench }) => {
-  const { t, lang, setLang } = useI18n();
+export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ 
+  onLaunchWorkbench,
+  onOpenConcatenation,
+  onOpenPostgis,
+  onOpenDoctor,
+  onOpenCRSModal,
+}) => {
+  const { t, lang } = useI18n();
   const { theme } = useTheme();
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
-  const [activeFeatureTab, setActiveFeatureTab] = useState<'formats' | 'geodesy' | 'doctor' | 'cartography' | 'audit'>('formats');
+  const [activeToolId, setActiveToolId] = useState<string>('ingestion');
 
   const githubRepoUrl = 'https://github.com/Maal1ck/OmniGEO';
 
@@ -52,31 +71,244 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
     setTimeout(() => setCopiedCmd(null), 2200);
   };
 
+  const walkthroughTools = [
+    {
+      id: 'ingestion',
+      name: lang === 'fr' ? '1. Ingestion Multi-Formats & Excel' : '1. Multi-Format & Excel Ingestion',
+      subtitle: lang === 'fr' ? 'DWG, Shapefile, GeoJSON, KML, CSV & Tableurs Excel' : 'DWG, Shapefiles, GeoJSON, KML, CSV & Excel Spreadsheets',
+      icon: FileBox,
+      tag: 'Input Engine',
+      summary: lang === 'fr'
+        ? 'Glissez-déposez n\'importe quel jeu de données spatiales (.shp complet, .dwg, .kml, .geojson) ou tableur Excel avec détection automatique de plus de 20 variantes de colonnes Latitude/Longitude.'
+        : 'Drag & drop any spatial dataset (.shp bundles, .dwg CAD, .kml, .geojson) or Excel files with auto-detection of 20+ Lat/Lon column naming patterns.',
+      features: [
+        lang === 'fr' ? 'Support natif des fichiers DAO / CAD .dwg et DXF sans conversion préalable' : 'Native CAD .dwg & DXF support without pre-conversion',
+        lang === 'fr' ? 'Détection intelligente des colonnes X/Y/Lat/Lon dans Excel (.xlsx, .xls, .csv)' : 'Smart Lat/Lon/X/Y detection across Excel sheets with manual picker fallback',
+        lang === 'fr' ? 'Interrupteur d\'exploration récursive des sous-dossiers (Include / Exclude subfolders)' : 'Recursive subfolder traversal toggle for deep folder archives',
+        lang === 'fr' ? 'Traitement par lots sélectif avec cases à cocher individuelles' : 'Selective batch processing toggle with individual file checkboxes'
+      ],
+      stepByStep: [
+        lang === 'fr' ? 'Rendez-vous dans l\'onglet "Atelier" ou "Espace de travail".' : 'Go to the "Craft" or "Workspace" tab.',
+        lang === 'fr' ? 'Déposez votre fichier ou dossier complet dans la zone de glisser-déposer.' : 'Drop your file or folder into the drop zone.',
+        lang === 'fr' ? 'Si vous importez un fichier Excel, le sélecteur d\'en-tête s\'ouvre avec les 6 942 CRS pour géolocaliser les lignes.' : 'For Excel files, the coordinate modal will detect lat/lon columns and let you choose target CRS.',
+        lang === 'fr' ? 'Vos couches sont instantanément parsées en mémoire 100% hors-ligne dans le navigateur.' : 'Layers are parsed in-memory 100% offline in your browser.'
+      ],
+      proTip: lang === 'fr'
+        ? 'Pour les shapefiles, vous pouvez glisser l\'ensemble des fichiers (.shp, .shx, .dbf, .prj) en une seule fois. OmniGeo les assemble automatiquement !'
+        : 'For shapefiles, drag all companion files (.shp, .shx, .dbf, .prj) together. OmniGeo automatically links them into an OGC-compliant layer.',
+      actionTab: 'craft' as NavTab,
+      actionLabel: lang === 'fr' ? 'Ouvrir l\'Atelier d\'Ingestion' : 'Open Craft Ingestion Studio',
+    },
+    {
+      id: 'geodesy',
+      name: lang === 'fr' ? '2. Moteur Géodésique & CRS EPSG' : '2. Geodetic CRS Engine (6,942 EPSG)',
+      subtitle: lang === 'fr' ? 'Détection ultra-précise de Merchich, Sud_Maroc, UTM, Lambert & WGS 84' : 'Precise detection for Merchich Sud_Maroc, UTM, Lambert & WGS 84',
+      icon: Globe,
+      tag: 'Projection Core',
+      summary: lang === 'fr'
+        ? 'Notre registre géodésique interne embarque 6 942 définitions EPSG officielles. L\'algorithme analyse les descripteurs WKT/PRJ, les étendues de coordonnées et les métadonnées pour éliminer toute confusion de projection.'
+        : 'Our built-in geodetic catalog embeds 6,942 official EPSG systems. Advanced heuristics inspect WKT/PRJ definitions, coordinate bounding boxes, and units to eliminate misidentification.',
+      features: [
+        lang === 'fr' ? 'Résolution exacte de Sud_Maroc Degrés (EPSG:4261) vs Sud_Maroc Métrique (EPSG:26192)' : 'Accurate discrimination between Merchich / Sud_Maroc degree (EPSG:4261) and metric grid (EPSG:26192)',
+        lang === 'fr' ? 'Recherche instantanée dans le catalogue complet des 6 942 systèmes' : 'Instant search across the complete 6,942 EPSG registry by code, name, or area',
+        lang === 'fr' ? 'Reprojection à la volée haute fidélité vers WGS 84 (EPSG:4326) ou Web Mercator (EPSG:3857)' : 'High-precision on-the-fly reprojection with mathematical datum shifts',
+        lang === 'fr' ? 'Bouton d\'override manuel pour corriger le CRS de n\'importe quelle couche en un clic' : 'Manual CRS override badge on every layer to change or inspect geodetic parameters'
+      ],
+      stepByStep: [
+        lang === 'fr' ? 'Cliquez sur le badge CRS d\'une couche dans la liste des fichiers.' : 'Click the CRS badge next to any layer in the dataset list.',
+        lang === 'fr' ? 'Tapez votre code (ex: "4261", "26192", "2154", "32628") ou le nom de la zone.' : 'Type your EPSG code (e.g. "4261", "26192", "2154") or region name.',
+        lang === 'fr' ? 'Sélectionnez le système de coordonnées correspondant et confirmez.' : 'Select the target coordinate reference system and confirm.',
+        lang === 'fr' ? 'La couche est immédiatement re-projetée et synchronisée avec la carte Leaflet.' : 'The dataset is reprojected and immediately aligned on the Leaflet canvas.'
+      ],
+      proTip: lang === 'fr'
+        ? 'Si votre fichier a des coordonnées entre -18° et +18° de latitude/longitude avec la mention Sud_Maroc, le moteur applique automatiquement le CRS géographique EPSG:4261 plutôt que la grille métrique 26192.'
+        : 'If coordinates are degree-based (e.g., -13° to -5° Lon, 21° to 28° Lat) with Sud_Maroc naming, OmniGeo selects EPSG:4261 (geographic 2D) rather than projected metric 26192.',
+      actionTab: 'workspace' as NavTab,
+      actionAction: onOpenCRSModal,
+      actionLabel: lang === 'fr' ? 'Rechercher un CRS dans le catalogue' : 'Browse 6,942 EPSG Catalog',
+    },
+    {
+      id: 'concatenation',
+      name: lang === 'fr' ? '3. Concaténation & Mappage de Colonnes' : '3. Layer Concatenation & Schema Mapping',
+      subtitle: lang === 'fr' ? 'Fusionnez plusieurs fichiers et unifiez leurs attributs' : 'Merge multiple vector layers and harmonize attribute columns',
+      icon: Workflow,
+      tag: 'Data Harmonizer',
+      summary: lang === 'fr'
+        ? 'Combinez 2 ou plusieurs couches vectorielles (même de formats différents) en un fichier consolidé unique avec un mappage intelligent des attributs.'
+        : 'Combine 2 or more spatial layers into a single consolidated dataset with interactive column mapping, schema harmonization, and output preview.',
+      features: [
+        lang === 'fr' ? 'Fusion multi-sources (mélangez Shapefile + GeoJSON + Excel géolocalisé)' : 'Multi-source union (mix Shapefile + GeoJSON + geolocated Excel)',
+        lang === 'fr' ? 'Mappage visuel des colonnes avec suggestions intelligentes par similarité de nom' : 'Visual column mapping with automatic fuzzy attribute matching',
+        lang === 'fr' ? 'Aperçu en temps réel des enregistrements fusionnés et compteurs d\'attributs' : 'Live preview table of combined records with null value fallback handling',
+        lang === 'fr' ? 'Export direct vers GeoJSON, Shapefile ou intégration PostGIS immédiate' : 'Direct export to new GeoJSON/Shapefile or push straight to PostGIS'
+      ],
+      stepByStep: [
+        lang === 'fr' ? 'Dans l\'Espace de travail ou la barre d\'outils, cliquez sur "Concaténer les couches".' : 'Click "Concatenate Layers" in the top bar or workspace actions.',
+        lang === 'fr' ? 'Cochez les couches que vous souhaitez combiner.' : 'Select the datasets you wish to merge together.',
+        lang === 'fr' ? 'Définissez le nom de la nouvelle couche et configurez la correspondance des colonnes.' : 'Set output table name and review or adjust column mappings.',
+        lang === 'fr' ? 'Cliquez sur "Générer la couche fusionnée" pour l\'ajouter instantanément à votre session.' : 'Click "Generate Merged Layer" to produce the combined dataset.'
+      ],
+      proTip: lang === 'fr'
+        ? 'Si vos fichiers utilisent des appellations différentes (ex: "id_parcelle" et "PARCEL_ID"), le système les aligne dans une même colonne propre sans perte de données !'
+        : 'If datasets use different field names (e.g. "parc_id" vs "PARCEL_ID"), use column mapping to combine them into one consistent attribute column.',
+      actionTab: 'workspace' as NavTab,
+      actionAction: onOpenConcatenation,
+      actionLabel: lang === 'fr' ? 'Lancer l\'Outil de Concaténation' : 'Open Concatenation Tool',
+    },
+    {
+      id: 'postgis',
+      name: lang === 'fr' ? '4. Intégration PostgreSQL & PostGIS' : '4. PostgreSQL & PostGIS Integration',
+      subtitle: lang === 'fr' ? 'Export 3 clics vers pgAdmin 4, psql CLI & scripts Python' : '3-click import into pgAdmin 4, psql CLI & Python GeoPandas',
+      icon: Database,
+      tag: 'Enterprise DB',
+      summary: lang === 'fr'
+        ? 'Exportez n\'importe quel jeu de données spatiales vers PostgreSQL/PostGIS sans installer d\'outils tiers complexes. Obtenez des scripts SQL optimisés avec index spatial GiST et support pgAdmin 4.'
+        : 'Streamline loading geospatial data into PostgreSQL/PostGIS. Generates production-ready DDL/DML SQL scripts with GiST spatial indexes, pgAdmin 4 query workflows, and Python scripts.',
+      features: [
+        lang === 'fr' ? 'Workflow pgAdmin 4 interactif avec explications détaillées des identifiants' : 'Interactive pgAdmin 4 guide clarifying database connection credentials',
+        lang === 'fr' ? 'Recherche parmi l\'ensemble des 6 942 SRID/EPSG pour la colonne géométrique' : 'Full 6,942 EPSG/SRID selector for target geometry column',
+        lang === 'fr' ? 'Script SQL complet avec DROP TABLE IF EXISTS et index spatial USING GIST(geom)' : 'Complete PostGIS SQL script with transaction safety and spatial indexing',
+        lang === 'fr' ? 'Générateur de commandes terminal psql, ogr2ogr et script Python GeoPandas' : 'Ready-to-run psql CLI, ogr2ogr batch commands, and Python automation code'
+      ],
+      stepByStep: [
+        lang === 'fr' ? 'Cliquez sur le bouton "PostGIS" dans la barre d\'outils ou dans l\'Espace de travail.' : 'Click the "PostGIS" button in the top navigation or workspace.',
+        lang === 'fr' ? 'Choisissez la couche source et le SRID cible (ex: 4261 ou 4326).' : 'Select the source layer and set your target SRID (e.g., 4261 or 4326).',
+        lang === 'fr' ? 'Téléchargez le fichier .sql ou copiez le code SQL d\'un clic.' : 'Download the generated .sql file or copy the SQL code.',
+        lang === 'fr' ? 'Ouvrez pgAdmin 4, connectez-vous avec votre mot de passe PostgreSQL, ouvrez le Query Tool et exécutez !' : 'Open pgAdmin 4, open Query Tool on your database, paste and run (F5)!'
+      ],
+      proTip: lang === 'fr'
+        ? 'Pourquoi OmniGeo ne demande pas de mot de passe ? Parce que l\'application s\'exécute 100% dans votre navigateur sans serveur backend. Vous saisissez votre mot de passe en toute sécurité directement dans pgAdmin 4.'
+        : 'Why does OmniGeo not prompt for your database password? OmniGeo is 100% client-side privacy-first; you enter your credentials safely in pgAdmin 4 without sharing them.',
+      actionTab: 'workspace' as NavTab,
+      actionAction: onOpenPostgis,
+      actionLabel: lang === 'fr' ? 'Ouvrir l\'Exporteur PostGIS' : 'Launch PostGIS Exporter',
+    },
+    {
+      id: 'doctor',
+      name: lang === 'fr' ? '5. Docteur Spatial & Calculs de Surfaces' : '5. Pre-Flight Spatial Doctor & Surfaces',
+      subtitle: lang === 'fr' ? 'Réparation de géométries invalides & calcul précis en Hectares' : 'Repair invalid geometries & calculate geodesic surfaces in ha/m²',
+      icon: Stethoscope,
+      tag: 'QA / QC Repair',
+      summary: lang === 'fr'
+        ? 'Diagnostiquez les erreurs topologiques critiques : détection des inversions Lat/Lon, fermeture automatique des anneaux de polygones non scellés et calcul de superficie géodésique.'
+        : 'Diagnose critical topology flaws: detect inverted Lat/Lon coordinates, close unclosed polygon rings, remove self-intersections, and calculate geodesic areas in Hectares.',
+      features: [
+        lang === 'fr' ? 'Détection automatique d\'inversion de coordonnées X/Y et remise en ordre' : 'Auto-detection of inverted latitude/longitude coordinates and instant flip',
+        lang === 'fr' ? 'Fermeture automatique des polygones ouverts selon les standards OGC' : 'Auto-closure of unsealed polygon boundary rings per OGC standards',
+        lang === 'fr' ? 'Calcul de surface en Hectares (ha), m² et km² avec ajout direct d\'une colonne d\'attribut' : 'Geodesic area calculations in Hectares, m², or km² injected as new attribute columns',
+        lang === 'fr' ? 'Audit d\'intégrité mathématique sans altérer les attributs métiers existants' : 'Mathematical integrity audit without modifying business properties'
+      ],
+      stepByStep: [
+        lang === 'fr' ? 'Cliquez sur "Docteur Spatial" dans le menu Outils ou dans la vue carte.' : 'Click "Pre-Flight Spatial Doctor" from the Tools dropdown or map quick actions.',
+        lang === 'fr' ? 'Lancez le diagnostic sur une couche ou l\'ensemble de vos fichiers.' : 'Run diagnosis on a specific layer or all ingested files.',
+        lang === 'fr' ? 'Visualisez les anomalies détectées et appliquez la réparation en un clic.' : 'Review flagged topology issues and click "Auto-Repair All".',
+        lang === 'fr' ? 'Utilisez le bouton "Calculer les surfaces (ha)" pour enrichir vos polygones.' : 'Use "Calculate Surfaces (ha)" to compute exact polygon areas.'
+      ],
+      proTip: lang === 'fr'
+        ? 'Si vos polygones apparaissent étirés ou au mauvais endroit sur la carte du monde, le Docteur Spatial détecte si les coordonnées étaient inversées (Y, X au lieu de X, Y).'
+        : 'If your polygons appear outside their expected region, the Spatial Doctor detects coordinate axis inversion (Y, X vs X, Y) and corrects them instantly.',
+      actionTab: 'workspace' as NavTab,
+      actionAction: onOpenDoctor,
+      actionLabel: lang === 'fr' ? 'Ouvrir le Docteur Spatial' : 'Open Spatial Doctor',
+    },
+    {
+      id: 'map',
+      name: lang === 'fr' ? '6. Studio Cartographique Multi-Couches' : '6. Multi-Layer Map Studio',
+      subtitle: lang === 'fr' ? 'Cadrage Afrique par défaut, zoom au clic sur ligne & symbologie' : 'Africa-first framing, click-row-to-zoom & 18-color palette',
+      icon: Layers,
+      tag: 'Interactive Carto',
+      summary: lang === 'fr'
+        ? 'Visualisez simultanément plusieurs couches vectorielles sur un canevas Leaflet performant. La carte s\'initialise centrée sur l\'Afrique puis s\'ajuste automatiquement dès l\'ajout de données.'
+        : 'Visualize multiple vector layers simultaneously on a smooth Leaflet canvas. Always centers on Africa on initial load, auto-fits to ingested data, and lets you zoom to any feature by clicking its attribute row.',
+      features: [
+        lang === 'fr' ? 'Cadrage Afrique par défaut avec bouton dédié "Afrique" dans la barre supérieure' : 'Africa-first default framing with dedicated "Africa" button in top toolbar',
+        lang === 'fr' ? 'Zoom automatique fluide sur l\'étendue des données dès qu\'un fichier est chargé' : 'Automatic smooth fit to data extent as soon as datasets are loaded',
+        lang === 'fr' ? 'Clic sur une ligne du tableau attributaire pour zoomer directement sur l\'entité' : 'Click any row in the attribute drawer to zoom and highlight that specific feature',
+        lang === 'fr' ? 'Palette de 18 couleurs cartographiques et curseurs d\'opacité entièrement thématisés' : '18-color symbology palette and per-layer opacity sliders with light theme'
+      ],
+      stepByStep: [
+        lang === 'fr' ? 'Basculez sur l\'onglet "Studio carto".' : 'Switch to the "Map Studio" tab.',
+        lang === 'fr' ? 'Ouvrez le panneau latéral "Légende / Couches" pour activer ou masquer vos couches.' : 'Open the "Legend / Layers" sidebar to toggle multiple layer visibility.',
+        lang === 'fr' ? 'Ajustez les couleurs et l\'opacité (10% à 100%) selon vos besoins cartographiques.' : 'Customize layer stroke/fill colors and opacity sliders.',
+        lang === 'fr' ? 'Déployez la table attributaire en bas, puis cliquez sur n\'importe quelle entité pour zoomer dessus.' : 'Expand the attribute drawer at the bottom and click any row to fly to it.'
+      ],
+      proTip: lang === 'fr'
+        ? 'Le mode glissière "Swipe Comparison" vous permet de comparer visuellement la couche originale et sa version re-projetée pour vérifier l\'absence de déformation !'
+        : 'Use the "Swipe Comparison" mode to visually inspect the source dataset side-by-side with its reprojected output layer to verify alignment.',
+      actionTab: 'map' as NavTab,
+      actionLabel: lang === 'fr' ? 'Explorer la Carte Interactive' : 'Open Map Studio',
+    },
+    {
+      id: 'batch',
+      name: lang === 'fr' ? '7. Labo de Conversion & Audit QA/QC' : '7. Batch Conversion & Audit QA/QC',
+      subtitle: lang === 'fr' ? 'Transformation en masse & certificats d\'audit cryptographiques' : 'Bulk format transformation & SHA-256 integrity certificates',
+      icon: FileCheck,
+      tag: 'Audit Provenance',
+      summary: lang === 'fr'
+        ? 'Convertissez simultanément des dizaines de fichiers vers GeoPackage OGC, Shapefile, GeoJSON ou KML, tout en générant un certificat d\'audit QA/QC avec empreinte SHA-256 certifiée.'
+        : 'Convert dozens of spatial files in batch to OGC GeoPackage, ESRI Shapefile, GeoJSON, or KML, with cryptographically verifiable SHA-256 provenance reports.',
+      features: [
+        lang === 'fr' ? 'Moteur de conversion parallèle haute vitesse exécuté dans le navigateur' : 'High-speed parallel client-side conversion engine',
+        lang === 'fr' ? 'Génération d\'empreintes SHA-256 pour chaque fichier entrant et sortant' : 'Cryptographic SHA-256 hashing for input and output provenance',
+        lang === 'fr' ? 'Export d\'un certificat d\'audit téléchargeable pour les livrables clients OGC' : 'Downloadable ISO/OGC QA/QC Audit Certificate for engineering deliverables',
+        lang === 'fr' ? 'Téléchargement groupé au format ZIP ou handoff consolidé' : 'One-click consolidated ZIP download with manifest metadata'
+      ],
+      stepByStep: [
+        lang === 'fr' ? 'Accédez au "Labo de conversion" ou lancez le traitement par lots.' : 'Go to "Conversion Lab" or trigger batch processing.',
+        lang === 'fr' ? 'Sélectionnez le format de destination souhaité (Shapefile, GeoPackage, GeoJSON, KML).' : 'Choose your target format (Shapefile, GeoPackage, GeoJSON, KML).',
+        lang === 'fr' ? 'Lancez la conversion et suivez la barre de progression en temps réel.' : 'Click "Start Batch" and monitor real-time progress indicators.',
+        lang === 'fr' ? 'Téléchargez le pack d\'artefacts ou consultez le certificat de validation.' : 'Download output artifacts and inspect the certified QA/QC report.'
+      ],
+      proTip: lang === 'fr'
+        ? 'OmniGeo préserve 100% de la confidentialité de vos données géospatiales : aucun octet ne transite sur un serveur distant.'
+        : 'OmniGeo operates 100% client-side via WebAssembly: zero telemetry, zero data exfiltration, air-gapped security.',
+      actionTab: 'lab' as NavTab,
+      actionLabel: lang === 'fr' ? 'Accéder au Labo de Conversion' : 'Open Conversion Lab',
+    }
+  ];
+
+  const activeTool = walkthroughTools.find(t => t.id === activeToolId) || walkthroughTools[0];
+
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-y-auto bg-[#13110E] text-[#F5EBE1] font-sans selection:bg-amber-500/30 selection:text-amber-200">
+    <div className={`flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-y-auto transition-colors font-sans selection:bg-amber-500/20 selection:text-amber-900 ${
+      theme === 'light' 
+        ? 'bg-[#FAF8F5] text-stone-900' 
+        : 'bg-[#13110E] text-[#F5EBE1]'
+    }`}>
       
-      {/* 1. TOP ANNOUNCEMENT BANNER */}
-      <aside aria-label="Version announcement" className="bg-gradient-to-r from-amber-950 via-amber-900/60 to-orange-950 border-b border-amber-600/30 px-4 py-2 text-xs flex items-center justify-between">
+      {/* 1. TOP ANNOUNCEMENT / CONTEXT BANNER */}
+      <aside 
+        aria-label="Walkthrough tutorial banner" 
+        className={`border-b px-4 py-2.5 text-xs flex items-center justify-between transition-colors ${
+          theme === 'light' 
+            ? 'bg-[#F2ECE3] border-[#E2DBD0] text-stone-700' 
+            : 'bg-gradient-to-r from-amber-950/80 via-stone-900 to-amber-950/80 border-amber-600/30 text-stone-300'
+        }`}
+      >
         <div className="max-w-6xl mx-auto w-full flex items-center justify-between text-[11px] font-mono">
           <div className="flex items-center space-x-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-bold text-amber-200">OmniGeo v1.0.0:</span>
-            <span className="text-stone-300 hidden sm:inline">Offline Web GIS Studio & Batch Workbench</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-bold text-amber-700 dark:text-amber-300">
+              {lang === 'fr' ? 'OmniGeo par Maodo · Guide & Tutoriel :' : 'OmniGeo by Maodo · Tutorial & Guide :'}
+            </span>
+            <span className="hidden sm:inline">
+              {lang === 'fr' ? 'Maîtrisez les 7 outils géospatiaux clés' : 'Master all 7 core geospatial workbench tools'}
+            </span>
           </div>
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => onLaunchWorkbench('craft')}
-              className="text-amber-300 hover:text-white font-bold flex items-center space-x-1"
+              className="text-amber-700 dark:text-amber-300 hover:underline font-bold flex items-center space-x-1"
             >
-              <span>{t.showcase.launchWebBtn}</span>
+              <span>{lang === 'fr' ? 'Lancer l\'application' : 'Launch App'}</span>
               <ArrowRight className="w-3 h-3" />
             </button>
-            <span className="text-stone-600">·</span>
+            <span className="text-stone-400">·</span>
             <a 
               href={githubRepoUrl} 
               target="_blank" 
               rel="noopener noreferrer" 
-              className="text-stone-400 hover:text-amber-300 flex items-center space-x-1"
+              className="hover:text-amber-600 flex items-center space-x-1"
             >
               <Github className="w-3 h-3" />
               <span>GitHub</span>
@@ -85,527 +317,426 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ onLaunchWorkbe
         </div>
       </aside>
 
-      <div className="max-w-6xl mx-auto w-full px-6 py-12 space-y-20">
+      <div className="max-w-6xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 space-y-12">
 
-        {/* 2. HERO SECTION */}
-        <section className="text-center space-y-6 pt-4">
-          <div className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full bg-amber-950/80 border border-amber-600/40 text-amber-300 text-xs font-mono font-medium shadow-lg shadow-amber-950/20">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>{t.showcase.badge}</span>
+        {/* 2. HEADER & INTRODUCTION */}
+        <section className="text-center space-y-4 pt-2">
+          <div className={`inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium border shadow-xs ${
+            theme === 'light'
+              ? 'bg-amber-100/80 border-amber-300 text-amber-900'
+              : 'bg-amber-950/80 border-amber-600/40 text-amber-300'
+          }`}>
+            <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+            <span>{lang === 'fr' ? 'GUIDE D\'UTILISATION COMPLET & TUTORIEL' : 'COMPREHENSIVE TOOL WALKTHROUGH & TUTORIAL'}</span>
           </div>
 
-          <div className="flex justify-center my-3">
+          <div className="flex justify-center my-2">
             <div className="relative group cursor-pointer" onClick={() => onLaunchWorkbench('craft')}>
-              <Logo size={84} className="group-hover:scale-105 transition-transform duration-300" />
-              <div className="absolute -inset-4 bg-amber-500/10 rounded-full blur-xl -z-10 group-hover:bg-amber-500/20 transition-all" />
+              <Logo size={72} className="group-hover:scale-105 transition-transform duration-300" />
             </div>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-display font-extrabold tracking-tight text-[#FAF6F0] max-w-4xl mx-auto leading-[1.12]">
-            {t.showcase.heroTitlePrefix}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-orange-400">
-              {t.showcase.heroTitleHighlight}
-            </span>{' '}
-            {t.showcase.heroTitleSuffix}
+          <h1 className="text-2xl sm:text-4xl font-display font-extrabold tracking-tight">
+            {lang === 'fr' ? (
+              <>Maîtrisez <span className="text-amber-600 dark:text-amber-400">OmniGeo</span> pas à pas</>
+            ) : (
+              <>Master <span className="text-amber-600 dark:text-amber-400">OmniGeo</span> Step-by-Step</>
+            )}
           </h1>
 
-          <p className="text-sm sm:text-base text-stone-300 max-w-2xl mx-auto leading-relaxed">
-            {t.showcase.heroSubtitle}
+          <p className={`max-w-2xl mx-auto text-xs sm:text-sm leading-relaxed ${
+            theme === 'light' ? 'text-stone-600' : 'text-stone-400'
+          }`}>
+            {lang === 'fr' 
+              ? 'Découvrez en détail le fonctionnement des outils essentiels : ingestion de fichiers CAO/SIG/Excel, correction des projections CRS, concaténation avec mappage d\'attributs, export PostGIS et cartographie interactive.'
+              : 'Detailed step-by-step documentation for all core features: multi-format CAD/GIS/Excel ingestion, geodetic CRS precision, schema concatenation, PostGIS export, and interactive multi-layer cartography.'}
           </p>
-
-          {/* Primary Action Buttons */}
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
-            {/* Launch GIS Studio Button */}
-            <button
-              onClick={() => onLaunchWorkbench('craft')}
-              className="flex items-center space-x-2.5 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-stone-950 font-display font-bold text-sm shadow-xl shadow-amber-950/40 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
-            >
-              <Sparkles className="w-4 h-4 text-stone-950 fill-current" />
-              <span>{t.showcase.launchWebBtn}</span>
-              <ArrowRight className="w-4 h-4 text-stone-950" />
-            </button>
-
-            {/* Launch Ingestion Workspace */}
-            <button
-              onClick={() => onLaunchWorkbench('workspace')}
-              className="flex items-center space-x-2.5 px-6 py-3.5 rounded-2xl bg-[#1F1915] hover:bg-[#2A221C] border border-stone-700/80 hover:border-amber-500/50 text-[#FAF6F0] font-display font-bold text-sm transition-all shadow-md transform hover:-translate-y-0.5"
-            >
-              <Layers className="w-4 h-4 text-amber-400" />
-              <span>{t.header.workspaceTab}</span>
-            </button>
-
-            {/* View on GitHub */}
-            <a
-              href={githubRepoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center space-x-2 px-5 py-3.5 rounded-2xl bg-[#181411] hover:bg-[#221B17] border border-stone-800 text-stone-300 hover:text-white text-sm font-semibold transition-colors"
-            >
-              <Github className="w-4 h-4 text-stone-400" />
-              <span>{t.showcase.viewGitHubBtn}</span>
-            </a>
-          </div>
-
-          {/* Air-gapped and security check pills */}
-          <div className="pt-4 flex flex-wrap items-center justify-center gap-3 text-xs font-mono text-stone-400">
-            <span className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#181411] border border-stone-800">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>100% Air-Gapped / Zero Telemetry</span>
-            </span>
-            <span className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#181411] border border-stone-800">
-              <Cpu className="w-3.5 h-3.5 text-amber-400" />
-              <span>Client-Side SQLite WASM</span>
-            </span>
-            <span className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#181411] border border-stone-800">
-              <Globe className="w-3.5 h-3.5 text-sky-400" />
-              <span>PROJ 6,900+ EPSG Systems</span>
-            </span>
-          </div>
         </section>
 
-        {/* 3. LOCAL-FIRST AIR-GAPPED ARCHITECTURE SPOTLIGHT */}
-        <section className={`relative rounded-3xl p-8 border transition-all overflow-hidden ${
-          theme === 'light'
-            ? 'bg-gradient-to-br from-[#FFFDF9] via-[#FEF7ED] to-[#FFF3DC] border-[#FCD34D] text-[#1C1917] shadow-xl shadow-amber-900/5'
-            : 'bg-gradient-to-br from-[#1C1713] via-[#16120F] to-[#120E0C] border-amber-600/40 text-[#FAF6F0] shadow-2xl'
-        }`}>
-          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
-            <div className="space-y-4 max-w-xl">
-              <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-md text-[11px] font-mono font-semibold border ${
-                theme === 'light'
-                  ? 'bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]'
-                  : 'bg-amber-950 text-amber-300 border-amber-600/40'
-              }`}>
-                <ShieldCheck className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-emerald-700' : 'text-emerald-400'}`} />
-                <span>100% Client-Side Air-Gapped Engine</span>
-              </div>
-              <h2 className={`text-2xl sm:text-3xl font-display font-bold ${
-                theme === 'light' ? 'text-[#1C1917]' : 'text-[#FAF6F0]'
-              }`}>
-                {t.showcase.releaseTitle}
-              </h2>
-              <p className={`text-xs sm:text-sm leading-relaxed font-sans ${
-                theme === 'light' ? 'text-[#44403C]' : 'text-stone-300'
-              }`}>
-                {t.showcase.releaseSub}
-              </p>
-              
-              <div className={`p-4 rounded-2xl border font-mono text-xs space-y-2 ${
-                theme === 'light'
-                  ? 'bg-white/95 border-[#E2DBD0] shadow-xs'
-                  : 'bg-[#110E0C] border-stone-800'
-              }`}>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className={theme === 'light' ? 'text-stone-600' : 'text-stone-400'}>Ingestion Engine:</span>
-                  <span className={theme === 'light' ? 'text-[#92400E] font-bold' : 'text-amber-300 font-semibold'}>Manual Files &amp; Recursive Folder Tree Ingestion</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className={theme === 'light' ? 'text-stone-600' : 'text-stone-400'}>Core Mathematics:</span>
-                  <span className={theme === 'light' ? 'text-stone-900 font-medium' : 'text-stone-200'}>PROJ 9.3 + WebAssembly SQLite Geodesy</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className={theme === 'light' ? 'text-stone-600' : 'text-stone-400'}>Telemetry &amp; Privacy:</span>
-                  <span className={theme === 'light' ? 'text-emerald-700 font-bold' : 'text-emerald-400'}>Zero Cloud Uploads · Total Privacy</span>
-                </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className={theme === 'light' ? 'text-stone-600' : 'text-stone-400'}>Format Support:</span>
-                  <span className={theme === 'light' ? 'text-stone-800 font-medium' : 'text-stone-300'}>GeoPackage, Shapefile, GeoJSON, KML, CSV, CAD (DWG/DXF), GPX</span>
-                </div>
-              </div>
-
-              <p className={`text-[11px] font-mono ${theme === 'light' ? 'text-stone-600' : 'text-stone-400'}`}>
-                {t.showcase.winReqs}
-              </p>
-            </div>
-
-            {/* Action Box */}
-            <div className="w-full lg:w-auto flex flex-col items-center sm:items-end space-y-3 flex-shrink-0">
-              <button
-                onClick={() => onLaunchWorkbench('workspace')}
-                className="w-full sm:w-auto flex items-center justify-center space-x-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-display font-extrabold text-base shadow-2xl shadow-amber-950/60 transition-all transform hover:scale-105 active:scale-95"
-              >
-                <Layers className="w-5 h-5" />
-                <span>{t.header.workspaceTab}</span>
-              </button>
-
-              <button
-                onClick={() => onLaunchWorkbench('craft')}
-                className="text-xs font-mono text-stone-400 hover:text-amber-300 underline flex items-center space-x-1"
-              >
-                <span>{t.showcase.launchWebBtn} &rarr;</span>
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* 4. FOUR KEY ARCHITECTURAL PILLARS */}
-        <section className="space-y-8">
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-display font-bold text-[#FAF6F0]">
-              {t.showcase.featuresTitle}
+        {/* 3. INTERACTIVE 7-TOOL SELECTOR TABS */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-mono uppercase tracking-wider text-stone-500 font-bold flex items-center space-x-2">
+              <Workflow className="w-4 h-4 text-amber-500" />
+              <span>{lang === 'fr' ? 'Sélectionnez un outil à explorer :' : 'Select a tool to explore :'}</span>
             </h2>
-            <p className="text-xs sm:text-sm text-stone-400 max-w-xl mx-auto">
-              {t.showcase.featuresSub}
-            </p>
+            <span className="text-xs font-mono text-stone-400 hidden sm:inline">
+              {walkthroughTools.length} {lang === 'fr' ? 'modules disponibles' : 'tools available'}
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Pillar 1 */}
-            <div className="p-6 rounded-2xl bg-[#181411] border border-stone-800 space-y-3 shadow-lg hover:border-amber-500/40 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <h3 className="font-display font-bold text-sm text-[#FAF6F0]">
-                {t.showcase.airGappedCardTitle}
-              </h3>
-              <p className="text-xs text-stone-400 leading-relaxed font-sans">
-                {t.showcase.airGappedCardDesc}
-              </p>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+            {walkthroughTools.map((tool) => {
+              const Icon = tool.icon;
+              const isActive = tool.id === activeToolId;
 
-            {/* Pillar 2 */}
-            <div className="p-6 rounded-2xl bg-[#181411] border border-stone-800 space-y-3 shadow-lg hover:border-amber-500/40 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400">
-                <Layers className="w-5 h-5" />
-              </div>
-              <h3 className="font-display font-bold text-sm text-[#FAF6F0]">
-                {t.showcase.formatCardTitle}
-              </h3>
-              <p className="text-xs text-stone-400 leading-relaxed font-sans">
-                {t.showcase.formatCardDesc}
-              </p>
-            </div>
-
-            {/* Pillar 3 */}
-            <div className="p-6 rounded-2xl bg-[#181411] border border-stone-800 space-y-3 shadow-lg hover:border-amber-500/40 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
-                <Globe className="w-5 h-5" />
-              </div>
-              <h3 className="font-display font-bold text-sm text-[#FAF6F0]">
-                {t.showcase.projCardTitle}
-              </h3>
-              <p className="text-xs text-stone-400 leading-relaxed font-sans">
-                {t.showcase.projCardDesc}
-              </p>
-            </div>
-
-            {/* Pillar 4 */}
-            <div className="p-6 rounded-2xl bg-[#181411] border border-stone-800 space-y-3 shadow-lg hover:border-amber-500/40 transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                <Stethoscope className="w-5 h-5" />
-              </div>
-              <h3 className="font-display font-bold text-sm text-[#FAF6F0]">
-                {t.showcase.doctorCardTitle}
-              </h3>
-              <p className="text-xs text-stone-400 leading-relaxed font-sans">
-                {t.showcase.doctorCardDesc}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* 5. INTERACTIVE FEATURE DEEP DIVE */}
-        <section className="rounded-3xl p-6 sm:p-8 bg-[#16120F] border border-stone-800 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-800 pb-4">
-            <div>
-              <span className="text-[10px] font-mono uppercase text-amber-400 font-bold tracking-wider">
-                Full Spectrum GIS Capabilities
-              </span>
-              <h3 className="text-xl font-display font-bold text-[#FAF6F0]">
-                Seven Groundbreaking Features Built for Production
-              </h3>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex items-center space-x-1.5 overflow-x-auto text-xs font-mono p-1 rounded-xl bg-[#110E0C] border border-stone-800">
-              {[
-                { id: 'formats', label: 'Vector Engine' },
-                { id: 'geodesy', label: 'Geodesy & Area' },
-                { id: 'doctor', label: 'Spatial Doctor' },
-                { id: 'cartography', label: 'Swipe Curtain' },
-                { id: 'audit', label: 'QA/QC Audit' },
-              ].map(tab => (
+              return (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveFeatureTab(tab.id as any)}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    activeFeatureTab === tab.id
-                      ? 'bg-amber-600 text-stone-950 font-bold shadow-sm'
-                      : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                  key={tool.id}
+                  onClick={() => setActiveToolId(tool.id)}
+                  className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between space-y-2 group ${
+                    isActive
+                      ? (theme === 'light'
+                          ? 'bg-amber-100/90 border-amber-500 shadow-sm ring-2 ring-amber-400/40 text-stone-950 font-bold'
+                          : 'bg-amber-950/60 border-amber-500 shadow-md ring-2 ring-amber-500/40 text-white font-bold')
+                      : (theme === 'light'
+                          ? 'bg-white border-[#E2DBD0] hover:border-amber-400 hover:bg-stone-50 text-stone-700'
+                          : 'bg-[#181411] border-stone-800 hover:border-stone-700 hover:bg-[#201A16] text-stone-300')
                   }`}
                 >
-                  {tab.label}
+                  <div className="flex items-center justify-between w-full">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${
+                      isActive
+                        ? 'bg-amber-500 text-stone-950'
+                        : theme === 'light' ? 'bg-[#F2ECE3] text-stone-700' : 'bg-stone-800 text-stone-300'
+                    }`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    {isActive && <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />}
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-mono block opacity-60">
+                      {tool.tag}
+                    </span>
+                    <span className="text-xs font-display font-semibold line-clamp-1">
+                      {tool.name.replace(/^\d+\.\s*/, '')}
+                    </span>
+                  </div>
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tab Content 1: Vector Engine */}
-          {activeFeatureTab === 'formats' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-              <div className="space-y-4">
-                <h4 className="font-display font-bold text-lg text-[#FAF6F0]">
-                  Native OGC GeoPackage & Automated Shapefile Sidecar Bundling
-                </h4>
-                <p className="text-xs sm:text-sm text-stone-300 leading-relaxed">
-                  Unlike traditional tools that corrupt shapefiles by losing sidecars, OmniGeo intelligently groups `.shp`, `.shx`, `.dbf`, `.prj`, and `.cpg` files together into structured ZIP archives. GeoPackage output writes full SQLite schemas compliant with OGC standards.
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <div className="p-2.5 rounded-xl bg-[#1C1713] border border-stone-800">
-                    <span className="text-amber-400 font-bold block">GeoPackage (.gpkg)</span>
-                    <span className="text-[11px] text-stone-400">Single-file SQLite spatial db</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-[#1C1713] border border-stone-800">
-                    <span className="text-amber-400 font-bold block">ESRI Shapefile (.zip)</span>
-                    <span className="text-[11px] text-stone-400">Sidecars preserved automatically</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-[#1C1713] border border-stone-800">
-                    <span className="text-emerald-400 font-bold block">GeoJSON (RFC 7946)</span>
-                    <span className="text-[11px] text-stone-400">High-fidelity web coordinates</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-[#1C1713] border border-stone-800">
-                    <span className="text-orange-400 font-bold block">Google Earth KML</span>
-                    <span className="text-[11px] text-stone-400">ExtendedData & styled placemarks</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-[#110E0C] border border-stone-800 font-mono text-xs space-y-2 shadow-inner">
-                <div className="flex items-center justify-between text-stone-400 pb-2 border-b border-stone-800 text-[11px]">
-                  <span>GDAL / CLI Equivalent</span>
-                  <span className="text-amber-400">Air-Gapped WASM Engine</span>
-                </div>
-                <div className="p-3 rounded-lg bg-[#181411] border border-stone-800/80 text-amber-300 overflow-x-auto text-[11px]">
-                  <code>ogr2ogr -f &quot;GPKG&quot; output.gpkg input.shp -t_srs EPSG:4326</code>
-                </div>
-                <p className="text-[11px] text-stone-400 leading-relaxed font-sans">
-                  OmniGeo reproduces GDAL and PROJ command line output with 100% zero-configuration graphical batch speed.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Tab Content 2: Geodesy & Area */}
-          {activeFeatureTab === 'geodesy' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-              <div className="space-y-4">
-                <h4 className="font-display font-bold text-lg text-[#FAF6F0]">
-                  Automated Geodesic Surface Calculations & Field Aggregations
-                </h4>
-                <p className="text-xs sm:text-sm text-stone-300 leading-relaxed">
-                  Calculate surface areas on the WGS 84 ellipsoid or equal-area projections seamlessly into new columns (<code className="text-amber-300 font-mono">surface_ha</code>, <code className="text-amber-300 font-mono">surface_m2</code>). Aggregate fields dynamically with Count, Sum, Mean, Min, and Max metrics.
-                </p>
-                <div className="flex flex-wrap gap-2 text-xs font-mono">
-                  <span className="px-3 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-600/50">Hectares (ha)</span>
-                  <span className="px-3 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-600/50">Square Meters (m²)</span>
-                  <span className="px-3 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-600/50">Square Kilometers (km²)</span>
-                  <span className="px-3 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-600/50">Acres</span>
-                </div>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-[#110E0C] border border-stone-800 space-y-3 font-mono text-xs">
-                <div className="flex items-center space-x-2 text-amber-400 font-bold">
-                  <Calculator className="w-4 h-4" />
-                  <span>Geodesic Area Engine</span>
-                </div>
-                <div className="p-3 rounded-lg bg-[#181411] text-[11px] text-stone-300 space-y-1">
-                  <div>// Geodesic polygon area on Equal-Area Cylindrical</div>
-                  <div className="text-emerald-400">gdf[&apos;surface_ha&apos;] = gdf.to_crs(6933).area / 10000;</div>
-                  <div>// Group-by field aggregation</div>
-                  <div className="text-amber-300">gdf[&apos;count_by_zone&apos;] = gdf.groupby(&apos;zone&apos;).transform(&apos;count&apos;)</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tab Content 3: Spatial Doctor */}
-          {activeFeatureTab === 'doctor' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-              <div className="space-y-4">
-                <h4 className="font-display font-bold text-lg text-[#FAF6F0]">
-                  Pre-Flight Spatial Doctor & 1-Click Axis Inversion Repair
-                </h4>
-                <p className="text-xs sm:text-sm text-stone-300 leading-relaxed">
-                  Inverted Latitude/Longitude coordinates are the #1 cause of corrupted GIS deliveries. OmniGeo runs heuristic bounds checking and coordinate range analysis, flagging swapped axes with confidence ratings and enabling 1-click inversion repair without modifying external files.
-                </p>
-                <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-600/40 text-amber-300 text-xs">
-                  <span>✔ Snaps unclosed polygon rings · Cleans consecutive duplicate vertices · Strips NaNs</span>
-                </div>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-[#110E0C] border border-stone-800 font-mono text-xs space-y-2">
-                <div className="flex items-center justify-between text-[11px] pb-2 border-b border-stone-800">
-                  <span className="text-stone-400">Axis Inversion Diagnostic</span>
-                  <span className="text-emerald-400 font-bold">99.4% Confidence</span>
-                </div>
-                <div className="p-3 rounded-lg bg-[#181411] text-[11px] space-y-1">
-                  <div className="text-rose-400">Detected: Y in [-180, 180] & X in [-90, 90]</div>
-                  <div className="text-emerald-400 font-bold">&rarr; 1-Click Axis Swap (X &harr; Y) Applied Successfully</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tab Content 4: Swipe Curtain */}
-          {activeFeatureTab === 'cartography' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-              <div className="space-y-4">
-                <h4 className="font-display font-bold text-lg text-[#FAF6F0]">
-                  Interactive Leaflet Cartography & Split-Screen Swipe Curtain
-                </h4>
-                <p className="text-xs sm:text-sm text-stone-300 leading-relaxed">
-                  Visually audit your reprojection accuracy by dragging a real-time vertical curtain across the map. Compare raw input geometries on the left against reprojected coordinates on the right, inspecting vertex drift down to sub-millimeter survey tolerances.
-                </p>
-                <div className="flex items-center space-x-2 text-xs font-mono text-stone-400">
-                  <span className="px-2.5 py-1 rounded-md bg-[#1C1713] border border-stone-800">OSM</span>
-                  <span className="px-2.5 py-1 rounded-md bg-[#1C1713] border border-stone-800">Dark Minimal</span>
-                  <span className="px-2.5 py-1 rounded-md bg-[#1C1713] border border-stone-800">Satellite</span>
-                  <span className="px-2.5 py-1 rounded-md bg-amber-950 text-amber-300 border border-amber-700/50">100% Offline Grid</span>
-                </div>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-[#110E0C] border border-stone-800 font-mono text-xs text-center space-y-3">
-                <div className="h-32 rounded-xl bg-gradient-to-r from-stone-900 via-amber-950/40 to-stone-900 border border-stone-800 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-amber-400" />
-                  <div className="absolute left-6 text-xs text-amber-300">SOURCE: WGS84</div>
-                  <div className="absolute right-6 text-xs text-orange-400">TARGET: LAMBERT-93</div>
-                </div>
-                <span className="text-[11px] text-stone-400 block">External legend outside map frame eliminates all Leaflet glitches.</span>
-              </div>
-            </div>
-          )}
-
-          {/* Tab Content 5: QA/QC Audit */}
-          {activeFeatureTab === 'audit' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-              <div className="space-y-4">
-                <h4 className="font-display font-bold text-lg text-[#FAF6F0]">
-                  Certified QA/QC Audit Certificate with Cryptographic SHA-256 Seals
-                </h4>
-                <p className="text-xs sm:text-sm text-stone-300 leading-relaxed">
-                  Generate formal, audit-ready compliance certificates for spatial deliverables. Every report includes input/output SHA-256 hashes, exact PROJ datum shift parameters, validation pass rates, and can be printed or exported as standalone HTML documents.
-                </p>
-                <button
-                  onClick={() => onLaunchWorkbench('monitor')}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-stone-950 font-bold text-xs transition-colors"
-                >
-                  View Sample QA/QC Certificate
-                </button>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-[#110E0C] border border-stone-800 font-mono text-xs space-y-2">
-                <div className="flex items-center space-x-2 text-emerald-400 font-bold pb-2 border-b border-stone-800">
-                  <Award className="w-4 h-4" />
-                  <span>ISO 19115 / OGC Geodetic Audit Record</span>
-                </div>
-                <div className="text-[11px] text-stone-400 space-y-1">
-                  <div>SHA-256: <span className="text-stone-300">e3b0c44298fc1c149afbf4c8996fb92427ae...</span></div>
-                  <div>Datum Shift: <span className="text-amber-400">EPSG:2154 &rarr; EPSG:4326 (Passed 100%)</span></div>
-                  <div>Geometry Validity: <span className="text-emerald-400">100% Rings Closed, 0 Inversions</span></div>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* 6. DESKTOP VS WEB COMPARISON TABLE */}
-        <section className="space-y-6">
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-display font-bold text-[#FAF6F0]">
-              {t.showcase.desktopVsWebTitle}
-            </h2>
-            <p className="text-xs sm:text-sm text-stone-400">
-              {t.showcase.desktopVsWebSub}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-stone-800 overflow-hidden bg-[#16120F]">
-            <table className="w-full text-left text-xs border-collapse font-mono">
-              <thead className="bg-[#110E0C] border-b border-stone-800 text-stone-400 uppercase text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">Feature / Capability</th>
-                  <th className="py-3 px-4 text-amber-400 font-bold">Windows Desktop (.exe)</th>
-                  <th className="py-3 px-4 text-stone-300">Web GIS Workbench</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-800 text-xs">
-                <tr>
-                  <td className="py-3 px-4 text-stone-300 font-sans font-medium">Installation</td>
-                  <td className="py-3 px-4 text-amber-300 font-bold">Native Windows Setup (.exe)</td>
-                  <td className="py-3 px-4 text-stone-400">Zero install (Browser)</td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-4 text-stone-300 font-sans font-medium">Air-Gapped & Offline</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ 100% Offline Local-First</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ 100% Offline WASM</td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-4 text-stone-300 font-sans font-medium">Batch File Ingestion</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ Direct OS File Drop</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ Browser Drag &amp; Drop</td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-4 text-stone-300 font-sans font-medium">OGC GeoPackage & Shapefile</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ Full Bundle Support</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ Full Bundle Support</td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-4 text-stone-300 font-sans font-medium">6,900+ EPSG Geodetic Engine</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ Embedded PROJ Registry</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ Embedded PROJ Registry</td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-4 text-stone-300 font-sans font-medium">Telemetry & Data Privacy</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ Zero Tracking / Private</td>
-                  <td className="py-3 px-4 text-emerald-400 font-bold">✔ Zero Tracking / Private</td>
-                </tr>
-              </tbody>
-            </table>
+              );
+            })}
           </div>
         </section>
 
-        {/* 7. GITHUB PAGES DEPLOYMENT GUIDE */}
-        <section className="rounded-3xl p-6 sm:p-8 bg-[#181411] border border-stone-800 space-y-4">
-          <div className="flex items-center space-x-2 text-amber-400 font-display font-bold text-base">
-            <Github className="w-5 h-5" />
-            <span>{t.showcase.ghPagesDeployTitle}</span>
+        {/* 4. ACTIVE TOOL DEEP-DIVE WALKTHROUGH CARD */}
+        <section className={`rounded-3xl border p-6 sm:p-8 space-y-6 transition-all ${
+          theme === 'light'
+            ? 'bg-white border-[#E2DBD0] shadow-sm text-stone-900'
+            : 'bg-[#181411] border-stone-800 shadow-xl text-[#FAF6F0]'
+        }`}>
+          {/* Card Title & Top Actions */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-stone-200 dark:border-stone-800">
+            <div className="flex items-start space-x-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                <activeTool.icon className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    {activeTool.tag}
+                  </span>
+                  <span className="text-xs font-mono text-stone-400">
+                    Module #{walkthroughTools.findIndex(t => t.id === activeTool.id) + 1} of 7
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-display font-bold mt-1">
+                  {activeTool.name}
+                </h3>
+                <p className="text-xs sm:text-sm text-stone-500 font-mono">
+                  {activeTool.subtitle}
+                </p>
+              </div>
+            </div>
+
+            {/* Launch / Try Button */}
+            <div className="shrink-0 flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeTool.actionAction) {
+                    activeTool.actionAction();
+                  } else {
+                    onLaunchWorkbench(activeTool.actionTab);
+                  }
+                }}
+                className="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-display font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-md shadow-amber-950/20 transition-all transform active:scale-95"
+              >
+                <span>{activeTool.actionLabel}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
-          <p className="text-xs sm:text-sm text-stone-300 leading-relaxed font-sans">
-            {t.showcase.ghPagesDeploySub} To publish this website live on GitHub Pages:
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono">
-            <div className="p-3.5 rounded-xl bg-[#110E0C] border border-stone-800 space-y-1">
-              <span className="text-amber-400 font-bold block">1. Open GitHub Repo</span>
-              <span className="text-stone-400 text-[11px]">Navigate to Settings &rarr; Pages on <a href={githubRepoUrl} target="_blank" rel="noopener noreferrer" className="underline text-amber-300">Maal1ck/OmniGEO</a></span>
+
+          {/* Overview Paragraph */}
+          <div className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed border ${
+            theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-700' : 'bg-[#120F0D] border-stone-800 text-stone-300'
+          }`}>
+            <p>{activeTool.summary}</p>
+          </div>
+
+          {/* Grid: Key Features & Step-by-Step Instructions */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Column A: Key Features */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-mono uppercase font-bold text-amber-600 dark:text-amber-400 flex items-center space-x-2">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{lang === 'fr' ? 'Fonctionnalités & Spécifications :' : 'Key Features & Capabilities :'}</span>
+              </h4>
+
+              <div className="space-y-2">
+                {activeTool.features.map((feat, i) => (
+                  <div 
+                    key={i} 
+                    className={`p-3 rounded-xl border text-xs flex items-start space-x-2.5 ${
+                      theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-800' : 'bg-[#15110E] border-stone-800 text-stone-300'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span>{feat}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="p-3.5 rounded-xl bg-[#110E0C] border border-stone-800 space-y-1">
-              <span className="text-amber-400 font-bold block">2. Select Source</span>
-              <span className="text-stone-400 text-[11px]">Select &quot;Deploy from a branch&quot; and choose <code className="text-amber-300 font-bold">main</code> branch with <code className="text-amber-300 font-bold">/docs</code> folder.</span>
+
+            {/* Column B: Step-by-Step How-To */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-mono uppercase font-bold text-amber-600 dark:text-amber-400 flex items-center space-x-2">
+                <Compass className="w-3.5 h-3.5" />
+                <span>{lang === 'fr' ? 'Guide d\'utilisation pas à pas :' : 'Step-by-Step Workflow :'}</span>
+              </h4>
+
+              <div className="space-y-2">
+                {activeTool.stepByStep.map((step, i) => (
+                  <div 
+                    key={i} 
+                    className={`p-3 rounded-xl border text-xs flex items-start space-x-3 ${
+                      theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-800' : 'bg-[#15110E] border-stone-800 text-stone-300'
+                    }`}
+                  >
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-mono font-bold text-[11px] flex items-center justify-center shrink-0">
+                      {i + 1}
+                    </span>
+                    <span className="flex-1 leading-relaxed">{step}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="p-3.5 rounded-xl bg-[#110E0C] border border-stone-800 space-y-1">
-              <span className="text-emerald-400 font-bold block">3. Instant Live Site</span>
-              <span className="text-stone-400 text-[11px]">Your website is published at <code className="text-emerald-300">maal1ck.github.io/OmniGEO</code> with download links!</span>
+          </div>
+
+          {/* Pro Tip Callout Box */}
+          <div className={`p-4 rounded-2xl border flex items-start space-x-3 ${
+            theme === 'light' 
+              ? 'bg-amber-50/70 border-amber-300 text-stone-800' 
+              : 'bg-amber-950/20 border-amber-600/30 text-amber-200'
+          }`}>
+            <Lightbulb className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <span className="font-bold block uppercase font-mono text-[11px] text-amber-700 dark:text-amber-400">
+                {lang === 'fr' ? 'Conseil d\'expert :' : 'Pro Tip & Best Practice :'}
+              </span>
+              <p className="leading-relaxed">{activeTool.proTip}</p>
             </div>
           </div>
         </section>
 
-        {/* 8. FOOTER */}
-        <footer className="pt-8 border-t border-stone-800 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono text-stone-400">
+        {/* 5. WINDOWS DESKTOP RELEASE & OFFLINE WEB SECTION (100% THEMED FOR LIGHT & DARK) */}
+        <section className={`rounded-3xl border p-6 sm:p-8 space-y-6 transition-colors ${
+          theme === 'light'
+            ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-sm'
+            : 'bg-[#181411] border-stone-800 text-[#FAF6F0]'
+        }`}>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
+            <div>
+              <div className="flex items-center space-x-2">
+                <Monitor className="w-5 h-5 text-amber-500" />
+                <h3 className="text-xl sm:text-2xl font-display font-bold">
+                  {lang === 'fr' ? 'Distribution Windows (.exe) & Mode Web Déconnecté' : 'Windows Desktop Release (.exe) & Offline Web'}
+                </h3>
+              </div>
+              <p className="text-xs sm:text-sm text-stone-500 font-mono mt-1">
+                {lang === 'fr' 
+                  ? 'Exécution 100% autonome en local-first sans connexion internet requise' 
+                  : '100% local-first air-gapped execution without external internet required'}
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <a
+                href={githubRepoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                  theme === 'light'
+                    ? 'bg-stone-100 hover:bg-stone-200 border-stone-300 text-stone-800'
+                    : 'bg-stone-800 hover:bg-stone-700 border-stone-700 text-stone-200'
+                }`}
+              >
+                <Github className="w-3.5 h-3.5" />
+                <span>GitHub Releases</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Specs comparison */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+            <div className={`p-4 rounded-2xl border space-y-2 ${
+              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+            }`}>
+              <div className="text-amber-600 dark:text-amber-400 font-bold flex items-center space-x-1.5">
+                <HardDrive className="w-4 h-4" />
+                <span>Zéro Dépendance</span>
+              </div>
+              <p className="text-stone-500 font-sans text-xs">
+                {lang === 'fr' 
+                  ? 'Pas besoin de Node.js, Python ou GDAL installés. Tout est embarqué en WebAssembly et binaire natif.'
+                  : 'No Node.js, Python, or GDAL installation required. All dependencies run inside self-contained WASM.'}
+              </p>
+            </div>
+
+            <div className={`p-4 rounded-2xl border space-y-2 ${
+              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+            }`}>
+              <div className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center space-x-1.5">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Confidentialité Totale</span>
+              </div>
+              <p className="text-stone-500 font-sans text-xs">
+                {lang === 'fr' 
+                  ? 'Vos fichiers cadastraux et géométries sensibles restent confinés à votre ordinateur.'
+                  : 'Your cadastral records, boundaries, and geometries remain 100% inside your local device.'}
+              </p>
+            </div>
+
+            <div className={`p-4 rounded-2xl border space-y-2 ${
+              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+            }`}>
+              <div className="text-amber-600 dark:text-amber-400 font-bold flex items-center space-x-1.5">
+                <Cpu className="w-4 h-4" />
+                <span>Multi-Plateforme</span>
+              </div>
+              <p className="text-stone-500 font-sans text-xs">
+                {lang === 'fr' 
+                  ? 'Compatible avec Windows 10/11 64-bit ainsi que tout navigateur moderne (Chrome, Edge, Firefox, Safari).'
+                  : 'Runs on Windows 10/11 64-bit and modern browsers with WebAssembly and Web Worker support.'}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* 6. FAQ & GEODETIC TROUBLESHOOTING */}
+        <section className={`rounded-3xl border p-6 sm:p-8 space-y-5 transition-colors ${
+          theme === 'light'
+            ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-sm'
+            : 'bg-[#181411] border-stone-800 text-[#FAF6F0]'
+        }`}>
+          <div className="flex items-center space-x-2">
+            <HelpCircle className="w-5 h-5 text-amber-500" />
+            <h3 className="text-lg sm:text-xl font-display font-bold">
+              {lang === 'fr' ? 'Foire Aux Questions & Résolution Géodésique' : 'FAQ & Geodetic Troubleshooting'}
+            </h3>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            {/* Q1: Sud_Maroc EPSG 4261 vs 26192 */}
+            <details className={`p-3.5 rounded-xl border group transition-colors ${
+              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+            }`}>
+              <summary className="font-bold cursor-pointer flex items-center justify-between text-stone-800 dark:text-stone-200">
+                <span>{lang === 'fr' 
+                  ? 'Pourquoi mon fichier marocain utilisait-il 26192 ou 27700 et comment OmniGeo garantit EPSG:4261 ?' 
+                  : 'Why was my Moroccan file previously showing 26192 or 27700, and how does OmniGeo guarantee EPSG:4261?'}</span>
+                <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90 text-amber-500 shrink-0" />
+              </summary>
+              <div className="mt-2.5 pt-2 border-t border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-400 space-y-1.5 leading-relaxed font-sans">
+                <p>
+                  {lang === 'fr'
+                    ? 'Le datum Merchich au Maroc possède deux variantes courantes : une représentation géographique en degrés décimaux (Sud_Maroc_degree, EPSG:4261) et une grille cartographique projetée en mètres (Lambert Sud Maroc, EPSG:26192). Les bibliothèques génériques confondaient souvent le nom textuel ou le range de coordonnées.'
+                    : 'The Merchich datum in Morocco has two primary representations: a geographic 2D coordinate system in degrees (Sud_Maroc_degree, EPSG:4261) and a projected metric grid (Lambert Sud Maroc, EPSG:26192). Generic libraries often mistakenly fallback to British or metric codes.'}
+                </p>
+                <p>
+                  {lang === 'fr'
+                    ? 'OmniGeo intègre une heuristique spécifique : si le descripteur mentionne "Sud_Maroc" ou "Merchich" et que les coordonnées sont de l\'ordre de -18° à +18° de latitude/longitude, il sélectionne avec 100% de certitude le CRS EPSG:4261.'
+                    : 'OmniGeo applies targeted geodetic inspection: whenever descriptors match "Sud_Maroc" or "Merchich" and coordinates fall within regional degree bounds, it assigns EPSG:4261.'}
+                </p>
+              </div>
+            </details>
+
+            {/* Q2: Excel coordinate headers */}
+            <details className={`p-3.5 rounded-xl border group transition-colors ${
+              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+            }`}>
+              <summary className="font-bold cursor-pointer flex items-center justify-between text-stone-800 dark:text-stone-200">
+                <span>{lang === 'fr' 
+                  ? 'Comment importer des fichiers Excel contenant des noms de colonnes inhabituels ?' 
+                  : 'How do I import Excel spreadsheets with unusual coordinate column names?'}</span>
+                <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90 text-amber-500 shrink-0" />
+              </summary>
+              <div className="mt-2.5 pt-2 border-t border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-400 space-y-1.5 leading-relaxed font-sans">
+                <p>
+                  {lang === 'fr'
+                    ? 'OmniGeo scanne automatiquement plus de 20 combinaisons d\'en-têtes (lat, latitude, lat_dd, X, Y, lon, long, longitude, coord_x, coord_y, etc.). Si vos colonnes portent un nom sur-mesure, une boîte de dialogue interactive vous permet de les sélectionner manuellement ainsi que de définir le CRS exact parmi les 6 942 disponibles.'
+                    : 'OmniGeo automatically matches 20+ common column patterns (lat, latitude, lat_dd, X, Y, lon, long, longitude, coord_x, coord_y, etc.). If custom column names are used, an interactive modal appears allowing you to select longitude/latitude fields and assign any of the 6,942 EPSG projections.'}
+                </p>
+              </div>
+            </details>
+
+            {/* Q3: PostGIS credentials */}
+            <details className={`p-3.5 rounded-xl border group transition-colors ${
+              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+            }`}>
+              <summary className="font-bold cursor-pointer flex items-center justify-between text-stone-800 dark:text-stone-200">
+                <span>{lang === 'fr' 
+                  ? 'Pourquoi l\'outil PostGIS ne demande-t-il pas de mot de passe pgAdmin en direct ?' 
+                  : 'Why does the PostGIS tool not ask for my pgAdmin database password directly?'}</span>
+                <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90 text-amber-500 shrink-0" />
+              </summary>
+              <div className="mt-2.5 pt-2 border-t border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-400 space-y-1.5 leading-relaxed font-sans">
+                <p>
+                  {lang === 'fr'
+                    ? 'OmniGeo respecte le principe de sécurité "Zero Trust" et n\'a pas de backend distant stockant vos mots de passe. Il génère pour vous un script SQL prêt à l\'emploi avec index spatial GiST que vous ouvrez et exécutez directement dans votre pgAdmin 4 local où vos identifiants sont déjà protégés.'
+                    : 'OmniGeo adopts a Zero-Trust client architecture and has no backend server storing passwords. It generates an optimized SQL script with GiST spatial indexing that you execute directly inside pgAdmin 4 where your credentials remain strictly local and private.'}
+                </p>
+              </div>
+            </details>
+
+            {/* Q4: Africa zoom & feature zoom */}
+            <details className={`p-3.5 rounded-xl border group transition-colors ${
+              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+            }`}>
+              <summary className="font-bold cursor-pointer flex items-center justify-between text-stone-800 dark:text-stone-200">
+                <span>{lang === 'fr' 
+                  ? 'Comment zoomer sur une entité spécifique dans la carte ?' 
+                  : 'How do I zoom directly into a specific feature on the map?'}</span>
+                <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90 text-amber-500 shrink-0" />
+              </summary>
+              <div className="mt-2.5 pt-2 border-t border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-400 space-y-1.5 leading-relaxed font-sans">
+                <p>
+                  {lang === 'fr'
+                    ? 'Dans l\'onglet "Studio carto", déployez la table attributaire en cliquant sur le bouton en bas de la carte. Cliquez simplement sur n\'importe quelle ligne du tableau pour déclencher un zoom fluide, un halo lumineux pulsant et une bulle d\'informations sur cette entité précise !'
+                    : 'In "Map Studio", expand the attribute table drawer at the bottom of the map canvas. Click any row in the table to trigger smooth map panning, a pulsing highlight outline, and a pop-up display with all feature attributes!'}
+                </p>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        {/* 7. FOOTER */}
+        <footer className={`pt-6 pb-8 border-t flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono transition-colors ${
+          theme === 'light' ? 'border-[#E2DBD0] text-stone-500' : 'border-stone-800 text-stone-400'
+        }`}>
           <div className="flex items-center space-x-2.5">
-            <Logo size={24} />
-            <span className="font-semibold text-stone-200">OmniGeo by Maodo</span>
-            <span className="text-stone-600">·</span>
+            <Logo size={22} />
+            <span className={`font-semibold ${theme === 'light' ? 'text-stone-800' : 'text-stone-200'}`}>
+              OmniGeo by Maodo
+            </span>
+            <span className="text-stone-400">·</span>
             <span>Apache 2.0 Open Source</span>
           </div>
 
           <div className="flex items-center space-x-4">
             <button 
               onClick={() => onLaunchWorkbench('craft')} 
-              className="text-amber-400 hover:text-white font-bold flex items-center space-x-1"
+              className="text-amber-600 dark:text-amber-400 hover:underline font-bold flex items-center space-x-1"
             >
-              <span>{t.showcase.launchWebBtn}</span>
+              <span>{lang === 'fr' ? 'Ouvrir l\'Atelier' : 'Open Workbench'}</span>
             </button>
-            <a href={githubRepoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-stone-200 flex items-center space-x-1">
+            <a 
+              href={githubRepoUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="hover:text-stone-800 dark:hover:text-stone-200 flex items-center space-x-1"
+            >
               <Github className="w-3.5 h-3.5" />
               <span>GitHub</span>
             </a>

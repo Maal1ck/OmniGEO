@@ -17,9 +17,12 @@ import {
   EyeOff,
   ShieldCheck,
   FileText,
-  Play
+  Play,
+  Search,
+  Globe,
+  ChevronDown
 } from 'lucide-react';
-import { SpatialDataset } from '../types/gis';
+import { SpatialDataset, CRSInfo } from '../types/gis';
 import { 
   generatePostgisSql, 
   generatePsqlCommand, 
@@ -28,6 +31,7 @@ import {
   extractSRID,
   PostgisExportOptions 
 } from '../core/postgisExporter';
+import { searchCRS, getCRSByCode } from '../core/crsDefinitions';
 import { useTheme } from '../core/theme';
 
 interface PostgisModalProps {
@@ -72,6 +76,18 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
   const [username, setUsername] = useState<string>('postgres');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
+
+  // Searchable CRS Catalog state (All 6,900+ EPSG CRS)
+  const [isCrsSearchOpen, setIsCrsSearchOpen] = useState<boolean>(false);
+  const [crsQuery, setCrsQuery] = useState<string>('');
+
+  const currentCrsInfo = useMemo(() => {
+    return getCRSByCode(`EPSG:${srid}`);
+  }, [srid]);
+
+  const matchingCrsList = useMemo(() => {
+    return searchCRS(crsQuery).slice(0, 100);
+  }, [crsQuery]);
 
   // Update table name and SRID if dataset changes
   React.useEffect(() => {
@@ -255,17 +271,45 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
             </div>
 
             <div>
-              <label className="text-[11px] font-mono uppercase font-bold text-stone-500 block mb-1">
-                EPSG / SRID
-              </label>
-              <input
-                type="number"
-                value={srid}
-                onChange={(e) => setSrid(parseInt(e.target.value, 10) || 4326)}
-                className={`w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border ${
-                  theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
-                }`}
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-mono uppercase font-bold text-stone-500">
+                  EPSG / SRID
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsCrsSearchOpen(true)}
+                  className="text-[10px] font-mono text-amber-600 dark:text-amber-400 hover:underline flex items-center space-x-0.5"
+                >
+                  <Search className="w-3 h-3 inline mr-0.5" />
+                  <span>Search 6,900+</span>
+                </button>
+              </div>
+              <div className="flex items-center space-x-1.5">
+                <input
+                  type="number"
+                  value={srid}
+                  onChange={(e) => setSrid(parseInt(e.target.value, 10) || 4326)}
+                  className={`w-20 px-2 py-1.5 text-xs font-mono rounded-lg border font-bold text-center ${
+                    theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                  }`}
+                  title="Direct numeric EPSG code"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsCrsSearchOpen(true)}
+                  className={`flex-1 flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
+                    theme === 'light'
+                      ? 'bg-white border-[#D6CEBE] text-stone-800 hover:bg-stone-50 hover:border-amber-400'
+                      : 'bg-[#120F0D] border-stone-700 text-stone-200 hover:bg-stone-800 hover:border-amber-500'
+                  }`}
+                  title="Search from all 6,900+ EPSG CRS database"
+                >
+                  <span className="truncate max-w-[130px] sm:max-w-[160px] font-mono text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                    {currentCrsInfo ? currentCrsInfo.name : `EPSG:${srid}`}
+                  </span>
+                  <Search className="w-3.5 h-3.5 text-stone-400 shrink-0 ml-1" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -745,6 +789,196 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Complete 6,942 EPSG CRS Search Modal Dialog */}
+      {isCrsSearchOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in-0 duration-150">
+          <div 
+            className={`w-full max-w-2xl max-h-[85vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden transition-colors ${
+              theme === 'light'
+                ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900'
+                : 'bg-[#181411] border-stone-700 text-[#FAF6F0]'
+            }`}
+          >
+            {/* Header */}
+            <div className={`p-4 border-b flex items-center justify-between ${
+              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3]' : 'border-stone-800 bg-[#14100D]'
+            }`}>
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-500">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-sm">
+                    Select PostGIS Target SRID / CRS
+                  </h3>
+                  <p className="text-[11px] text-stone-500 font-mono">
+                    Search 6,942 EPSG coordinate reference systems in embedded registry
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCrsSearchOpen(false)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  theme === 'light' ? 'text-stone-500 hover:bg-stone-200 text-stone-800' : 'text-stone-400 hover:bg-stone-800 text-stone-200'
+                }`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Search Input Bar */}
+            <div className={`p-4 border-b space-y-3 ${
+              theme === 'light' ? 'border-[#E2DBD0] bg-white' : 'border-stone-800 bg-[#120F0D]'
+            }`}>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={crsQuery}
+                  onChange={(e) => setCrsQuery(e.target.value)}
+                  placeholder="Search by EPSG (4261, 26192, 4326, 2154), name (Merchich, Lambert, UTM), or area..."
+                  className={`w-full pl-9 pr-8 py-2 text-xs font-mono rounded-xl border focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                    theme === 'light'
+                      ? 'bg-stone-50 border-[#D6CEBE] text-stone-900 placeholder:text-stone-400'
+                      : 'bg-[#181411] border-stone-700 text-stone-100 placeholder:text-stone-500'
+                  }`}
+                />
+                {crsQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCrsQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs font-bold"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Preset Badges */}
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                <span className="text-stone-500 font-semibold mr-1">Presets:</span>
+                {[
+                  { label: 'Sud_Maroc degree (4261)', query: '4261' },
+                  { label: 'Sud_Maroc metric (26192)', query: '26192' },
+                  { label: 'WGS 84 (4326)', query: '4326' },
+                  { label: 'Web Mercator (3857)', query: '3857' },
+                  { label: 'Lambert-93 (2154)', query: '2154' },
+                  { label: 'UTM 28N (32628)', query: '32628' },
+                  { label: 'UTM 29N (32629)', query: '32629' },
+                  { label: 'UTM 30N (32630)', query: '32630' },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => setCrsQuery(preset.query)}
+                    className={`px-2 py-0.5 rounded-md border transition-colors ${
+                      crsQuery === preset.query
+                        ? 'bg-amber-500 text-stone-950 font-bold border-amber-600'
+                        : theme === 'light'
+                          ? 'bg-stone-100 hover:bg-stone-200 border-stone-300 text-stone-700'
+                          : 'bg-stone-850 hover:bg-stone-800 border-stone-700 text-stone-300'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Results List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-1.5 divide-y divide-stone-500/10 max-h-[50vh]">
+              {matchingCrsList.length === 0 ? (
+                <div className="p-8 text-center space-y-2">
+                  <p className="text-xs text-stone-400">No matching coordinate systems found for &quot;{crsQuery}&quot;.</p>
+                  <p className="text-[11px] font-mono text-stone-500">Try searching &quot;4326&quot;, &quot;Merchich&quot;, &quot;Lambert&quot;, or &quot;UTM&quot;</p>
+                </div>
+              ) : (
+                matchingCrsList.map((item) => {
+                  const itemCodeNum = parseInt(item.code.replace(/[^\d]/g, ''), 10) || 4326;
+                  const isCurrent = itemCodeNum === srid;
+
+                  return (
+                    <div
+                      key={item.code}
+                      onClick={() => {
+                        setSrid(itemCodeNum);
+                        setIsCrsSearchOpen(false);
+                      }}
+                      className={`p-3 rounded-xl cursor-pointer transition-all flex items-start justify-between gap-3 ${
+                        isCurrent
+                          ? (theme === 'light'
+                              ? 'bg-amber-100/90 border border-amber-400 text-stone-950 shadow-xs'
+                              : 'bg-amber-950/40 border border-amber-500/60 text-[#FAF6F0]')
+                          : (theme === 'light'
+                              ? 'hover:bg-stone-100 text-stone-800'
+                              : 'hover:bg-stone-850 text-stone-300')
+                      }`}
+                    >
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-0.5 rounded font-mono font-bold text-xs ${
+                            isCurrent
+                              ? 'bg-amber-600 text-white'
+                              : theme === 'light' ? 'bg-stone-200 text-stone-800' : 'bg-stone-800 text-amber-400'
+                          }`}>
+                            {item.code}
+                          </span>
+                          <span className="font-semibold text-xs truncate">
+                            {item.name}
+                          </span>
+                          <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-stone-500/10 text-stone-500">
+                            {item.isGeographic ? 'Geographic' : 'Projected'}
+                          </span>
+                        </div>
+
+                        {item.area && (
+                          <p className="text-[11px] text-stone-500 font-sans line-clamp-1">
+                            Area: {item.area}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="shrink-0 pt-0.5">
+                        {isCurrent ? (
+                          <span className="flex items-center space-x-1 text-xs font-bold text-amber-600 dark:text-amber-400">
+                            <Check className="w-4 h-4" />
+                            <span>Selected</span>
+                          </span>
+                        ) : (
+                          <span className={`text-[11px] font-mono px-2.5 py-1 rounded-lg border transition-colors ${
+                            theme === 'light'
+                              ? 'bg-white border-stone-300 text-stone-700 hover:bg-amber-50 hover:border-amber-400'
+                              : 'bg-[#201A16] border-stone-700 text-stone-300 hover:bg-stone-800 hover:border-amber-500'
+                          }`}>
+                            Choose
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Results Footer Counter */}
+            <div className={`p-3 border-t flex items-center justify-between text-[11px] font-mono ${
+              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3] text-stone-600' : 'border-stone-800 bg-[#14100D] text-stone-400'
+            }`}>
+              <span>Showing {matchingCrsList.length} matches (from 6,942 EPSG database)</span>
+              <button
+                type="button"
+                onClick={() => setIsCrsSearchOpen(false)}
+                className="hover:underline font-semibold"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
