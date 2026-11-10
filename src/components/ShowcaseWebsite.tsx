@@ -83,19 +83,20 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
         : 'Drag & drop any spatial dataset (.shp bundles, .dwg CAD, .kml, .geojson) or Excel files with auto-detection of 20+ Lat/Lon column naming patterns.',
       features: [
         lang === 'fr' ? 'Support natif des fichiers DAO / CAD .dwg et DXF sans conversion préalable' : 'Native CAD .dwg & DXF support without pre-conversion',
-        lang === 'fr' ? 'Détection intelligente des colonnes X/Y/Lat/Lon dans Excel (.xlsx, .xls, .csv)' : 'Smart Lat/Lon/X/Y detection across Excel sheets with manual picker fallback',
-        lang === 'fr' ? 'Interrupteur d\'exploration récursive des sous-dossiers (Include / Exclude subfolders)' : 'Recursive subfolder traversal toggle for deep folder archives',
-        lang === 'fr' ? 'Traitement par lots sélectif avec cases à cocher individuelles' : 'Selective batch processing toggle with individual file checkboxes'
+        lang === 'fr' ? 'Isolation sélective des feuilles Excel : choisissez quelles feuilles importer en couches indépendantes' : 'Selective Excel sheet isolation: choose which worksheets to import as isolated layers',
+        lang === 'fr' ? 'Isolation des couches GeoPackage (.gpkg) : dialogue interactif pour extraire les couches désirées' : 'GeoPackage (.gpkg) layer isolation: interactive modal to extract specific vector layers',
+        lang === 'fr' ? 'Détection intelligente des colonnes X/Y/Lat/Lon dans Excel avec 6 942 CRS au choix' : 'Smart Lat/Lon/X/Y detection across Excel sheets with full 6,942 EPSG projection selector',
+        lang === 'fr' ? 'Interrupteur d\'exploration récursive des sous-dossiers (Include / Exclude subfolders)' : 'Recursive subfolder traversal toggle for deep folder archives'
       ],
       stepByStep: [
         lang === 'fr' ? 'Rendez-vous dans l\'onglet "Atelier" ou "Espace de travail".' : 'Go to the "Craft" or "Workspace" tab.',
         lang === 'fr' ? 'Déposez votre fichier ou dossier complet dans la zone de glisser-déposer.' : 'Drop your file or folder into the drop zone.',
-        lang === 'fr' ? 'Si vous importez un fichier Excel, le sélecteur d\'en-tête s\'ouvre avec les 6 942 CRS pour géolocaliser les lignes.' : 'For Excel files, the coordinate modal will detect lat/lon columns and let you choose target CRS.',
-        lang === 'fr' ? 'Vos couches sont instantanément parsées en mémoire 100% hors-ligne dans le navigateur.' : 'Layers are parsed in-memory 100% offline in your browser.'
+        lang === 'fr' ? 'Pour un fichier Excel multi-feuilles ou un GeoPackage multi-couches, la boîte d\'isolation s\'ouvre pour choisir les couches à extraire.' : 'For multi-sheet Excel workbooks or multi-layer GeoPackages, the isolation dialog lets you choose layers to extract.',
+        lang === 'fr' ? 'Vos couches sélectionnées sont instantanément isolées et ajoutées à votre session.' : 'Selected layers are instantly isolated and loaded into your session.'
       ],
       proTip: lang === 'fr'
-        ? 'Pour les shapefiles, vous pouvez glisser l\'ensemble des fichiers (.shp, .shx, .dbf, .prj) en une seule fois. OmniGeo les assemble automatiquement !'
-        : 'For shapefiles, drag all companion files (.shp, .shx, .dbf, .prj) together. OmniGeo automatically links them into an OGC-compliant layer.',
+        ? 'Si votre GeoPackage contient 10 couches et que vous n\'avez besoin que de la couche parcelles, cliquez sur "Isoler seule" pour n\'importer que cette couche en 1 clic !'
+        : 'If your GeoPackage contains 10 layers and you only need parcels, click "Isolate" next to that layer to import only that specific layer in 1 click!',
       actionTab: 'craft' as NavTab,
       actionLabel: lang === 'fr' ? 'Ouvrir l\'Atelier d\'Ingestion' : 'Open Craft Ingestion Studio',
     },

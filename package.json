@@ -7,7 +7,7 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite",
     "generate:crs": "node scripts/generate-crs-catalog.mjs",
     "prebuild": "npm run generate:crs",
     "build": "vite build",

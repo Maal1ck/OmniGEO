@@ -31,9 +31,10 @@ import {
 } from 'lucide-react';
 import { SpatialDataset, CRSInfo } from '../types/gis';
 import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers, parseCadFile, parseGpxFile } from '../core/formatParsers';
-import { parseGeoPackage } from '../core/geoPackageParser';
+import { parseGeoPackage, inspectGeoPackageLayers } from '../core/geoPackageParser';
 import { inspectExcelWorkbook } from '../core/excelParser';
 import { ExcelCoordinateModal, PendingExcelFile } from './ExcelCoordinateModal';
+import { GpkgLayerModal, PendingGpkgFile } from './GpkgLayerModal';
 import { CRSModal } from './CRSModal';
 import { useI18n } from '../core/i18n';
 import { useTheme } from '../core/theme';
@@ -89,6 +90,10 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   // Excel manual mapping modal state
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [pendingExcelFile, setPendingExcelFile] = useState<PendingExcelFile | null>(null);
+
+  // GeoPackage layer isolation modal state
+  const [isGpkgModalOpen, setIsGpkgModalOpen] = useState(false);
+  const [pendingGpkgFile, setPendingGpkgFile] = useState<PendingGpkgFile | null>(null);
 
   // CRS calibration modal states
   const [crsModalTarget, setCrsModalTarget] = useState<SpatialDataset | null>(null);
@@ -471,8 +476,21 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             const dataset = parseGeoJSON(text, displayName, file.size);
             newDatasets.push(dataset);
           } else if (ext === '.gpkg') {
-            const gpkgDatasets = await parseGeoPackage(await file.arrayBuffer(), displayName, file.size);
-            newDatasets.push(...gpkgDatasets);
+            const buf = await file.arrayBuffer();
+            const gpkgLayers = await inspectGeoPackageLayers(buf);
+            if (gpkgLayers.length > 1) {
+              setPendingGpkgFile({
+                file,
+                buffer: buf,
+                displayName,
+                fileSize: file.size,
+                layers: gpkgLayers,
+              });
+              setIsGpkgModalOpen(true);
+            } else {
+              const gpkgDatasets = await parseGeoPackage(buf, displayName, file.size);
+              newDatasets.push(...gpkgDatasets);
+            }
           } else if (ext === '.csv') {
             const text = await file.text();
             const dataset = parseCSV(text, displayName, file.size);
@@ -500,7 +518,21 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           } else if (ext === '.xlsx' || ext === '.xls') {
             const buf = await file.arrayBuffer();
             const result = inspectExcelWorkbook(buf, displayName);
-            if (result.dataset && !result.needsManualMapping) {
+            // If the workbook has multiple sheets, always allow isolating specific sheets
+            if (result.sheetNames.length > 1) {
+              setPendingExcelFile({
+                file,
+                buffer: buf,
+                sheetNames: result.sheetNames,
+                selectedSheet: result.selectedSheet,
+                headers: result.headers,
+                previewRows: result.previewRows,
+                detectedXCol: result.detectedXCol,
+                detectedYCol: result.detectedYCol,
+                totalRowCount: result.totalRowCount,
+              });
+              setIsExcelModalOpen(true);
+            } else if (result.dataset && !result.needsManualMapping) {
               newDatasets.push(result.dataset);
             } else {
               setPendingExcelFile({
@@ -1508,7 +1540,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         </div>
       </div>
 
-      {/* Interactive Excel Coordinate Column Mapper Modal */}
+      {/* Interactive Excel Coordinate Column Mapper & Worksheet Isolation Modal */}
       <ExcelCoordinateModal
         isOpen={isExcelModalOpen}
         onClose={() => {
@@ -1516,13 +1548,44 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           setPendingExcelFile(null);
         }}
         pendingFile={pendingExcelFile}
-        onConfirmDataset={(newDataset) => {
-          setDatasets(prev => [...prev, newDataset]);
-          if (!selectedDatasetId) {
-            setSelectedDatasetId(newDataset.id);
+        onConfirmDataset={(newDatasetOrList) => {
+          const list = Array.isArray(newDatasetOrList) ? newDatasetOrList : [newDatasetOrList];
+          setDatasets(prev => [...prev, ...list]);
+          if (!selectedDatasetId && list[0]) {
+            setSelectedDatasetId(list[0].id);
           }
           setIsExcelModalOpen(false);
           setPendingExcelFile(null);
+        }}
+      />
+
+      {/* GeoPackage Multi-Layer Isolation Modal */}
+      <GpkgLayerModal
+        isOpen={isGpkgModalOpen}
+        onClose={() => {
+          setIsGpkgModalOpen(false);
+          setPendingGpkgFile(null);
+        }}
+        pendingGpkg={pendingGpkgFile}
+        onConfirmLayers={async (selectedTableNames) => {
+          if (!pendingGpkgFile) return;
+          try {
+            const isolatedDatasets = await parseGeoPackage(
+              pendingGpkgFile.buffer,
+              pendingGpkgFile.displayName,
+              pendingGpkgFile.fileSize,
+              selectedTableNames
+            );
+            setDatasets(prev => [...prev, ...isolatedDatasets]);
+            if (!selectedDatasetId && isolatedDatasets[0]) {
+              setSelectedDatasetId(isolatedDatasets[0].id);
+            }
+          } catch (err) {
+            console.error('Failed to import isolated GPKG layers:', err);
+          } finally {
+            setIsGpkgModalOpen(false);
+            setPendingGpkgFile(null);
+          }
         }}
       />
 

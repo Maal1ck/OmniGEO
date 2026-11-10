@@ -181,11 +181,19 @@ function readRows(db: Database, sql: string): Record<string, unknown>[] {
   return rows;
 }
 
-export async function parseGeoPackage(
-  content: ArrayBuffer,
-  fileName: string,
-  fileSize: number,
-): Promise<SpatialDataset[]> {
+export interface GeoPackageLayerInfo {
+  tableName: string;
+  identifier: string;
+  geometryColumn: string;
+  srsId: number;
+  geometryType?: string;
+  featureCount: number;
+}
+
+/**
+ * Inspects all vector layers in a GeoPackage file without parsing all geometries
+ */
+export async function inspectGeoPackageLayers(content: ArrayBuffer): Promise<GeoPackageLayerInfo[]> {
   const SQL = await getSqlJs();
   const db = new SQL.Database(new Uint8Array(content));
 
@@ -198,6 +206,56 @@ export async function parseGeoPackage(
 
     const layers = readRows(
       db,
+      `SELECT c.table_name, c.identifier, g.column_name, g.srs_id, g.geometry_type_name
+       FROM gpkg_contents c
+       JOIN gpkg_geometry_columns g ON g.table_name = c.table_name
+       WHERE c.data_type = 'features'`,
+    );
+
+    return layers.map(layer => {
+      const tableName = String(layer.table_name);
+      let count = 0;
+      try {
+        const countRes = readRows(db, `SELECT COUNT(*) as cnt FROM ${quoteIdentifier(tableName)}`);
+        if (countRes.length > 0 && countRes[0].cnt !== undefined) {
+          count = Number(countRes[0].cnt) || 0;
+        }
+      } catch {
+        count = 0;
+      }
+
+      return {
+        tableName,
+        identifier: String(layer.identifier || tableName),
+        geometryColumn: String(layer.column_name),
+        srsId: Number(layer.srs_id),
+        geometryType: layer.geometry_type_name ? String(layer.geometry_type_name) : undefined,
+        featureCount: count,
+      };
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function parseGeoPackage(
+  content: ArrayBuffer,
+  fileName: string,
+  fileSize: number,
+  selectedTableNames?: string[],
+): Promise<SpatialDataset[]> {
+  const SQL = await getSqlJs();
+  const db = new SQL.Database(new Uint8Array(content));
+
+  try {
+    const tables = readRows(db, "SELECT name FROM sqlite_master WHERE type = 'table'");
+    const tableNames = new Set(tables.map(table => String(table.name)));
+    if (!tableNames.has('gpkg_contents') || !tableNames.has('gpkg_geometry_columns')) {
+      throw new Error('The selected SQLite file is not a valid GeoPackage.');
+    }
+
+    let layers = readRows(
+      db,
       `SELECT c.table_name, c.identifier, g.column_name, g.srs_id
        FROM gpkg_contents c
        JOIN gpkg_geometry_columns g ON g.table_name = c.table_name
@@ -205,6 +263,14 @@ export async function parseGeoPackage(
     );
     if (layers.length === 0) {
       throw new Error('This GeoPackage contains no vector feature layers.');
+    }
+
+    if (selectedTableNames && selectedTableNames.length > 0) {
+      const selectedSet = new Set(selectedTableNames);
+      layers = layers.filter(layer => selectedSet.has(String(layer.table_name)));
+      if (layers.length === 0) {
+        throw new Error('None of the selected GeoPackage layers were found in the database.');
+      }
     }
 
     const datasets = layers.map(layer => {

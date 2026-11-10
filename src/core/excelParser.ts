@@ -389,6 +389,56 @@ export function inspectExcelWorkbook(
   };
 }
 
+export interface ExcelSheetSummary {
+  sheetName: string;
+  rowCount: number;
+  headers: string[];
+  detectedXCol?: string;
+  detectedYCol?: string;
+  hasCoordinates: boolean;
+  previewRows: Record<string, any>[];
+}
+
+/**
+ * Inspects all worksheets within an Excel workbook (.xlsx / .xls)
+ */
+export function inspectAllExcelSheets(buffer: ArrayBuffer): ExcelSheetSummary[] {
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const sheetNames = workbook.SheetNames || [];
+
+  return sheetNames.map(sheetName => {
+    const worksheet = workbook.Sheets[sheetName];
+    if (!worksheet) {
+      return {
+        sheetName,
+        rowCount: 0,
+        headers: [],
+        hasCoordinates: false,
+        previewRows: [],
+      };
+    }
+
+    const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(worksheet, { defval: null });
+    const headerSet = new Set<string>();
+    rawRows.slice(0, 50).forEach(row => {
+      Object.keys(row).forEach(k => headerSet.add(k));
+    });
+    const headers = Array.from(headerSet);
+    const previewRows = rawRows.slice(0, 5);
+    const detected = detectCoordinateColumns(headers, previewRows);
+
+    return {
+      sheetName,
+      rowCount: rawRows.length,
+      headers,
+      detectedXCol: detected?.xCol,
+      detectedYCol: detected?.yCol,
+      hasCoordinates: !!(detected?.xCol && detected?.yCol),
+      previewRows,
+    };
+  });
+}
+
 /**
  * Exports a GeoJSON FeatureCollection to an Excel workbook binary (.xlsx)
  */
