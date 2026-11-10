@@ -24,7 +24,8 @@ import {
   Check, 
   Sliders,
   Play,
-  Database
+  Database,
+  GitMerge
 } from 'lucide-react';
 import { SpatialDataset, BatchSettings, ConsolidationSettings } from '../types/gis';
 import { SurfaceUnit } from '../core/spatialAnalytics';
@@ -51,6 +52,7 @@ interface CraftStudioProps {
   hasCertificate: boolean;
   onOpenConcatenationModal?: () => void;
   onOpenPostgisModal?: () => void;
+  onOpenJoinModal?: () => void;
 }
 
 export const CraftStudio: React.FC<CraftStudioProps> = ({
@@ -72,6 +74,7 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
   hasCertificate,
   onOpenConcatenationModal,
   onOpenPostgisModal,
+  onOpenJoinModal,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -246,6 +249,26 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
       onExecute: () => {
         if (onOpenPostgisModal) {
           onOpenPostgisModal();
+        } else {
+          setActiveTab('workspace');
+        }
+      },
+    },
+    {
+      id: 'spatial-attribute-join',
+      title: lang === 'fr' ? 'Jointures Spatiales et Attributaires' : lang === 'ar' ? 'الربط المكاني والجدولي' : 'Spatial & Attribute Join Studio',
+      category: 'analytics',
+      description: lang === 'fr'
+        ? 'Associez des données tabulaires par identifiant commun ou enrichissez vos entités par intersection/inclusion spatiale.'
+        : 'Join tabular data by common key ID, or enrich entities through geometric overlay predicates (intersects, within, contains).',
+      icon: GitMerge,
+      badge: 'Relational & Spatial Joins',
+      badgeColor: 'bg-purple-950 text-purple-300 border-purple-700/50',
+      cliCommand: 'python -c "import geopandas as gpd; parcels = gpd.read_file(\'parcels.geojson\'); owners = gpd.read_file(\'owners.csv\'); joined = parcels.merge(owners, on=\'parcel_id\'); joined.to_file(\'joined.geojson\', driver=\'GeoJSON\')"',
+      actionLabel: lang === 'fr' ? 'Ouvrir le Studio de Jointure' : 'Open Join Studio',
+      onExecute: () => {
+        if (onOpenJoinModal) {
+          onOpenJoinModal();
         } else {
           setActiveTab('workspace');
         }

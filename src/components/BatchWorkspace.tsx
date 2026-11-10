@@ -27,7 +27,8 @@ import {
   Loader2,
   Play,
   Globe,
-  Edit3
+  Edit3,
+  GitMerge
 } from 'lucide-react';
 import { SpatialDataset, CRSInfo } from '../types/gis';
 import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers, parseCadFile, parseGpxFile } from '../core/formatParsers';
@@ -62,6 +63,7 @@ interface BatchWorkspaceProps {
   onStartBatch?: (selectedDatasetIds?: string[]) => void;
   onOpenConcatenationModal?: (initialSelectedIds?: string[]) => void;
   onOpenPostgisModal?: (datasetId?: string) => void;
+  onOpenJoinModal?: (datasetId?: string) => void;
 }
 
 export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
@@ -75,6 +77,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   onStartBatch,
   onOpenConcatenationModal,
   onOpenPostgisModal,
+  onOpenJoinModal,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -916,6 +919,22 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 </button>
               )}
 
+              {datasets.length >= 2 && onOpenJoinModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenJoinModal(selectedIds.size >= 1 ? Array.from(selectedIds)[0] : undefined)}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                    theme === 'light'
+                      ? 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-300'
+                      : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border-purple-700/50'
+                  }`}
+                  title="Perform an attribute or spatial join between two layers"
+                >
+                  <GitMerge className="w-3.5 h-3.5 text-purple-500" />
+                  <span>{lang === 'fr' ? 'Jointures' : lang === 'ar' ? 'الربط' : 'Join Layers'}</span>
+                </button>
+              )}
+
               {onOpenPostgisModal && (
                 <button
                   type="button"
@@ -1484,6 +1503,15 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                               className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-indigo-400 transition-colors"
                             >
                               <Database className="w-4 h-4" />
+                            </button>
+                          )}
+                          {datasets.length >= 2 && onOpenJoinModal && (
+                            <button
+                              onClick={() => onOpenJoinModal(d.id)}
+                              title="Join with another layer (Attribute or Spatial)"
+                              className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-purple-400 transition-colors"
+                            >
+                              <GitMerge className="w-4 h-4" />
                             </button>
                           )}
                           <button

@@ -27,6 +27,7 @@ import { AuditCertificateModal } from './components/AuditCertificateModal';
 import { AggregationModal } from './components/AggregationModal';
 import { ConcatenationModal } from './components/ConcatenationModal';
 import { PostgisModal } from './components/PostgisModal';
+import { JoinModal } from './components/JoinModal';
 import { generateAutoHarmonizerRules, applySchemaHarmonization } from './core/schemaHarmonizer';
 import { createMultiLayerGeoPackage, generateQgisProjectXml, bundleConsolidatedHandoff } from './core/multiLayerGpkg';
 import { generateQAQCReportData } from './core/auditCertificate';
@@ -86,10 +87,18 @@ export default function App() {
   const [isAggregationModalOpen, setIsAggregationModalOpen] = useState(false);
   const [isConcatenationModalOpen, setIsConcatenationModalOpen] = useState(false);
   const [isPostgisModalOpen, setIsPostgisModalOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [concatenationInitialIds, setConcatenationInitialIds] = useState<string[]>([]);
   const [postgisTargetDatasetId, setPostgisTargetDatasetId] = useState<string | null>(null);
+  const [joinTargetDatasetId, setJoinTargetDatasetId] = useState<string | null>(null);
 
   const handleAddConcatenatedDataset = (newDataset: SpatialDataset) => {
+    setDatasets(prev => [newDataset, ...prev]);
+    setSelectedDatasetId(newDataset.id);
+    setActiveTab('workspace');
+  };
+
+  const handleAddJoinedDataset = (newDataset: SpatialDataset) => {
     setDatasets(prev => [newDataset, ...prev]);
     setSelectedDatasetId(newDataset.id);
     setActiveTab('workspace');
@@ -107,6 +116,11 @@ export default function App() {
   const handleOpenPostgisModal = (datasetId?: string) => {
     setPostgisTargetDatasetId(datasetId || selectedDatasetId || null);
     setIsPostgisModalOpen(true);
+  };
+
+  const handleOpenJoinModal = (targetDatasetId?: string) => {
+    setJoinTargetDatasetId(targetDatasetId || selectedDatasetId || null);
+    setIsJoinModalOpen(true);
   };
 
   // Surface calculation handler - appends new column to dataset
@@ -420,6 +434,7 @@ export default function App() {
         onSelectPreset={handleSelectPreset}
         onOpenConcatenationModal={() => handleOpenConcatenationModal()}
         onOpenPostgisModal={() => handleOpenPostgisModal()}
+        onOpenJoinModal={() => handleOpenJoinModal()}
       />
 
       {/* Main Work Area Views */}
@@ -444,6 +459,7 @@ export default function App() {
             hasCertificate={!!qaqcReport}
             onOpenConcatenationModal={() => handleOpenConcatenationModal()}
             onOpenPostgisModal={() => handleOpenPostgisModal()}
+            onOpenJoinModal={() => handleOpenJoinModal()}
           />
         )}
 
@@ -460,6 +476,7 @@ export default function App() {
             onStartBatch={handleStartBatch}
             onOpenConcatenationModal={handleOpenConcatenationModal}
             onOpenPostgisModal={handleOpenPostgisModal}
+            onOpenJoinModal={handleOpenJoinModal}
           />
         )}
 
@@ -515,6 +532,7 @@ export default function App() {
             onOpenPostgis={() => handleOpenPostgisModal()}
             onOpenDoctor={() => setIsDoctorOpen(true)}
             onOpenCRSModal={() => setIsCRSModalOpen(true)}
+            onOpenJoin={() => handleOpenJoinModal()}
           />
         )}
       </main>
@@ -535,6 +553,7 @@ export default function App() {
         onOpenAuditCertificate={() => setIsCertificateOpen(true)}
         onOpenConcatenationModal={() => handleOpenConcatenationModal()}
         onOpenPostgisModal={() => handleOpenPostgisModal()}
+        onOpenJoinModal={() => handleOpenJoinModal()}
       />
 
       {/* Python Architecture & Packaging Modal */}
@@ -598,6 +617,15 @@ export default function App() {
         onClose={() => setIsPostgisModalOpen(false)}
         datasets={datasets}
         defaultDatasetId={postgisTargetDatasetId}
+      />
+
+      {/* Feature: Spatial & Attribute Join Studio Modal */}
+      <JoinModal
+        isOpen={isJoinModalOpen}
+        onClose={() => setIsJoinModalOpen(false)}
+        datasets={datasets}
+        onAddJoinedDataset={handleAddJoinedDataset}
+        initialTargetDatasetId={joinTargetDatasetId}
       />
     </div>
   );

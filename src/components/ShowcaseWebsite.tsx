@@ -36,7 +36,8 @@ import {
   FileSpreadsheet,
   Download,
   ExternalLink,
-  Github
+  Github,
+  GitMerge
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { useI18n } from '../core/i18n';
@@ -49,6 +50,7 @@ interface ShowcaseWebsiteProps {
   onOpenPostgis?: () => void;
   onOpenDoctor?: () => void;
   onOpenCRSModal?: () => void;
+  onOpenJoin?: () => void;
 }
 
 export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ 
@@ -57,6 +59,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
   onOpenPostgis,
   onOpenDoctor,
   onOpenCRSModal,
+  onOpenJoin,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -83,20 +86,20 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
         : 'Drag & drop any spatial dataset (.shp bundles, .dwg CAD, .kml, .geojson) or Excel files with auto-detection of 20+ Lat/Lon column naming patterns.',
       features: [
         lang === 'fr' ? 'Support natif des fichiers DAO / CAD .dwg et DXF sans conversion préalable' : 'Native CAD .dwg & DXF support without pre-conversion',
-        lang === 'fr' ? 'Isolation sélective des feuilles Excel : choisissez quelles feuilles importer en couches indépendantes' : 'Selective Excel sheet isolation: choose which worksheets to import as isolated layers',
-        lang === 'fr' ? 'Isolation des couches GeoPackage (.gpkg) : dialogue interactif pour extraire les couches désirées' : 'GeoPackage (.gpkg) layer isolation: interactive modal to extract specific vector layers',
+        lang === 'fr' ? 'Configuration et importation simultanée de toutes les feuilles Excel : configurez X/Y, CRS et nom pour chaque onglet et importez tout en un clic !' : 'Configure and import all Excel sheets simultaneously: set Lon/Lat, CRS, and layer names per sheet and import in one click!',
+        lang === 'fr' ? 'Isolation sélective des feuilles Excel ou couches GeoPackage (.gpkg) avec filtres visuels' : 'Selective Excel sheet or GeoPackage (.gpkg) vector layer isolation with visual checklists',
         lang === 'fr' ? 'Détection intelligente des colonnes X/Y/Lat/Lon dans Excel avec 6 942 CRS au choix' : 'Smart Lat/Lon/X/Y detection across Excel sheets with full 6,942 EPSG projection selector',
         lang === 'fr' ? 'Interrupteur d\'exploration récursive des sous-dossiers (Include / Exclude subfolders)' : 'Recursive subfolder traversal toggle for deep folder archives'
       ],
       stepByStep: [
         lang === 'fr' ? 'Rendez-vous dans l\'onglet "Atelier" ou "Espace de travail".' : 'Go to the "Craft" or "Workspace" tab.',
-        lang === 'fr' ? 'Déposez votre fichier ou dossier complet dans la zone de glisser-déposer.' : 'Drop your file or folder into the drop zone.',
-        lang === 'fr' ? 'Pour un fichier Excel multi-feuilles ou un GeoPackage multi-couches, la boîte d\'isolation s\'ouvre pour choisir les couches à extraire.' : 'For multi-sheet Excel workbooks or multi-layer GeoPackages, the isolation dialog lets you choose layers to extract.',
-        lang === 'fr' ? 'Vos couches sélectionnées sont instantanément isolées et ajoutées à votre session.' : 'Selected layers are instantly isolated and loaded into your session.'
+        lang === 'fr' ? 'Déposez votre classeur Excel (.xlsx/.xls) ou GeoPackage (.gpkg).' : 'Drop your Excel workbook (.xlsx/.xls) or GeoPackage (.gpkg).',
+        lang === 'fr' ? 'Dans le dialogue, configurez chaque feuille (colonnes X/Y, CRS, nom) en cliquant dessus, ou appliquez les paramètres à toutes les feuilles.' : 'In the dialog, click each sheet to configure coordinates and CRS, or use the batch apply helper buttons.',
+        lang === 'fr' ? 'Cliquez sur "Importer toutes les feuilles cochées" pour charger simultanément toutes vos couches en session !' : 'Click "Import All Checked Sheets" to load all your configured layers in one step!'
       ],
       proTip: lang === 'fr'
-        ? 'Si votre GeoPackage contient 10 couches et que vous n\'avez besoin que de la couche parcelles, cliquez sur "Isoler seule" pour n\'importer que cette couche en 1 clic !'
-        : 'If your GeoPackage contains 10 layers and you only need parcels, click "Isolate" next to that layer to import only that specific layer in 1 click!',
+        ? 'Vous pouvez configurer 5 feuilles Excel différentes (ex: Bâtiments, Réseaux, Bornes) avec leurs propres colonnes de coordonnées et les importer simultanément en couches spatiales distinctes en un clic !'
+        : 'You can configure 5 distinct Excel worksheets (e.g. Buildings, Parcels, Points) with their own coordinate columns and import them simultaneously as distinct spatial layers in one go!',
       actionTab: 'craft' as NavTab,
       actionLabel: lang === 'fr' ? 'Ouvrir l\'Atelier d\'Ingestion' : 'Open Craft Ingestion Studio',
     },
@@ -157,8 +160,37 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
       actionLabel: lang === 'fr' ? 'Lancer l\'Outil de Concaténation' : 'Open Concatenation Tool',
     },
     {
+      id: 'joins',
+      name: lang === 'fr' ? '4. Jointures Spatiales & Attributaires' : '4. Spatial & Attribute Joins (Table & Spatial)',
+      subtitle: lang === 'fr' ? 'Jointure par clé (ex: parcelles & propriétaires) ou par intersection géographique' : 'Join by common key field or geometric overlay (intersects, within, contains)',
+      icon: GitMerge,
+      tag: 'Relational & Spatial Core',
+      summary: lang === 'fr'
+        ? 'Associez des données tabulaires (ex: table Excel de propriétaires, loyers, cadastre) à vos couches spatiales par identifiant commun, ou réalisez des jointures spatiales pour transférer automatiquement les attributs d\'un polygone aux points qu\'il contient.'
+        : 'Join non-spatial tabular data (Excel sheets, census data) to vector geometries using common key IDs, or perform spatial joins to transfer attributes between layers based on geometric containment or intersection.',
+      features: [
+        lang === 'fr' ? 'Jointure attributaire (Left Outer ou Inner) avec normalisation intelligente des types (texte/numérique)' : 'Attribute join (Left Outer or Inner) with flexible type matching (text vs numbers)',
+        lang === 'fr' ? 'Jointure spatiale par algorithme Ray-Casting & bounding-box (Intersects, Within, Contains)' : 'Spatial join using robust ray-casting polygon topology (Intersects, Within, Contains)',
+        lang === 'fr' ? 'Reprojection géodésique automatique entre couches ayant des CRS différents' : 'Automatic geodetic reprojection between layers with different coordinate systems',
+        lang === 'fr' ? 'Sélection sélective des attributs à importer et préfixage personnalisable (ex: join_)' : 'Selective attribute column checklist with custom prefixing to avoid collisions',
+        lang === 'fr' ? 'Aperçu en direct du taux de correspondance (%) et tableau d\'échantillon avant création' : 'Live match rate statistics (%) and sample preview table before finalizing'
+      ],
+      stepByStep: [
+        lang === 'fr' ? 'Ouvrez le dialogue de Jointure via la barre d\'outils, l\'Atelier, ou le raccourci Ctrl+K.' : 'Open the Join dialog from the top toolbar, Craft Studio, or Ctrl+K shortcut.',
+        lang === 'fr' ? 'Choisissez le mode : "Jointure Attributaire" (clé commune) ou "Jointure Spatiale" (position géo).' : 'Select the mode: "Attribute Join" (common key ID) or "Spatial Join" (spatial location).',
+        lang === 'fr' ? 'Sélectionnez la couche cible et la couche jointe, puis choisissez les champs clés ou le prédicat.' : 'Select target and join layers, pick key fields or spatial predicate (e.g. Intersects).',
+        lang === 'fr' ? 'Vérifiez le taux de correspondance dans l\'aperçu et cliquez sur "Exécuter et Créer la Couche".' : 'Review the match rate percentage in the preview table and click "Execute & Create Layer".'
+      ],
+      proTip: lang === 'fr'
+        ? 'Parfait pour le cadastre : importez vos parcelles (Shapefile) et un fichier Excel de propriétaires fonciers. La jointure attributaire sur le numéro de parcelle fusionne toutes les infos d\'un seul coup !'
+        : 'Ideal for cadastre & municipal workflows: import parcel polygons and an Excel file of landowner records. The attribute join on parcel ID attaches all owner data in one click!',
+      actionTab: 'workspace' as NavTab,
+      actionAction: onOpenJoin,
+      actionLabel: lang === 'fr' ? 'Ouvrir le Studio de Jointures' : 'Launch Join Studio',
+    },
+    {
       id: 'postgis',
-      name: lang === 'fr' ? '4. Intégration PostgreSQL & PostGIS' : '4. PostgreSQL & PostGIS Integration',
+      name: lang === 'fr' ? '5. Intégration PostgreSQL & PostGIS' : '5. PostgreSQL & PostGIS Integration',
       subtitle: lang === 'fr' ? 'Export 3 clics vers pgAdmin 4, psql CLI & scripts Python' : '3-click import into pgAdmin 4, psql CLI & Python GeoPandas',
       icon: Database,
       tag: 'Enterprise DB',
@@ -186,7 +218,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
     },
     {
       id: 'doctor',
-      name: lang === 'fr' ? '5. Docteur Spatial & Calculs de Surfaces' : '5. Pre-Flight Spatial Doctor & Surfaces',
+      name: lang === 'fr' ? '6. Docteur Spatial & Calculs de Surfaces' : '6. Pre-Flight Spatial Doctor & Surfaces',
       subtitle: lang === 'fr' ? 'Réparation de géométries invalides & calcul précis en Hectares' : 'Repair invalid geometries & calculate geodesic surfaces in ha/m²',
       icon: Stethoscope,
       tag: 'QA / QC Repair',
@@ -214,7 +246,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
     },
     {
       id: 'map',
-      name: lang === 'fr' ? '6. Studio Cartographique Multi-Couches' : '6. Multi-Layer Map Studio',
+      name: lang === 'fr' ? '7. Studio Cartographique Multi-Couches' : '7. Multi-Layer Map Studio',
       subtitle: lang === 'fr' ? 'Cadrage Afrique par défaut, zoom au clic sur ligne & symbologie' : 'Africa-first framing, click-row-to-zoom & 18-color palette',
       icon: Layers,
       tag: 'Interactive Carto',
@@ -241,7 +273,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
     },
     {
       id: 'batch',
-      name: lang === 'fr' ? '7. Labo de Conversion & Audit QA/QC' : '7. Batch Conversion & Audit QA/QC',
+      name: lang === 'fr' ? '8. Labo de Conversion & Audit QA/QC' : '8. Batch Conversion & Audit QA/QC',
       subtitle: lang === 'fr' ? 'Transformation en masse & certificats d\'audit cryptographiques' : 'Bulk format transformation & SHA-256 integrity certificates',
       icon: FileCheck,
       tag: 'Audit Provenance',

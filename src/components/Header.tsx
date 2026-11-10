@@ -25,7 +25,8 @@ import {
   Globe,
   Check,
   Database,
-  BookOpen
+  BookOpen,
+  GitMerge
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { BatchSettings, PresetProfile } from '../types/gis';
@@ -54,6 +55,7 @@ interface HeaderProps {
   onSelectPreset: (preset: PresetProfile) => void;
   onOpenConcatenationModal?: () => void;
   onOpenPostgisModal?: () => void;
+  onOpenJoinModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -75,6 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectPreset,
   onOpenConcatenationModal,
   onOpenPostgisModal,
+  onOpenJoinModal,
 }) => {
   const { lang, setLang, t } = useI18n();
   const { theme, toggleTheme } = useTheme();
@@ -505,6 +508,30 @@ export const Header: React.FC<HeaderProps> = ({
                     <div>
                       <div className="font-semibold text-xs">Concatenate & Merge Layers</div>
                       <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>Map columns, reproject, & consolidate into one output</div>
+                    </div>
+                  </button>
+                )}
+
+                {onOpenJoinModal && (
+                  <button
+                    onClick={() => {
+                      setIsToolsOpen(false);
+                      onOpenJoinModal();
+                    }}
+                    className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                      theme === 'light'
+                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-purple-800'
+                        : 'hover:bg-[#28211C] text-stone-200 hover:text-purple-300'
+                    }`}
+                  >
+                    <GitMerge className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                    <div>
+                      <div className="font-semibold text-xs">
+                        {lang === 'fr' ? 'Jointures (Attributs & Spatiale)' : lang === 'ar' ? 'الربط المكاني والجدولي' : 'Spatial & Attribute Joins'}
+                      </div>
+                      <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>
+                        {lang === 'fr' ? 'Lier des tables par clé commune ou prédicat spatial' : lang === 'ar' ? 'ربط الجداول بواسطة المفاتيح أو التراكب المكاني' : 'Join tables by key field or spatial overlay (intersects, within)'}
+                      </div>
                     </div>
                   </button>
                 )}

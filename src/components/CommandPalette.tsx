@@ -16,7 +16,8 @@ import {
   Stethoscope, 
   TableProperties, 
   Award,
-  Database
+  Database,
+  GitMerge
 } from 'lucide-react';
 import { NavTab } from './Header';
 
@@ -46,6 +47,7 @@ interface CommandPaletteProps {
   onOpenAggregationModal?: () => void;
   onOpenConcatenationModal?: () => void;
   onOpenPostgisModal?: () => void;
+  onOpenJoinModal?: () => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
@@ -63,6 +65,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onOpenAuditCertificate,
   onOpenConcatenationModal,
   onOpenPostgisModal,
+  onOpenJoinModal,
 }) => {
   const [query, setQuery] = useState('');
 
@@ -186,6 +189,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       category: 'Action',
       icon: <Database className="w-4 h-4 text-indigo-400" />,
       run: () => { onOpenPostgisModal?.(); onClose(); },
+    },
+    {
+      id: 'act-join',
+      title: 'Open Spatial & Attribute Join Studio (Jointures)',
+      category: 'Action',
+      icon: <GitMerge className="w-4 h-4 text-purple-400" />,
+      run: () => { onOpenJoinModal?.(); onClose(); },
     },
     {
       id: 'act-python',
