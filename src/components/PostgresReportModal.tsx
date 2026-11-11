@@ -20,14 +20,14 @@ import {
   ChevronDown, 
   ChevronUp, 
   Network,
-  RotateCcw,
-  Key,
-  Languages,
-  Eye
+  Key
 } from 'lucide-react';
 import { SpatialDataset } from '../types/gis';
 import { 
   PostgresDatabaseSchema, 
+  PostgresTableSchema,
+  PostgresColumnSchema,
+  PostgresRelationship,
   POSTGRES_EXTRACTOR_SQL, 
   SAMPLE_POSTGRES_DATABASES, 
   generateStandaloneHtmlReport, 
@@ -63,7 +63,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
   // Active database schema being reported
   const [schema, setSchema] = useState<PostgresDatabaseSchema>(() => {
-    if (datasets.length > 0) {
+    if (datasets && datasets.length > 0) {
       return buildSchemaFromDatasets(datasets, 'omnigeo_spatial_production_db');
     }
     return SAMPLE_POSTGRES_DATABASES.cadastre;
@@ -81,8 +81,10 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
   const [selectedSchemaFilter, setSelectedSchemaFilter] = useState<string>('all');
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
 
-  // MPD interactive selected entity
+  // MPD interactive selected entity & card width customizer
   const [selectedMpdTable, setSelectedMpdTable] = useState<string | null>(null);
+  const [mpdCardWidth, setMpdCardWidth] = useState<number>(360);
+  const [tableWidthOverrides, setTableWidthOverrides] = useState<Record<string, number>>({});
 
   // Copy status
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -163,37 +165,88 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
         throw new Error(reportLang === 'fr' ? "Le JSON doit comporter un tableau de 'tables'." : "JSON must contain an array of 'tables'.");
       }
 
-      // Compute summary and normalize types
-      const rels = parsed.relationships || [];
+      // Compute relationships with unique IDs
+      const rawRels = Array.isArray(parsed.relationships) ? parsed.relationships : [];
+      const rels: PostgresRelationship[] = rawRels.map((r: any, idx: number) => ({
+        id: r.id ? `${r.id}_${idx}` : `rel_${r.sourceTable || 'src'}_${r.sourceColumn || 'col'}_${idx}`,
+        constraintName: r.constraintName || `fk_${r.sourceTable || 'src'}_${r.sourceColumn || 'col'}_${idx}`,
+        sourceTable: r.sourceTable || '',
+        sourceColumn: r.sourceColumn || '',
+        targetTable: r.targetTable || '',
+        targetColumn: r.targetColumn || '',
+        cardinality: r.cardinality || '1:N',
+        sourceCardinality: r.sourceCardinality || '0..n',
+        targetCardinality: r.targetCardinality || '1..1',
+        updateRule: r.updateRule,
+        deleteRule: r.deleteRule,
+      }));
+
+      // Compute summary and normalize tables/columns
       let totalRec = 0;
       let totalCols = 0;
       let totalSpatial = 0;
       const typeDist: Record<string, number> = {};
 
-      for (const t of parsed.tables) {
-        totalRec += t.estimatedRows || 0;
-        let isSp = false;
-        for (const c of (t.columns || [])) {
+      const tables: PostgresTableSchema[] = (parsed.tables || []).map((t: any, tIdx: number) => {
+        totalRec += typeof t.estimatedRows === 'number' ? Math.max(t.estimatedRows, 0) : 0;
+        let isSp = !!t.isSpatial;
+
+        const rawCols = Array.isArray(t.columns) ? t.columns : [];
+        const columns: PostgresColumnSchema[] = rawCols.map((c: any, cIdx: number) => {
           totalCols++;
-          c.dataType = normalizeToPostgresType(c.dataType || 'text');
-          if (c.isGeometry || c.dataType.toLowerCase().includes('geom')) {
-            isSp = true;
-          }
-          const cat = categorizeDataType(c.dataType);
+          const canonicalType = normalizeToPostgresType(c.dataType || 'text');
+          const isGeom = !!c.isGeometry || canonicalType.toLowerCase().includes('geom');
+          if (isGeom) isSp = true;
+
+          const cat = categorizeDataType(canonicalType);
           typeDist[cat] = (typeDist[cat] || 0) + 1;
-        }
-        t.isSpatial = isSp;
+
+          return {
+            name: c.name || `col_${cIdx}`,
+            dataType: canonicalType,
+            isNullable: c.isNullable !== false,
+            defaultValue: c.defaultValue ?? null,
+            isPrimaryKey: !!c.isPrimaryKey,
+            isForeignKey: !!c.isForeignKey || !!c.foreignKeyTarget,
+            foreignKeyTarget: c.foreignKeyTarget,
+            isGeometry: isGeom,
+            geometryType: c.geometryType,
+            srid: c.srid,
+            comment: c.comment,
+          };
+        });
+
         if (isSp) totalSpatial++;
-      }
+
+        const primaryKeys = (t.primaryKeys && Array.isArray(t.primaryKeys))
+          ? t.primaryKeys
+          : columns.filter(c => c.isPrimaryKey).map(c => c.name);
+
+        const tableForeignKeys = (t.foreignKeys && Array.isArray(t.foreignKeys))
+          ? t.foreignKeys
+          : rels.filter(r => r.sourceTable === t.name);
+
+        return {
+          name: t.name || `table_${tIdx}`,
+          schema: t.schema || 'public',
+          estimatedRows: typeof t.estimatedRows === 'number' ? Math.max(t.estimatedRows, 0) : 0,
+          sizeFormatted: t.sizeFormatted || `${((columns.length * 20) / 1024).toFixed(1)} kB`,
+          columns,
+          primaryKeys,
+          foreignKeys: tableForeignKeys,
+          isSpatial: isSp,
+          comment: t.comment,
+        };
+      });
 
       const formattedSchema: PostgresDatabaseSchema = {
         databaseName: parsed.databaseName || 'postgres_db',
         serverVersion: parsed.serverVersion || 'PostgreSQL 16+',
         generatedAt: parsed.generatedAt || new Date().toISOString(),
-        tables: parsed.tables,
+        tables,
         relationships: rels,
         summary: {
-          totalTables: parsed.tables.length,
+          totalTables: tables.length,
           totalRecords: totalRec,
           totalColumns: totalCols,
           totalRelationships: rels.length,
@@ -224,7 +277,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     }
     try {
       const parsed = parsePostgresDDL(ddlInput.trim(), 'database_ddl_import');
-      if (parsed.tables.length === 0) {
+      if (!parsed.tables || parsed.tables.length === 0) {
         throw new Error(reportLang === 'fr' ? "Aucune table 'CREATE TABLE' détectée dans le script collé." : "No 'CREATE TABLE' statements detected.");
       }
       setSchema(parsed);
@@ -250,27 +303,32 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
   // Schemas list for dropdown
   const uniqueSchemas = useMemo(() => {
     const s = new Set<string>();
-    schema.tables.forEach(t => s.add(t.schema));
+    (schema.tables || []).forEach(t => {
+      if (t.schema) s.add(t.schema);
+    });
     return Array.from(s);
   }, [schema]);
 
   // Filtered tables for preview
   const filteredTables = useMemo(() => {
+    if (!schema.tables) return [];
     return schema.tables.filter(t => {
       const matchesSchema = selectedSchemaFilter === 'all' || t.schema === selectedSchemaFilter;
       if (!matchesSchema) return false;
 
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
-      const matchTableName = t.name.toLowerCase().includes(q);
-      const matchCols = t.columns.some(c => c.name.toLowerCase().includes(q) || c.dataType.toLowerCase().includes(q));
+      const matchTableName = (t.name || '').toLowerCase().includes(q);
+      const matchCols = (t.columns || []).some(c => 
+        (c.name || '').toLowerCase().includes(q) || (c.dataType || '').toLowerCase().includes(q)
+      );
       return matchTableName || matchCols;
     });
   }, [schema, searchQuery, selectedSchemaFilter]);
 
   // Related tables for the selected table in MPD tab
   const mpdHighlightedRelations = useMemo(() => {
-    if (!selectedMpdTable) return [];
+    if (!selectedMpdTable || !schema.relationships) return [];
     return schema.relationships.filter(
       r => r.sourceTable === selectedMpdTable || r.targetTable === selectedMpdTable
     );
@@ -306,7 +364,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-stone-500 font-mono mt-0.5">
-                {schema.summary.totalTables} {isFr ? 'tables' : 'tables'} &bull; {schema.summary.totalRecords.toLocaleString()} {isFr ? 'enregistrements' : 'records'} &bull; {schema.summary.totalRelationships} {isFr ? 'relations clés étrangères' : 'foreign key links'}
+                {(schema.tables || []).length} {isFr ? 'tables' : 'tables'} &bull; {(schema.summary?.totalRecords || 0).toLocaleString()} {isFr ? 'enregistrements' : 'records'} &bull; {(schema.relationships || []).length} {isFr ? 'relations clés étrangères' : 'foreign key links'}
               </p>
             </div>
           </div>
@@ -401,8 +459,8 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
             >
               <TableProperties className="w-3.5 h-3.5 text-amber-500" />
               <span>{isFr ? 'Dictionnaire de Données' : 'Data Dictionary'}</span>
-              <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-600">
-                {schema.tables.length}
+              <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-600 font-bold">
+                {(schema.tables || []).length}
               </span>
             </button>
 
@@ -419,7 +477,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               <Network className="w-3.5 h-3.5 text-purple-400" />
               <span>{isFr ? 'Modèle Physique (MPD / ERD)' : 'Physical Model (MPD / ERD)'}</span>
               <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-bold">
-                {schema.relationships.length} rels
+                {(schema.relationships || []).length} rels
               </span>
             </button>
 
@@ -473,7 +531,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Tables Métier' : 'Total Tables'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-amber-500 mt-0.5">{schema.summary.totalTables}</div>
+                  <div className="text-2xl font-bold font-mono text-amber-500 mt-0.5">{(schema.tables || []).length}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Tables relationnelles' : 'Relational tables'}
                   </span>
@@ -485,7 +543,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Couches PostGIS' : 'PostGIS Layers'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-emerald-500 mt-0.5">{schema.summary.totalSpatialTables}</div>
+                  <div className="text-2xl font-bold font-mono text-emerald-500 mt-0.5">{schema.summary?.totalSpatialTables || 0}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Colonnes géométriques' : 'Spatial geometries'}
                   </span>
@@ -497,7 +555,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Enregistrements' : 'Data Records'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-stone-200 mt-0.5">{schema.summary.totalRecords.toLocaleString()}</div>
+                  <div className="text-2xl font-bold font-mono text-stone-200 mt-0.5">{(schema.summary?.totalRecords || 0).toLocaleString()}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Volume estimé' : 'Estimated row count'}
                   </span>
@@ -509,7 +567,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Total Champs' : 'Total Fields'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-stone-200 mt-0.5">{schema.summary.totalColumns}</div>
+                  <div className="text-2xl font-bold font-mono text-stone-200 mt-0.5">{schema.summary?.totalColumns || 0}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Attributs typés PostgreSQL' : 'Canonical attributes'}
                   </span>
@@ -521,7 +579,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Relations (FK)' : 'Foreign Keys'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-purple-400 mt-0.5">{schema.summary.totalRelationships}</div>
+                  <div className="text-2xl font-bold font-mono text-purple-400 mt-0.5">{(schema.relationships || []).length}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Liaisons d’intégrité' : 'Referential links'}
                   </span>
@@ -535,8 +593,8 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 <span className="font-mono text-[11px] font-bold text-stone-500 uppercase mr-2">
                   {isFr ? 'Distribution des Types Canoniques :' : 'Canonical Types Distribution:'}
                 </span>
-                {Object.entries(schema.summary.dataTypesDistribution).map(([category, count]) => (
-                  <span key={category} className={`px-2.5 py-1 rounded-lg border font-mono text-[11px] flex items-center space-x-1.5 ${
+                {Object.entries(schema.summary?.dataTypesDistribution || {}).map(([category, count], idx) => (
+                  <span key={`dtype-pill-${category}-${idx}`} className={`px-2.5 py-1 rounded-lg border font-mono text-[11px] flex items-center space-x-1.5 ${
                     category.includes('Spatial') 
                       ? 'bg-emerald-950/40 border-emerald-600/40 text-emerald-300 font-bold'
                       : category.includes('Numeric')
@@ -552,7 +610,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               </div>
 
               {/* Foreign Keys & Relationships Matrix Card */}
-              {schema.relationships.length > 0 && (
+              {(schema.relationships || []).length > 0 && (
                 <div className={`rounded-xl border overflow-hidden ${
                   theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
                 }`}>
@@ -566,7 +624,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       </h3>
                     </div>
                     <span className="text-[10px] font-mono text-stone-500">
-                      {schema.relationships.length} {isFr ? 'liaisons actives' : 'active links'}
+                      {(schema.relationships || []).length} {isFr ? 'liaisons actives' : 'active links'}
                     </span>
                   </div>
                   <div className="overflow-x-auto">
@@ -583,8 +641,8 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${theme === 'light' ? 'divide-[#F0ECE4]' : 'divide-stone-800/60'}`}>
-                        {schema.relationships.map(rel => (
-                          <tr key={rel.id} className="hover:bg-amber-500/5 transition-colors">
+                        {(schema.relationships || []).map((rel, idx) => (
+                          <tr key={`rel-row-${rel.id || ''}-${rel.constraintName || ''}-${rel.sourceTable}-${rel.sourceColumn}-${rel.targetTable}-${idx}`} className="hover:bg-amber-500/5 transition-colors">
                             <td className="py-2 px-4 text-stone-500 text-[11px]">{rel.constraintName}</td>
                             <td className="py-2 px-4 font-bold text-amber-500">
                               {rel.sourceTable}.<span className="underline">{rel.sourceColumn}</span>
@@ -637,8 +695,8 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                     }`}
                   >
                     <option value="all">ALL SCHEMAS ({uniqueSchemas.length})</option>
-                    {uniqueSchemas.map(s => (
-                      <option key={s} value={s}>{s}</option>
+                    {uniqueSchemas.map((s, idx) => (
+                      <option key={`schema-opt-${s}-${idx}`} value={s}>{s}</option>
                     ))}
                   </select>
                 </div>
@@ -646,12 +704,12 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
               {/* Table Catalog List */}
               <div className="space-y-4">
-                {filteredTables.map(table => {
+                {filteredTables.map((table, tIdx) => {
                   const isCollapsed = expandedTables[table.name] === false;
 
                   return (
                     <div 
-                      key={`${table.schema}.${table.name}`}
+                      key={`tbl-card-${table.schema}.${table.name}-${tIdx}`}
                       className={`rounded-xl border overflow-hidden transition-all ${
                         theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
                       }`}
@@ -665,7 +723,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       >
                         <div className="flex items-center space-x-3">
                           <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-stone-500/20 text-stone-400 uppercase">
-                            {table.schema}
+                            {table.schema || 'public'}
                           </span>
                           <span className="font-mono font-bold text-sm text-amber-500">
                             {table.name}
@@ -683,7 +741,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         </div>
 
                         <div className="flex items-center space-x-3 text-xs font-mono text-stone-400">
-                          <span>{table.columns.length} {isFr ? 'champs' : 'cols'}</span>
+                          <span>{(table.columns || []).length} {isFr ? 'champs' : 'cols'}</span>
                           <span>&bull;</span>
                           <span>{(table.estimatedRows || 0).toLocaleString()} {isFr ? 'lignes' : 'rows'}</span>
                           {table.sizeFormatted && (
@@ -700,68 +758,68 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
                       {/* Columns Table */}
                       {!isCollapsed && (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs">
+                        <div className="overflow-x-auto w-full">
+                          <table className="w-full text-left text-xs table-fixed border-collapse">
                             <thead className={`text-[10px] uppercase font-mono font-bold border-b ${
-                              theme === 'light' ? 'bg-[#FAF8F5] text-stone-600 border-[#E2DBD0]' : 'bg-stone-900/60 text-stone-400 border-stone-800'
+                              theme === 'light' ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-slate-900/60 text-slate-400 border-slate-800'
                             }`}>
                               <tr>
-                                <th className="py-2.5 px-5">{isFr ? 'Nom du Champ' : 'Column Name'}</th>
-                                <th className="py-2.5 px-5">{isFr ? 'Type PostgreSQL Canonique' : 'PostgreSQL Canonical Type'}</th>
-                                <th className="py-2.5 px-5 text-center">{isFr ? 'Nullabilité' : 'Nullable'}</th>
-                                <th className="py-2.5 px-5">{isFr ? 'Clés & Contraintes' : 'Keys & Constraints'}</th>
-                                <th className="py-2.5 px-5">{isFr ? 'Valeur par Défaut' : 'Default Value'}</th>
+                                <th className="py-2.5 px-4 w-[25%] truncate">{isFr ? 'Nom du Champ' : 'Column Name'}</th>
+                                <th className="py-2.5 px-4 w-[26%] truncate">{isFr ? 'Type PostgreSQL Canonique' : 'PostgreSQL Canonical Type'}</th>
+                                <th className="py-2.5 px-4 w-[12%] text-center truncate">{isFr ? 'Nullabilité' : 'Nullable'}</th>
+                                <th className="py-2.5 px-4 w-[22%] truncate">{isFr ? 'Clés & Contraintes' : 'Keys & Constraints'}</th>
+                                <th className="py-2.5 px-4 w-[15%] truncate">{isFr ? 'Valeur par Défaut' : 'Default Value'}</th>
                               </tr>
                             </thead>
-                            <tbody className={`divide-y ${theme === 'light' ? 'divide-[#F0ECE4]' : 'divide-stone-800/60'}`}>
-                              {table.columns.map(col => {
-                                const canonicalType = normalizeToPostgresType(col.dataType);
+                            <tbody className={`divide-y ${theme === 'light' ? 'divide-slate-100' : 'divide-slate-800/60'}`}>
+                              {(table.columns || []).map((col, colIdx) => {
+                                const canonicalType = normalizeToPostgresType(col.dataType || 'text');
 
                                 return (
-                                  <tr key={col.name} className="hover:bg-amber-500/5 transition-colors">
-                                    <td className="py-2.5 px-5 font-mono font-bold text-stone-200">
+                                  <tr key={`col-row-${table.name}-${col.name}-${colIdx}`} className="hover:bg-blue-500/5 transition-colors">
+                                    <td className="py-2 px-4 font-mono font-bold text-slate-200 truncate" title={col.name}>
                                       {col.name}
                                     </td>
-                                    <td className="py-2.5 px-5">
-                                      <span className={`px-2 py-0.5 rounded font-mono text-[11px] font-semibold border ${
+                                    <td className="py-2 px-4 truncate">
+                                      <span className={`inline-block max-w-full truncate px-2 py-0.5 rounded font-mono text-[11px] font-semibold border ${
                                         col.isGeometry
                                           ? 'bg-emerald-950/40 text-emerald-300 border-emerald-600/40 font-bold'
                                           : canonicalType.includes('int') || canonicalType.includes('numeric')
                                           ? 'bg-sky-950/40 text-sky-300 border-sky-700/40'
-                                          : 'bg-stone-900 text-stone-300 border-stone-700'
-                                      }`}>
+                                          : 'bg-slate-800 text-slate-300 border-slate-700'
+                                      }`} title={canonicalType}>
                                         {canonicalType}
                                       </span>
                                     </td>
-                                    <td className="py-2.5 px-5 text-center font-mono text-[11px]">
+                                    <td className="py-2 px-4 text-center font-mono text-[11px]">
                                       {col.isNullable ? (
-                                        <span className="text-stone-500">NULL</span>
+                                        <span className="text-slate-500">NULL</span>
                                       ) : (
                                         <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30 text-[10px] font-bold">
                                           NOT NULL
                                         </span>
                                       )}
                                     </td>
-                                    <td className="py-2.5 px-5">
-                                      <div className="flex items-center space-x-1.5 flex-wrap">
+                                    <td className="py-2 px-4">
+                                      <div className="flex items-center space-x-1.5 flex-wrap overflow-hidden">
                                         {col.isPrimaryKey && (
-                                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 font-mono text-[10px] font-bold">
+                                          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 font-mono text-[10px] font-bold shrink-0">
                                             PK
                                           </span>
                                         )}
                                         {col.isForeignKey && col.foreignKeyTarget && (
-                                          <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono text-[10px] font-bold" title={`Links to ${col.foreignKeyTarget.table}.${col.foreignKeyTarget.column}`}>
+                                          <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono text-[10px] font-bold truncate max-w-[170px]" title={`Liaison vers ${col.foreignKeyTarget.table}.${col.foreignKeyTarget.column}`}>
                                             FK &rarr; {col.foreignKeyTarget.table}
                                           </span>
                                         )}
                                         {col.isGeometry && (
-                                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono text-[10px] font-bold">
+                                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono text-[10px] font-bold shrink-0">
                                             SRID {col.srid || 4326}
                                           </span>
                                         )}
                                       </div>
                                     </td>
-                                    <td className="py-2.5 px-5 font-mono text-[11px] text-stone-400">
+                                    <td className="py-2 px-4 font-mono text-[11px] text-slate-400 truncate" title={col.defaultValue || ''}>
                                       {col.defaultValue || '—'}
                                     </td>
                                   </tr>
@@ -781,25 +839,86 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
           {/* TAB 2: PHYSICAL DATA MODEL (MPD / ERD SCHEMATIC VIEW) */}
           {activeTab === 'mpd' && (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/30">
+              {/* Header toolbar with width controls & export */}
+              <div className={`flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl border ${
+                theme === 'light' 
+                  ? 'bg-slate-50 border-slate-200 text-slate-800' 
+                  : 'bg-slate-900/80 border-slate-800 text-slate-200'
+              }`}>
                 <div className="flex items-center space-x-3">
-                  <Network className="w-5 h-5 text-purple-400 shrink-0" />
+                  <Network className="w-5 h-5 text-blue-500 shrink-0" />
                   <div>
-                    <h3 className="text-xs font-bold text-stone-200">
+                    <h3 className="text-xs font-bold font-sans">
                       {isFr ? 'Modèle Physique de Données (MPD) Schématique' : 'Physical Data Model (ERD) Schematic'}
                     </h3>
-                    <p className="text-[11px] text-stone-400">
+                    <p className="text-[11px] text-slate-400">
                       {isFr 
-                        ? 'Vue graphique interactive des tables relationnelles, cardinalités (1:N, 1:1) et types PostgreSQL canoniques.'
-                        : 'Interactive visual layout of relational tables, foreign key arrows, cardinalities (1:N, 1:1), and canonical types.'}
+                        ? 'Vue graphique des entités relationnelles, largeurs éditables et types PostgreSQL canoniques.'
+                        : 'Visual layout of relational entities with editable card widths and canonical PostgreSQL types.'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Card Width Slider & Presets */}
+                  <div className={`flex items-center space-x-2 px-2.5 py-1 rounded-lg border text-xs ${
+                    theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-800 border-slate-700'
+                  }`}>
+                    <span className="text-[11px] font-medium text-slate-400">{isFr ? 'Largeur :' : 'Width :'}</span>
+                    <input 
+                      type="range"
+                      min={280}
+                      max={650}
+                      value={mpdCardWidth >= 900 ? 650 : mpdCardWidth}
+                      onChange={(e) => setMpdCardWidth(parseInt(e.target.value, 10))}
+                      className="w-20 cursor-pointer accent-blue-600"
+                    />
+                    <span className="font-mono text-[11px] font-bold text-blue-400 min-w-[42px]">
+                      {mpdCardWidth >= 900 ? '100%' : `${mpdCardWidth}px`}
+                    </span>
+                    <div className="flex items-center space-x-1 pl-1 border-l border-slate-700">
+                      {[
+                        { label: '280', val: 280 },
+                        { label: '360', val: 360 },
+                        { label: '480', val: 480 },
+                        { label: '100%', val: 9999 },
+                      ].map(p => (
+                        <button
+                          key={`preset-${p.label}`}
+                          onClick={() => setMpdCardWidth(p.val)}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
+                            mpdCardWidth === p.val 
+                              ? 'bg-blue-600 text-white' 
+                              : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          const overrides: Record<string, number> = {};
+                          (schema.tables || []).forEach(t => {
+                            let maxChars = t.name.length + 8;
+                            (t.columns || []).forEach(c => {
+                              const chars = (c.name || '').length + (c.dataType || '').length + 8;
+                              if (chars > maxChars) maxChars = chars;
+                            });
+                            overrides[t.name] = Math.min(Math.max(maxChars * 8.5 + 46, 280), 650);
+                          });
+                          setTableWidthOverrides(overrides);
+                        }}
+                        title={isFr ? 'Ajuster automatiquement chaque table à son contenu' : 'Auto-fit each table width to its content'}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-slate-400 hover:text-white hover:bg-slate-700/60"
+                      >
+                        Auto
+                      </button>
+                    </div>
+                  </div>
+
                   <button
                     onClick={handleDownloadMpdHtml}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>{isFr ? 'Exporter MPD (HTML)' : 'Export MPD (HTML)'}</span>
@@ -807,7 +926,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
                   <button
                     onClick={() => handlePrint('mpd')}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold"
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     <span>{isFr ? 'Imprimer MPD' : 'Print MPD'}</span>
@@ -815,86 +934,132 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </div>
               </div>
 
-              {/* In-app visual grid of Entity Cards and relationships */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {schema.tables.map(table => {
+              {/* In-app flexible non-overlapping container of Entity Cards */}
+              <div className="flex flex-wrap gap-4 items-start justify-start">
+                {(schema.tables || []).map((table, tIdx) => {
                   const isSelected = selectedMpdTable === table.name;
                   const isLinkedToSelected = selectedMpdTable && mpdHighlightedRelations.some(
                     r => (r.sourceTable === table.name && r.targetTable === selectedMpdTable) ||
                          (r.targetTable === table.name && r.sourceTable === selectedMpdTable)
                   );
 
+                  const safeForeignKeys = Array.isArray(table.foreignKeys) ? table.foreignKeys : [];
+                  const currentWidth = mpdCardWidth >= 900 
+                    ? '100%' 
+                    : `${tableWidthOverrides[table.name] || mpdCardWidth}px`;
+
                   return (
                     <div
-                      key={table.name}
-                      onClick={() => setSelectedMpdTable(isSelected ? null : table.name)}
-                      className={`rounded-xl border transition-all cursor-pointer ${
+                      key={`mpd-table-${table.schema || 'public'}.${table.name}-${tIdx}`}
+                      style={{ width: currentWidth, maxWidth: '100%', boxSizing: 'border-box' }}
+                      className={`rounded-lg border transition-all overflow-hidden flex flex-col shrink-0 ${
                         isSelected 
-                          ? 'border-purple-500 ring-2 ring-purple-500/40 shadow-lg shadow-purple-950/40 bg-[#1D1713]'
+                          ? 'border-blue-500 ring-2 ring-blue-500/40 shadow-lg shadow-blue-950/40 bg-slate-900'
                           : isLinkedToSelected
-                          ? 'border-amber-500/70 ring-1 ring-amber-500/30 bg-[#1A1411]'
+                          ? 'border-amber-500/70 ring-1 ring-amber-500/30 bg-slate-900/90'
                           : theme === 'light'
-                          ? 'bg-white border-[#E2DBD0] hover:border-amber-500/50'
-                          : 'bg-[#181310] border-stone-800 hover:border-stone-700'
+                          ? 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'
+                          : 'bg-slate-900 border-slate-800 hover:border-slate-700'
                       }`}
                     >
-                      {/* Entity Header */}
-                      <div className={`p-3 border-b flex items-center justify-between ${
+                      {/* Entity Header with individual width adjusters */}
+                      <div className={`p-2.5 border-b flex items-center justify-between gap-2 overflow-hidden ${
                         isSelected 
-                          ? 'bg-purple-950/40 border-purple-800/40' 
-                          : theme === 'light' ? 'bg-[#FDFBF8] border-[#E2DBD0]' : 'bg-[#221B16] border-stone-800'
+                          ? 'bg-blue-950/50 border-blue-800/40' 
+                          : theme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/60 border-slate-800'
                       }`}>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-stone-700/40 text-stone-400 uppercase font-bold">
-                            {table.schema}
+                        <div 
+                          onClick={() => setSelectedMpdTable(isSelected ? null : table.name)}
+                          className="flex items-center space-x-2 min-w-0 overflow-hidden flex-1 cursor-pointer"
+                        >
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300 uppercase font-bold shrink-0">
+                            {table.schema || 'public'}
                           </span>
-                          <span className="font-mono font-bold text-xs text-amber-400">
+                          <span className="font-mono font-bold text-xs text-blue-400 truncate" title={table.name}>
                             {table.name}
                           </span>
                         </div>
-                        <div className="flex items-center space-x-1.5">
+
+                        <div className="flex items-center space-x-1.5 shrink-0">
                           {table.isSpatial && (
-                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                               POSTGIS
                             </span>
                           )}
-                          <span className="text-[10px] font-mono text-stone-500">
+                          <span className="text-[10px] font-mono text-slate-400">
                             {(table.estimatedRows || 0).toLocaleString()} r.
                           </span>
+
+                          {/* Individual table width steppers (- / +) */}
+                          {mpdCardWidth < 900 && (
+                            <div className="flex items-center pl-1 space-x-0.5 border-l border-slate-700/50">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const current = tableWidthOverrides[table.name] || mpdCardWidth;
+                                  setTableWidthOverrides(prev => ({
+                                    ...prev,
+                                    [table.name]: Math.max(260, current - 40),
+                                  }));
+                                }}
+                                title={isFr ? 'Réduire la largeur' : 'Decrease width'}
+                                className="w-4 h-4 rounded flex items-center justify-center text-[10px] font-mono font-bold text-slate-400 hover:text-white hover:bg-slate-700/60 cursor-pointer"
+                              >
+                                &minus;
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const current = tableWidthOverrides[table.name] || mpdCardWidth;
+                                  setTableWidthOverrides(prev => ({
+                                    ...prev,
+                                    [table.name]: Math.min(800, current + 40),
+                                  }));
+                                }}
+                                title={isFr ? 'Augmenter la largeur' : 'Increase width'}
+                                className="w-4 h-4 rounded flex items-center justify-center text-[10px] font-mono font-bold text-slate-400 hover:text-white hover:bg-slate-700/60 cursor-pointer"
+                              >
+                                +
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Columns List */}
-                      <div className="p-2 space-y-1 max-h-64 overflow-y-auto font-mono text-[11px]">
-                        {table.columns.map(col => {
-                          const canonicalType = normalizeToPostgresType(col.dataType);
+                      {/* Columns List strictly contained */}
+                      <div className="p-2 space-y-1 max-h-64 overflow-y-auto font-mono text-[11px] w-full box-sizing: border-box;">
+                        {(table.columns || []).map((col, colIdx) => {
+                          const canonicalType = normalizeToPostgresType(col.dataType || 'text');
 
                           return (
                             <div 
-                              key={col.name}
-                              className="flex items-center justify-between px-2 py-1 rounded hover:bg-white/[0.03]"
+                              key={`mpd-col-${table.name}-${col.name}-${colIdx}`}
+                              className="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-white/[0.04] overflow-hidden"
                             >
-                              <div className="flex items-center space-x-1.5 truncate">
+                              <div className="flex items-center space-x-1.5 min-w-0 flex-1 overflow-hidden">
                                 {col.isPrimaryKey ? (
-                                  <span className="text-[9px] font-bold px-1 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                                  <span className="text-[9px] font-bold px-1 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 shrink-0">
                                     PK
                                   </span>
                                 ) : col.isForeignKey ? (
-                                  <span className="text-[9px] font-bold px-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                                  <span className="text-[9px] font-bold px-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0">
                                     FK
                                   </span>
                                 ) : (
-                                  <span className="w-4" />
+                                  <span className="w-3 shrink-0" />
                                 )}
-                                <span className={`truncate ${col.isPrimaryKey ? 'font-bold text-amber-300' : 'text-stone-300'}`}>
+                                <span 
+                                  className={`truncate flex-1 min-w-0 ${col.isPrimaryKey ? 'font-bold text-amber-300' : 'text-slate-300'}`}
+                                  title={col.name}
+                                >
                                   {col.name}
                                 </span>
                               </div>
 
-                              <div className="flex items-center space-x-1.5 shrink-0 text-[10px]">
-                                <span className="text-stone-400 truncate max-w-[120px]">{canonicalType}</span>
+                              <div className="flex items-center space-x-1.5 shrink-0 text-[10px] max-w-[50%] overflow-hidden">
+                                <span className="text-slate-400 truncate" title={canonicalType}>{canonicalType}</span>
                                 {!col.isNullable && (
-                                  <span className="text-[8px] font-bold text-rose-400 bg-rose-500/10 px-1 rounded">NN</span>
+                                  <span className="text-[8px] font-bold text-rose-400 bg-rose-500/10 px-1 rounded shrink-0">NN</span>
                                 )}
                               </div>
                             </div>
@@ -902,16 +1067,16 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         })}
                       </div>
 
-                      {/* Outgoing relationships summary */}
-                      {table.foreignKeys.length > 0 && (
-                        <div className="px-3 py-2 border-t border-stone-800/60 bg-black/20 text-[10px] font-mono text-stone-400 space-y-0.5">
-                          {table.foreignKeys.map(fk => (
-                            <div key={fk.id} className="flex items-center space-x-1 text-purple-300">
+                      {/* Outgoing relationships summary strictly contained */}
+                      {safeForeignKeys.length > 0 && (
+                        <div className="px-3 py-2 border-t border-slate-800 bg-black/30 text-[10px] font-mono text-slate-400 space-y-0.5 overflow-hidden">
+                          {safeForeignKeys.map((fk, fkIdx) => (
+                            <div key={`mpd-fk-${fk.id || 'fk'}-${fk.sourceColumn}-${fk.targetTable}-${fkIdx}`} className="flex items-center space-x-1 text-purple-300 truncate">
                               <span>&bull;</span>
-                              <span className="font-bold">{fk.sourceColumn}</span>
+                              <span className="font-bold truncate max-w-[100px]" title={fk.sourceColumn}>{fk.sourceColumn}</span>
                               <span>&rarr;</span>
-                              <span className="text-amber-400 underline">{fk.targetTable}.{fk.targetColumn}</span>
-                              <span className="text-stone-400 font-bold">({fk.cardinality || '1:N'})</span>
+                              <span className="text-amber-400 underline truncate max-w-[120px]" title={`${fk.targetTable}.${fk.targetColumn}`}>{fk.targetTable}.{fk.targetColumn}</span>
+                              <span className="text-slate-400 font-bold shrink-0">({fk.cardinality || '1:N'})</span>
                             </div>
                           ))}
                         </div>
@@ -942,8 +1107,8 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
                   {mpdHighlightedRelations.length > 0 ? (
                     <div className="space-y-1.5">
-                      {mpdHighlightedRelations.map(rel => (
-                        <div key={rel.id} className="text-xs font-mono p-2 rounded bg-black/30 border border-purple-500/20 flex items-center justify-between">
+                      {mpdHighlightedRelations.map((rel, rIdx) => (
+                        <div key={`drawer-rel-${rel.id || ''}-${rel.sourceTable}-${rel.sourceColumn}-${rIdx}`} className="text-xs font-mono p-2 rounded bg-black/30 border border-purple-500/20 flex items-center justify-between">
                           <div>
                             <span className="text-amber-400 font-bold">{rel.sourceTable}.{rel.sourceColumn}</span>
                             <span className="mx-2 text-stone-500">&mdash;[{rel.sourceCardinality || '0..n'} &rarr; {rel.cardinality || '1:N'} &rarr; {rel.targetCardinality || '1..1'}]&rarr;</span>
@@ -974,11 +1139,11 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   { id: 'sql_query' as const, label: isFr ? '1. Requête SQL d\'extraction pgAdmin (1-Clic)' : '1. SQL Extractor Query for pgAdmin' },
                   { id: 'ddl_paste' as const, label: isFr ? '2. Coller un script DDL (CREATE TABLE)' : '2. Paste DDL Script (CREATE TABLE)' },
                   { id: 'samples' as const, label: isFr ? '3. Bases de Données d\'Exemple SIG' : '3. Sample GIS Databases' },
-                  { id: 'workspace' as const, label: isFr ? `4. Couches Actives de l'Atelier (${datasets.length})` : `4. Active Workspace Layers (${datasets.length})` },
+                  { id: 'workspace' as const, label: isFr ? `4. Couches Actives de l'Atelier (${(datasets || []).length})` : `4. Active Workspace Layers (${(datasets || []).length})` },
                   { id: 'python' as const, label: isFr ? '5. Script Python d\'Inspection' : '5. Python Inspector Script' },
                 ].map(tab => (
                   <button
-                    key={tab.id}
+                    key={`tab-btn-${tab.id}`}
                     onClick={() => setSourceMode(tab.id)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                       sourceMode === tab.id
@@ -1147,15 +1312,15 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       ? 'Générez une architecture PostgreSQL PostGIS avec types canoniques reflétant directement les couches géospatiales actives :'
                       : 'Generate a PostgreSQL PostGIS schema with canonical types directly reflecting active workspace layers:'}
                   </p>
-                  {datasets.length > 0 ? (
+                  {(datasets && datasets.length > 0) ? (
                     <div className="space-y-3">
                       <div className="p-3 rounded-xl bg-stone-900 border border-stone-800 space-y-1">
                         <div className="text-xs font-bold text-stone-200">
                           {datasets.length} {isFr ? 'couches spatiales disponibles :' : 'spatial layers available:'}
                         </div>
                         <ul className="text-xs font-mono text-stone-400 list-disc ml-5 space-y-0.5">
-                          {datasets.map(d => (
-                            <li key={d.id}>
+                          {datasets.map((d, dIdx) => (
+                            <li key={`ws-layer-${d.id || d.name}-${dIdx}`}>
                               {d.name} ({d.featureCount} entités, {d.geometryType}, {d.detectedCRS?.code || 'EPSG:4326'})
                             </li>
                           ))}
@@ -1285,11 +1450,11 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs text-stone-400">
                   <span>{isFr ? 'Aperçu du code source HTML du Dictionnaire :' : 'HTML Source preview (Data Dictionary):'}</span>
-                  <span className="font-mono text-[11px] text-stone-500">{(standaloneDataDictHtml.length / 1024).toFixed(1)} KB</span>
+                  <span className="font-mono text-[11px] text-stone-500">{((standaloneDataDictHtml || '').length / 1024).toFixed(1)} KB</span>
                 </div>
                 <textarea
                   readOnly
-                  value={standaloneDataDictHtml.slice(0, 4000) + '\n\n/* ... (contenu complet généré prêt au téléchargement) ... */'}
+                  value={(standaloneDataDictHtml || '').slice(0, 4000) + '\n\n/* ... (contenu complet généré prêt au téléchargement) ... */'}
                   className="w-full h-56 p-4 bg-[#0D0A08] border border-stone-800 rounded-xl text-xs font-mono text-stone-400 outline-none"
                 />
               </div>

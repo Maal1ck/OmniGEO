@@ -683,33 +683,39 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       />
 
       {/* Workspace Header Toolbar */}
-      <div className="relative z-40 px-6 py-3.5 border-b border-stone-800/80 bg-[#181411]/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
+      <div className={`relative z-40 px-6 py-3.5 border-b backdrop-blur-md flex flex-wrap items-center justify-between gap-4 ${
+        theme === 'light' ? 'border-[#E2DBD0] bg-white/90' : 'border-stone-800/80 bg-[#181411]/90'
+      }`}>
         {/* Left: Summary Metrics */}
         <div className="flex items-center space-x-4">
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="text-sm font-display font-bold text-[#FAF6F0] tracking-tight flex items-center space-x-2">
-                <Database className="w-4 h-4 text-amber-400" />
+              <h1 className={`text-sm font-display font-bold tracking-tight flex items-center space-x-2 ${
+                theme === 'light' ? 'text-stone-900' : 'text-[#FAF6F0]'
+              }`}>
+                <Database className="w-4 h-4 text-amber-500" />
                 <span>{t.workspace.queueTitle}</span>
               </h1>
-              <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md bg-amber-950/70 text-amber-300 border border-amber-700/50">
+              <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-md border ${
+                theme === 'light' ? 'bg-[#FEF3C7] text-amber-900 border-amber-300' : 'bg-amber-950/70 text-amber-300 border border-amber-700/50'
+              }`}>
                 {datasets.length} {t.workspace.filesCount}
               </span>
             </div>
-            <p className="text-xs text-stone-400 mt-0.5 font-mono">
+            <p className={`text-xs mt-0.5 font-mono ${theme === 'light' ? 'text-stone-600' : 'text-stone-400'}`}>
               <span>{totalFeatures.toLocaleString()} {t.workspace.totalFeatures}</span>
-              <span className="mx-1.5 text-stone-600">·</span>
+              <span className={`mx-1.5 ${theme === 'light' ? 'text-stone-400' : 'text-stone-600'}`}>·</span>
               <span>{(totalSizeBytes / (1024 * 1024)).toFixed(2)} MB {t.workspace.totalSize}</span>
               {warningCount > 0 && (
                 <>
-                  <span className="mx-1.5 text-stone-600">·</span>
-                  <span className="text-amber-400 font-semibold">{warningCount} {t.workspace.warningsCount}</span>
+                  <span className={`mx-1.5 ${theme === 'light' ? 'text-stone-400' : 'text-stone-600'}`}>·</span>
+                  <span className={`${theme === 'light' ? 'text-amber-700' : 'text-amber-400'} font-semibold`}>{warningCount} {t.workspace.warningsCount}</span>
                 </>
               )}
               {errorCount > 0 && (
                 <>
-                  <span className="mx-1.5 text-stone-600">·</span>
-                  <span className="text-rose-400 font-semibold">{errorCount} {t.workspace.invalidCount}</span>
+                  <span className={`mx-1.5 ${theme === 'light' ? 'text-stone-400' : 'text-stone-600'}`}>·</span>
+                  <span className={`${theme === 'light' ? 'text-rose-700' : 'text-rose-400'} font-semibold`}>{errorCount} {t.workspace.invalidCount}</span>
                 </>
               )}
             </p>
@@ -721,46 +727,12 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           {warningCount > 0 && onOpenSpatialDoctor && (
             <button
               onClick={onOpenSpatialDoctor}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-950/70 hover:bg-amber-900/70 text-amber-300 border border-amber-600/60 transition-all shadow-sm"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-950/70 hover:bg-amber-900/70 text-amber-300 border border-amber-600/60 transition-all shadow-sm cursor-pointer"
             >
               <Stethoscope className="w-3.5 h-3.5 text-amber-400" />
               <span>{t.workspace.fixWarnings} ({warningCount})</span>
             </button>
           )}
-
-          {/* 1. Manual File Picker Button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isProcessingFiles}
-            title="Select single or multiple GIS files manually"
-            className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold border transition-all shadow-sm active:scale-95 disabled:opacity-50 ${
-              theme === 'light'
-                ? 'bg-white hover:bg-[#F5EFE6] text-stone-900 border-[#D6CEBE]'
-                : 'bg-[#241E19] hover:bg-[#2F2620] text-stone-200 hover:text-white border-stone-700/80'
-            }`}
-          >
-            {isProcessingFiles ? (
-              <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
-            ) : (
-              <FileCode className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-amber-600' : 'text-amber-400'}`} />
-            )}
-            <span>{t.workspace.selectFiles}</span>
-          </button>
-
-          {/* 2. Folder & Subfolder Directory Ingestion Button */}
-          <button
-            onClick={() => folderInputRef.current?.click()}
-            disabled={isProcessingFiles}
-            title="Select a whole folder to ingest geospatial files"
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 shadow-md shadow-amber-950/20 transition-all active:scale-95 disabled:opacity-50"
-          >
-            {isProcessingFiles ? (
-              <Loader2 className="w-3.5 h-3.5 text-stone-950 animate-spin" />
-            ) : (
-              <FolderTree className="w-3.5 h-3.5 text-stone-950" />
-            )}
-            <span>{isProcessingFiles ? t.common.loading : t.workspace.selectFolder}</span>
-          </button>
 
           {/* Subfolder Mode Toggle Button in Toolbar */}
           <button
@@ -1085,43 +1057,77 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           className={`border-2 border-dashed rounded-2xl p-5 transition-all text-center ${
             isDragging
               ? 'border-amber-400 bg-amber-950/40 glow-amber'
-              : 'border-stone-800/90 hover:border-amber-600/50 bg-[#191512]/60 hover:bg-[#1E1915]/70'
+              : theme === 'light'
+                ? 'border-[#D6CEBE] hover:border-amber-600 bg-white/70 hover:bg-[#FDFBF7]'
+                : 'border-stone-800/90 hover:border-amber-600/50 bg-[#191512]/60 hover:bg-[#1E1915]/70'
           }`}
         >
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-5xl mx-auto">
             {/* Left: Dropzone illustration & description */}
-            <div className="flex items-center space-x-3.5 text-left">
-              <div className="p-3 bg-amber-950/70 rounded-xl text-amber-400 border border-amber-700/50 shadow-inner shrink-0">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center space-x-3.5 text-left cursor-pointer group"
+              title={t.workspace.selectFiles}
+            >
+              <div className={`p-3 rounded-xl border shadow-inner shrink-0 transition-transform group-hover:scale-105 ${
+                theme === 'light'
+                  ? 'bg-[#FEF3C7] text-amber-800 border-amber-300'
+                  : 'bg-amber-950/70 text-amber-400 border-amber-700/50'
+              }`}>
                 <UploadCloud className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-sm font-display font-semibold text-[#FAF6F0]">
+                <p className={`text-sm font-display font-semibold transition-colors ${
+                  theme === 'light' ? 'text-stone-900 group-hover:text-amber-800' : 'text-[#FAF6F0] group-hover:text-amber-300'
+                }`}>
                   {t.workspace.dropzoneTitle}
                 </p>
-                <p className="text-xs text-stone-400 mt-0.5">
+                <p className={`text-xs mt-0.5 ${theme === 'light' ? 'text-stone-600' : 'text-stone-400'}`}>
                   {t.workspace.dropzoneSubtitle}
                 </p>
               </div>
             </div>
 
-            {/* Center: Direct Manual File & Folder Ingestion Buttons */}
+            {/* Center: Direct Manual File & Folder Ingestion Buttons (Sole Ingestion Action Center) */}
             <div className="flex items-center space-x-2.5 shrink-0">
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-display font-bold bg-[#2A221C] hover:bg-amber-600 text-stone-200 hover:text-stone-950 border border-stone-700/80 transition-all shadow-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+                disabled={isProcessingFiles}
+                title={t.workspace.selectFiles}
+                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-display font-bold border transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer ${
+                  theme === 'light'
+                    ? 'bg-white hover:bg-[#F5EFE6] text-stone-900 border-[#D6CEBE]'
+                    : 'bg-[#2A221C] hover:bg-[#342A23] text-stone-200 hover:text-white border-stone-700/80'
+                }`}
               >
-                <FileCode className="w-3.5 h-3.5 text-amber-400" />
+                {isProcessingFiles ? (
+                  <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+                ) : (
+                  <FileCode className="w-3.5 h-3.5 text-amber-400" />
+                )}
                 <span>{t.workspace.selectFiles}</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => folderInputRef.current?.click()}
-                className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 shadow-md shadow-amber-950/40 transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  folderInputRef.current?.click();
+                }}
+                disabled={isProcessingFiles}
+                title={t.workspace.selectFolder}
+                className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 shadow-md shadow-amber-950/40 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
               >
-                <FolderTree className="w-3.5 h-3.5 text-stone-950" />
-                <span>{t.workspace.selectFolder}</span>
+                {isProcessingFiles ? (
+                  <Loader2 className="w-3.5 h-3.5 text-stone-950 animate-spin" />
+                ) : (
+                  <FolderTree className="w-3.5 h-3.5 text-stone-950" />
+                )}
+                <span>{isProcessingFiles ? t.common.loading : t.workspace.selectFolder}</span>
               </button>
 
               <button
@@ -1559,29 +1565,17 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             </table>
           ) : (
             <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-stone-500">
-              <Database className="w-10 h-10 mb-2 text-stone-600" />
-              <p className="text-sm font-display font-semibold text-stone-300">No geospatial datasets in workspace</p>
-              <p className="text-xs text-stone-400 mt-1 max-w-sm">
-                Select individual files or an entire folder with subfolders to begin batch transformations.
-              </p>
-              <div className="mt-4 flex items-center space-x-2.5">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-display font-bold bg-[#2A221C] hover:bg-amber-600 text-stone-200 hover:text-stone-950 border border-stone-700/80 transition-all shadow-sm"
-                >
-                  <FileCode className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{t.workspace.selectFiles}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => folderInputRef.current?.click()}
-                  className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-display font-bold bg-amber-600 hover:bg-amber-500 text-stone-950 shadow-md shadow-amber-950/40 transition-all"
-                >
-                  <FolderTree className="w-3.5 h-3.5 text-stone-950" />
-                  <span>{t.workspace.selectFolder}</span>
-                </button>
+              <div className={`p-3 rounded-2xl mb-3 ${theme === 'light' ? 'bg-[#EAE4DA] text-stone-600' : 'bg-stone-900/80 text-stone-500'}`}>
+                <Database className="w-8 h-8" />
               </div>
+              <p className={`text-sm font-display font-semibold ${theme === 'light' ? 'text-stone-800' : 'text-stone-300'}`}>
+                {lang === 'fr' ? 'Aucune couche dans l\'espace de travail' : 'No geospatial datasets in workspace'}
+              </p>
+              <p className={`text-xs mt-1 max-w-sm ${theme === 'light' ? 'text-stone-600' : 'text-stone-400'}`}>
+                {lang === 'fr'
+                  ? 'Glissez-déposez vos fichiers ou dossiers dans la zone ci-dessus pour lancer l\'ingestion.'
+                  : 'Drag & drop files or folders into the ingestion area above to begin processing.'}
+              </p>
             </div>
           )}
         </div>

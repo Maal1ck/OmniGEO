@@ -201,7 +201,7 @@ WITH tables_metadata AS (
     AND t.table_type = 'BASE TABLE'
 ),
 fk_constraints AS (
-  SELECT
+  SELECT DISTINCT
     tc.constraint_name,
     tc.table_schema AS source_schema,
     tc.table_name AS source_table,
@@ -305,7 +305,7 @@ SELECT json_build_object(
   'relationships', (
     SELECT json_agg(
       json_build_object(
-        'id', 'rel_' || fk.source_table || '_' || fk.source_column,
+        'id', 'rel_' || fk.constraint_name || '_' || fk.source_table || '_' || fk.source_column || '_' || fk.target_table,
         'constraintName', fk.constraint_name,
         'sourceTable', fk.source_table,
         'sourceColumn', fk.source_column,
@@ -374,21 +374,21 @@ export function computeDatabaseSummary(
   let totalSpatialTables = 0;
   const dataTypesDistribution: Record<string, number> = {};
 
-  for (const t of tables) {
+  for (const t of (tables || [])) {
     totalRecords += t.estimatedRows || 0;
     if (t.isSpatial) totalSpatialTables++;
-    for (const c of t.columns) {
+    for (const c of (t.columns || [])) {
       totalColumns++;
-      const typeCategory = categorizeDataType(c.dataType);
+      const typeCategory = categorizeDataType(c.dataType || 'text');
       dataTypesDistribution[typeCategory] = (dataTypesDistribution[typeCategory] || 0) + 1;
     }
   }
 
   return {
-    totalTables: tables.length,
+    totalTables: (tables || []).length,
     totalRecords,
     totalColumns,
-    totalRelationships: relationships.length,
+    totalRelationships: (relationships || []).length,
     totalSpatialTables,
     dataTypesDistribution,
   };
@@ -1057,26 +1057,26 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
   };
 
   // Tables catalog rows
-  const tablesHtml = schema.tables.map(table => {
-    const columnsHtml = table.columns.map(col => {
-      const canonicalType = normalizeToPostgresType(col.dataType);
+  const tablesHtml = (schema.tables || []).map(table => {
+    const columnsHtml = (table.columns || []).map(col => {
+      const canonicalType = normalizeToPostgresType(col.dataType || 'text');
       const pkBadge = col.isPrimaryKey ? `<span class="badge badge-pk">PK</span>` : '';
       const fkBadge = col.isForeignKey && col.foreignKeyTarget 
-        ? `<span class="badge badge-fk" title="Lien vers ${col.foreignKeyTarget.table}.${col.foreignKeyTarget.column}">FK &rarr; ${col.foreignKeyTarget.table}</span>` 
+        ? `<span class="badge badge-fk" title="Liaison vers ${escapeHtml(col.foreignKeyTarget.table)}.${escapeHtml(col.foreignKeyTarget.column)}">FK &rarr; ${escapeHtml(col.foreignKeyTarget.table)}</span>` 
         : '';
       const geomBadge = col.isGeometry 
-        ? `<span class="badge badge-geom">${col.geometryType || 'GEOMETRY'} (${col.srid || 4326})</span>` 
+        ? `<span class="badge badge-geom" title="PostGIS Geometry">${escapeHtml(col.geometryType || 'GEOMETRY')}${col.srid ? ` (${col.srid})` : ''}</span>` 
         : '';
 
       const nullBadge = col.isNullable 
-        ? `<span class="text-muted">NULL</span>` 
-        : `<span class="badge badge-notnull">NOT NULL</span>`;
+        ? `<span class="nullable-tag tag-null">NULL</span>` 
+        : `<span class="nullable-tag tag-notnull">NOT NULL</span>`;
 
       return `
         <tr class="col-row">
-          <td class="col-name font-mono font-bold">${escapeHtml(col.name)}</td>
-          <td>
-            <span class="type-pill type-${categorizeDataType(canonicalType).replace(/[^a-zA-Z]/g, '').toLowerCase()}">${escapeHtml(canonicalType)}</span>
+          <td class="col-name font-mono font-bold" title="${escapeHtml(col.name)}">${escapeHtml(col.name)}</td>
+          <td class="col-type-cell" title="${escapeHtml(canonicalType)}">
+            <span class="type-badge font-mono">${escapeHtml(canonicalType)}</span>
           </td>
           <td class="text-center">${nullBadge}</td>
           <td>
@@ -1086,36 +1086,37 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
               ${geomBadge}
             </div>
           </td>
-          <td class="col-default font-mono">${col.defaultValue ? escapeHtml(col.defaultValue) : '&mdash;'}</td>
-          <td class="col-comment text-muted">${col.comment ? escapeHtml(col.comment) : ''}</td>
+          <td class="col-default font-mono" title="${col.defaultValue ? escapeHtml(col.defaultValue) : ''}">${col.defaultValue ? escapeHtml(col.defaultValue) : '<span class="text-subtle">&mdash;</span>'}</td>
+          <td class="col-comment" title="${col.comment ? escapeHtml(col.comment) : ''}">${col.comment ? escapeHtml(col.comment) : '<span class="text-subtle">&mdash;</span>'}</td>
         </tr>
       `;
     }).join('\n');
 
     return `
-      <section class="table-card" id="tbl-${table.name}">
+      <section class="table-card" id="tbl-${escapeHtml(table.name)}">
         <div class="table-card-header">
           <div class="table-title-group">
-            <span class="schema-badge">${escapeHtml(table.schema)}</span>
-            <h3 class="table-name font-mono">${escapeHtml(table.name)}</h3>
-            ${table.isSpatial ? `<span class="badge badge-spatial">${i18n.spatialBadge}</span>` : ''}
+            <span class="schema-tag font-mono">${escapeHtml(table.schema || 'public')}</span>
+            <h3 class="table-name font-mono" title="${escapeHtml(table.name)}">${escapeHtml(table.name)}</h3>
+            ${table.isSpatial ? `<span class="badge badge-postgis">${i18n.spatialBadge}</span>` : ''}
           </div>
-          <div class="table-meta-pills font-mono">
-            <span><strong>${table.columns.length}</strong> ${i18n.fieldsWord}</span>
+          <div class="table-meta-row font-mono">
+            <span><strong>${(table.columns || []).length}</strong> ${i18n.fieldsWord}</span>
+            <span class="meta-sep">&bull;</span>
             <span><strong>${(table.estimatedRows || 0).toLocaleString()}</strong> ${i18n.recordsWord}</span>
-            ${table.sizeFormatted ? `<span>${escapeHtml(table.sizeFormatted)}</span>` : ''}
+            ${table.sizeFormatted ? `<span class="meta-sep">&bull;</span><span>${escapeHtml(table.sizeFormatted)}</span>` : ''}
           </div>
         </div>
         ${table.comment ? `<p class="table-description">${escapeHtml(table.comment)}</p>` : ''}
-        <div class="table-responsive">
+        <div class="table-wrap">
           <table class="data-table">
             <thead>
               <tr>
-                <th style="width: 25%">${i18n.thColName}</th>
-                <th style="width: 23%">${i18n.thColType}</th>
+                <th style="width: 24%">${i18n.thColName}</th>
+                <th style="width: 25%">${i18n.thColType}</th>
                 <th style="width: 12%" class="text-center">${i18n.thNullable}</th>
                 <th style="width: 17%">${i18n.thKeys}</th>
-                <th style="width: 13%">${i18n.thDefault}</th>
+                <th style="width: 12%">${i18n.thDefault}</th>
                 <th style="width: 10%">${i18n.thDesc}</th>
               </tr>
             </thead>
@@ -1129,22 +1130,26 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
   }).join('\n');
 
   // Relationships table
-  const relsHtml = schema.relationships.length > 0 ? schema.relationships.map(rel => `
+  const relsHtml = (schema.relationships && schema.relationships.length > 0) ? schema.relationships.map(rel => `
     <tr>
-      <td class="font-mono text-muted">${escapeHtml(rel.constraintName)}</td>
-      <td class="font-mono font-bold">${escapeHtml(rel.sourceTable)}.<span class="text-amber">${escapeHtml(rel.sourceColumn)}</span></td>
-      <td class="text-center">
-        <span class="badge badge-rel">${rel.sourceCardinality || '0..n'} &rarr; ${rel.cardinality || '1:N'} &rarr; ${rel.targetCardinality || '1..1'}</span>
+      <td class="font-mono text-muted text-truncate" title="${escapeHtml(rel.constraintName)}">${escapeHtml(rel.constraintName)}</td>
+      <td class="font-mono font-bold text-truncate" title="${escapeHtml(rel.sourceTable)}.${escapeHtml(rel.sourceColumn)}">
+        ${escapeHtml(rel.sourceTable)}.<span class="text-accent">${escapeHtml(rel.sourceColumn)}</span>
       </td>
-      <td class="font-mono font-bold">${escapeHtml(rel.targetTable)}.<span class="text-emerald">${escapeHtml(rel.targetColumn)}</span></td>
+      <td class="text-center">
+        <span class="cardinality-chip font-mono">${rel.sourceCardinality || '0..n'} &rarr; ${rel.cardinality || '1:N'} &rarr; ${rel.targetCardinality || '1..1'}</span>
+      </td>
+      <td class="font-mono font-bold text-truncate" title="${escapeHtml(rel.targetTable)}.${escapeHtml(rel.targetColumn)}">
+        ${escapeHtml(rel.targetTable)}.<span class="text-success">${escapeHtml(rel.targetColumn)}</span>
+      </td>
       <td class="font-mono text-muted">${rel.deleteRule ? `ON DELETE ${escapeHtml(rel.deleteRule)}` : 'CASCADE'}</td>
     </tr>
-  `).join('\n') : `<tr><td colspan="5" class="text-center text-muted">${i18n.noRels}</td></tr>`;
+  `).join('\n') : `<tr><td colspan="5" class="text-center text-muted" style="padding: 24px;">${i18n.noRels}</td></tr>`;
 
   // Type breakdown cards
-  const typeDistributionHtml = Object.entries(schema.summary.dataTypesDistribution).map(([category, count]) => `
-    <div class="dist-pill">
-      <span class="dist-name">${escapeHtml(category)}</span>
+  const typeDistributionHtml = Object.entries(schema.summary?.dataTypesDistribution || {}).map(([category, count]) => `
+    <div class="dist-item">
+      <span class="dist-name font-mono">${escapeHtml(category)}</span>
       <span class="dist-count font-mono font-bold">${count}</span>
     </div>
   `).join('\n');
@@ -1155,23 +1160,29 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #FAF8F5;
+      --bg: #F8FAFC;
       --card-bg: #FFFFFF;
-      --text: #1C1917;
-      --text-muted: #78716C;
-      --border: #E2DBD0;
-      --primary: #92400E;
-      --primary-light: #FEF3C7;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --text-subtle: #94A3B8;
+      --border: #E2E8F0;
+      --border-dark: #CBD5E1;
+      --primary: #1E293B;
       --accent: #2563EB;
-      --accent-light: #EFF6FF;
+      --accent-subtle: #EFF6FF;
       --success: #059669;
-      --success-light: #ECFDF5;
+      --success-subtle: #ECFDF5;
+      --warning: #D97706;
+      --warning-subtle: #FFFBEB;
       --purple: #7C3AED;
-      --purple-light: #F5F3FF;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --purple-subtle: #F5F3FF;
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1439,46 +1450,72 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     }
 
     /* Badges */
+    /* Badges */
+    .badges-row { display: flex; gap: 4px; align-items: center; overflow: hidden; }
     .badge {
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 3px;
+      display: inline-block;
+      line-height: 1.2;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .badge-pk { background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D; }
+    .badge-fk { background: #EDE9FE; color: #6D28D9; border: 1px solid #C4B5FD; }
+    .badge-geom { background: #ECFDF5; color: #047857; border: 1px solid #6EE7B7; }
+    .badge-postgis { background: #047857; color: #FFFFFF; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
+    
+    .type-badge {
+      display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 11px;
+      color: #1E293B;
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
       padding: 2px 6px;
       border-radius: 4px;
-      display: inline-block;
-      text-transform: uppercase;
     }
-    .badge-pk { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
-    .badge-fk { background: #EFF6FF; color: #1E40AF; border: 1px solid #DBEAFE; }
-    .badge-geom { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
-    .badge-spatial { background: #065F46; color: #FFFFFF; font-size: 9px; }
-    .badge-notnull { background: #FEE2E2; color: #991B1B; font-size: 9px; }
-    .badge-rel { background: #F3E8FF; color: #6B21A8; }
 
-    .badges-row { display: flex; gap: 4px; flex-wrap: wrap; }
-
-    .type-pill {
+    .nullable-tag {
       font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 6px;
-      background: #F5F5F4;
-      color: #292524;
-      border: 1px solid #E7E5E4;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 3px;
       display: inline-block;
     }
-    .type-spatialpostgis { background: #ECFDF5; color: #047857; border-color: #A7F3D0; font-weight: 700; }
-    .type-numeric { color: #0369A1; background: #F0F9FF; border-color: #BAE6FD; }
-    .type-textstring { color: #4338CA; background: #EEF2FF; border-color: #C7D2FE; }
-    .type-temporaldatetime { color: #B45309; background: #FFFBEB; border-color: #FDE68A; }
+    .tag-null { color: var(--text-subtle); background: transparent; }
+    .tag-notnull { color: #DC2626; background: #FEF2F2; border: 1px solid #FCA5A5; }
+
+    .cardinality-chip {
+      display: inline-block;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: var(--text);
+    }
 
     .font-mono { font-family: var(--font-mono); }
     .font-bold { font-weight: 700; }
     .text-center { text-align: center; }
     .text-muted { color: var(--text-muted); }
-    .text-amber { color: #B45309; }
-    .text-emerald { color: #059669; }
+    .text-subtle { color: var(--text-subtle); }
+    .text-accent { color: var(--accent); }
+    .text-success { color: var(--success); }
+    .text-truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     /* Section Headers */
     .section-header {
@@ -1632,8 +1669,10 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
         let hasMatchingCol = false;
 
         rows.forEach(r => {
-          const colName = r.querySelector('.col-name').textContent.toLowerCase();
-          const colType = r.querySelector('.type-pill').textContent.toLowerCase();
+          const colNameEl = r.querySelector('.col-name');
+          const colTypeEl = r.querySelector('.type-badge') || r.querySelector('.type-pill');
+          const colName = colNameEl ? colNameEl.textContent.toLowerCase() : '';
+          const colType = colTypeEl ? colTypeEl.textContent.toLowerCase() : '';
           if (colName.includes(q) || colType.includes(q)) {
             r.style.display = '';
             hasMatchingCol = true;
@@ -1671,34 +1710,53 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
     : `Physical Data Model (ERD) - PostgreSQL ${schema.databaseName}`;
   const generatedTimeStr = new Date(schema.generatedAt).toUTCString();
 
-  // Prepare table layout positions
-  const tablesJson = JSON.stringify(schema.tables.map((t, idx) => ({
-    name: t.name,
-    schema: t.schema,
-    isSpatial: t.isSpatial,
-    estimatedRows: t.estimatedRows,
-    columns: t.columns.map(c => ({
-      name: c.name,
-      dataType: normalizeToPostgresType(c.dataType),
-      isPrimaryKey: c.isPrimaryKey,
-      isForeignKey: c.isForeignKey,
-      foreignKeyTarget: c.foreignKeyTarget,
-      isNullable: c.isNullable,
-      isGeometry: c.isGeometry,
-      srid: c.srid,
-    })),
-    // Compute initial grid position
-    x: 40 + (idx % 3) * 380,
-    y: 40 + Math.floor(idx / 3) * 360,
-  })));
+  // Compute collision-free initial layout positions
+  const rawTables = schema.tables || [];
+  const defaultCardWidth = 340;
+  const colGap = 130;
+  const rowGap = 50;
+  const numCols = Math.min(Math.max(Math.ceil(Math.sqrt(rawTables.length * 1.5)), 2), 4);
+  const colHeights = new Array(numCols).fill(40);
 
-  const relsJson = JSON.stringify(schema.relationships.map(r => ({
-    id: r.id,
-    constraintName: r.constraintName,
-    sourceTable: r.sourceTable,
-    sourceColumn: r.sourceColumn,
-    targetTable: r.targetTable,
-    targetColumn: r.targetColumn,
+  const tablesJson = JSON.stringify(rawTables.map((t, idx) => {
+    let minCol = 0;
+    for (let c = 1; c < numCols; c++) {
+      if (colHeights[c] < colHeights[minCol]) minCol = c;
+    }
+    const cols = t.columns || [];
+    const estHeight = 46 + (cols.length * 28) + 20;
+    const x = 50 + minCol * (defaultCardWidth + colGap);
+    const y = colHeights[minCol];
+    colHeights[minCol] += estHeight + rowGap;
+
+    return {
+      name: t.name || `table_${idx}`,
+      schema: t.schema || 'public',
+      isSpatial: !!t.isSpatial,
+      estimatedRows: t.estimatedRows || 0,
+      width: defaultCardWidth,
+      columns: cols.map(c => ({
+        name: c.name || 'unnamed_col',
+        dataType: normalizeToPostgresType(c.dataType || 'text'),
+        isPrimaryKey: !!c.isPrimaryKey,
+        isForeignKey: !!c.isForeignKey,
+        foreignKeyTarget: c.foreignKeyTarget,
+        isNullable: c.isNullable !== false,
+        isGeometry: !!c.isGeometry,
+        srid: c.srid,
+      })),
+      x,
+      y,
+    };
+  }));
+
+  const relsJson = JSON.stringify((schema.relationships || []).map((r, rIdx) => ({
+    id: r.id ? `${r.id}_${rIdx}` : `rel_${r.sourceTable}_${r.sourceColumn}_${rIdx}`,
+    constraintName: r.constraintName || `fk_${r.sourceTable}_${r.sourceColumn}_${rIdx}`,
+    sourceTable: r.sourceTable || '',
+    sourceColumn: r.sourceColumn || '',
+    targetTable: r.targetTable || '',
+    targetColumn: r.targetColumn || '',
     cardinality: r.cardinality || '1:N',
     sourceCardinality: r.sourceCardinality || '0..n',
     targetCardinality: r.targetCardinality || '1..1',
@@ -1710,39 +1768,42 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #14100D;
-      --board-bg: #0D0A08;
-      --card-bg: #1B1612;
-      --card-border: #3A2F27;
-      --header-bg: #261F1A;
-      --text: #F5F0EB;
-      --text-muted: #A89F95;
-      --accent: #F59E0B;
+      --bg: #090D16;
+      --board-bg: #0B1120;
+      --card-bg: #111827;
+      --card-border: #1F2937;
+      --header-bg: #1A2234;
+      --text: #F3F4F6;
+      --text-muted: #9CA3AF;
+      --accent: #3B82F6;
       --pk-color: #F59E0B;
       --fk-color: #A855F7;
       --geom-color: #10B981;
-      --line-color: #D97706;
-      --grid-dot: #241D17;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --line-color: #3B82F6;
+      --grid-dot: #1E293B;
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
     body.light-theme {
-      --bg: #FAF8F5;
-      --board-bg: #F3EFE9;
+      --bg: #F8FAFC;
+      --board-bg: #F1F5F9;
       --card-bg: #FFFFFF;
-      --card-border: #DED6CB;
-      --header-bg: #F5EFE6;
-      --text: #1C1917;
-      --text-muted: #78716C;
-      --accent: #B45309;
-      --pk-color: #B45309;
-      --fk-color: #7E22CE;
-      --geom-color: #047857;
-      --line-color: #B45309;
-      --grid-dot: #E5DDD0;
+      --card-border: #CBD5E1;
+      --header-bg: #F8FAFC;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --accent: #2563EB;
+      --pk-color: #D97706;
+      --fk-color: #7C3AED;
+      --geom-color: #059669;
+      --line-color: #2563EB;
+      --grid-dot: #CBD5E1;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1754,7 +1815,10 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       background: var(--bg);
       color: var(--text);
       user-select: none;
+      -webkit-font-smoothing: antialiased;
     }
+
+    .font-mono { font-family: var(--font-mono); }
 
     /* Top navigation bar */
     header.mpd-navbar {
@@ -1764,7 +1828,7 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
+      padding: 0 18px;
       z-index: 50;
       position: relative;
     }
@@ -1772,49 +1836,102 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
     .brand-title-group {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      min-width: 0;
     }
     .badge-mpd {
-      background: #78350F;
-      color: #FDE68A;
+      background: var(--header-bg);
+      color: var(--accent);
+      border: 1px solid var(--card-border);
       font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 800;
-      padding: 4px 8px;
-      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
+      white-space: nowrap;
     }
     h1.db-title {
-      font-size: 16px;
-      font-weight: 800;
+      font-size: 15px;
+      font-weight: 700;
       letter-spacing: -0.01em;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .db-meta {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-muted);
       font-family: var(--font-mono);
+      white-space: nowrap;
     }
 
     .nav-actions {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Width control group */
+    .width-ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--header-bg);
+      border: 1px solid var(--card-border);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .width-label {
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .width-slider {
+      width: 75px;
+      cursor: pointer;
+    }
+    .width-presets {
+      display: flex;
+      gap: 2px;
+      align-items: center;
+    }
+    .btn-preset {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      padding: 2px 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-preset:hover, .btn-preset.active {
+      background: var(--accent);
+      color: #FFFFFF;
+      border-color: var(--accent);
     }
 
     button.btn-ctrl {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       color: var(--text);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       transition: all 0.15s ease;
+      font-family: var(--font-sans);
     }
     button.btn-ctrl:hover {
       background: var(--header-bg);
@@ -1893,40 +2010,67 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
     /* Entity Table Cards */
     .table-entity {
       position: absolute;
-      width: 320px;
+      width: 340px;
+      min-width: 240px;
+      max-width: 850px;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
       z-index: 20;
       cursor: default;
       transition: box-shadow 0.15s ease, border-color 0.15s ease;
+      box-sizing: border-box;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     .table-entity:hover, .table-entity.selected {
       border-color: var(--accent);
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
       z-index: 30;
     }
     .table-entity.highlight-rel {
       border-color: #3B82F6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    }
+
+    /* Draggable Right-Edge Resize Handle on Table Cards */
+    .card-resize-handle {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 8px;
+      height: 100%;
+      cursor: ew-resize;
+      z-index: 25;
+      background: transparent;
+      transition: background 0.15s ease;
+    }
+    .card-resize-handle:hover, .table-entity.resizing .card-resize-handle {
+      background: rgba(59, 130, 246, 0.45);
     }
 
     .entity-header {
       background: var(--header-bg);
       border-bottom: 1px solid var(--card-border);
-      padding: 10px 14px;
-      border-top-left-radius: 11px;
-      border-top-right-radius: 11px;
+      padding: 9px 12px;
       cursor: move;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 8px;
+      box-sizing: border-box;
+      overflow: hidden;
+      min-width: 0;
     }
     .entity-header-left {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      min-width: 0;
+      overflow: hidden;
+      flex: 1;
     }
     .schema-tag {
       font-family: var(--font-mono);
@@ -1935,20 +2079,27 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       text-transform: uppercase;
       background: rgba(120, 113, 108, 0.25);
       padding: 2px 5px;
-      border-radius: 4px;
+      border-radius: 3px;
       color: var(--text-muted);
+      flex-shrink: 0;
     }
     .entity-name {
       font-family: var(--font-mono);
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 700;
       color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      flex: 1;
     }
 
     .entity-badges {
       display: flex;
       align-items: center;
       gap: 4px;
+      flex-shrink: 0;
     }
     .badge-postgis {
       font-size: 9px;
@@ -1957,8 +2108,8 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       background: rgba(16, 185, 129, 0.2);
       color: var(--geom-color);
       border: 1px solid rgba(16, 185, 129, 0.4);
-      padding: 1px 5px;
-      border-radius: 4px;
+      padding: 1px 4px;
+      border-radius: 3px;
       text-transform: uppercase;
     }
     .badge-rows {
@@ -1968,24 +2119,30 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
     }
 
     .entity-columns {
-      padding: 6px 0;
+      padding: 4px 0;
       max-height: 480px;
       overflow-y: auto;
+      box-sizing: border-box;
+      width: 100%;
     }
     .column-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 14px;
-      font-size: 12px;
+      gap: 8px;
+      padding: 5px 12px;
+      font-size: 11px;
       border-bottom: 1px solid rgba(120, 113, 108, 0.08);
       position: relative;
+      box-sizing: border-box;
+      width: 100%;
+      overflow: hidden;
     }
     .column-row:last-child {
       border-bottom: none;
     }
     .column-row:hover {
-      background: rgba(245, 158, 11, 0.06);
+      background: rgba(59, 130, 246, 0.06);
     }
 
     .col-left {
@@ -1993,6 +2150,8 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       align-items: center;
       gap: 6px;
       overflow: hidden;
+      flex: 1;
+      min-width: 0;
     }
     .tag-key {
       font-family: var(--font-mono);
@@ -2001,6 +2160,7 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       padding: 1px 4px;
       border-radius: 3px;
       line-height: 1.2;
+      flex-shrink: 0;
     }
     .tag-pk {
       background: rgba(245, 158, 11, 0.2);
@@ -2019,7 +2179,8 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 140px;
+      flex: 1;
+      min-width: 0;
     }
     .col-name.pk-col {
       color: var(--pk-color);
@@ -2032,11 +2193,16 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       gap: 6px;
       font-family: var(--font-mono);
       font-size: 11px;
+      flex-shrink: 0;
+      max-width: 50%;
+      overflow: hidden;
     }
     .col-type {
       color: var(--text-muted);
       font-size: 11px;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .col-nn {
       font-size: 8px;
@@ -2045,6 +2211,7 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       background: rgba(239, 68, 68, 0.15);
       padding: 1px 3px;
       border-radius: 2px;
+      flex-shrink: 0;
     }
 
     /* Floating Tool controls on canvas */
@@ -2117,12 +2284,41 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
   <!-- Top Navigation Bar -->
   <header class="mpd-navbar">
     <div class="brand-title-group">
-      <span class="badge-mpd">${isFr ? 'Modèle Physique de Données (MPD)' : 'Physical Data Model (ERD)'}</span>
+      <span class="badge-mpd">${isFr ? 'Modèle Physique (MPD)' : 'Physical Model (ERD)'}</span>
       <h1 class="db-title">${escapeHtml(schema.databaseName)}</h1>
       <span class="db-meta">(${schema.tables.length} tables &bull; ${schema.relationships.length} ${isFr ? 'relations' : 'relationships'})</span>
     </div>
 
     <div class="nav-actions">
+      <!-- Table Width Controls -->
+      <div class="width-ctrl-group">
+        <span class="width-label">${isFr ? 'Largeur :' : 'Width :'}</span>
+        <input 
+          type="range" 
+          id="global-width-slider" 
+          class="width-slider" 
+          min="260" 
+          max="650" 
+          value="340" 
+          oninput="setGlobalTableWidth(this.value)" 
+          title="${isFr ? 'Ajuster la largeur des tables' : 'Adjust table width'}" 
+        />
+        <span id="global-width-val" class="font-mono">340px</span>
+        <div class="width-presets">
+          <button class="btn-preset" data-w="280" onclick="setGlobalTableWidth(280)">280</button>
+          <button class="btn-preset active" data-w="340" onclick="setGlobalTableWidth(340)">340</button>
+          <button class="btn-preset" data-w="440" onclick="setGlobalTableWidth(440)">440</button>
+          <button class="btn-preset" data-w="560" onclick="setGlobalTableWidth(560)">560</button>
+          <button class="btn-preset" onclick="autoFitAllWidths()" title="${isFr ? 'Ajuster automatiquement à la longueur des colonnes' : 'Auto-fit width to columns'}">Auto</button>
+        </div>
+      </div>
+
+      <!-- Auto Layout (No Overlap) Button -->
+      <button class="btn-ctrl" onclick="autoLayoutNoOverlap()" title="${isFr ? 'Réorganiser proprement toutes les tables sans aucun chevauchement' : 'Pack tables neatly with zero overlap'}">
+        <span>📐</span>
+        <span>${isFr ? 'Auto-Disposition' : 'Auto-Layout'}</span>
+      </button>
+
       <button class="btn-ctrl" onclick="toggleTheme()">
         <span id="theme-icon">☀️</span>
         <span id="theme-text">${isFr ? 'Thème' : 'Theme'}</span>
@@ -2134,7 +2330,7 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
       </button>
 
       <button class="btn-ctrl" onclick="window.print()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
         <span>${isFr ? 'Imprimer / PDF' : 'Print / PDF'}</span>
       </button>
     </div>
@@ -2210,6 +2406,7 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
         card.id = 'entity-' + table.name;
         card.style.left = table.x + 'px';
         card.style.top = table.y + 'px';
+        card.style.width = (table.width || 340) + 'px';
 
         const colsHtml = table.columns.map(c => {
           const pkBadge = c.isPrimaryKey ? '<span class="tag-key tag-pk">PK</span>' : '';
@@ -2221,10 +2418,10 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
               <div class="col-left">
                 \${pkBadge}
                 \${fkBadge}
-                <span class="col-name \${c.isPrimaryKey ? 'pk-col' : ''}">\${c.name}</span>
+                <span class="col-name \${c.isPrimaryKey ? 'pk-col' : ''}" title="\${c.name}">\${c.name}</span>
               </div>
               <div class="col-right">
-                <span class="col-type">\${c.dataType}</span>
+                <span class="col-type" title="\${c.dataType}">\${c.dataType}</span>
                 \${nnBadge}
               </div>
             </div>
@@ -2235,7 +2432,7 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
           <div class="entity-header">
             <div class="entity-header-left">
               <span class="schema-tag">\${table.schema}</span>
-              <span class="entity-name">\${table.name}</span>
+              <span class="entity-name" title="\${table.name}">\${table.name}</span>
             </div>
             <div class="entity-badges">
               \${table.isSpatial ? '<span class="badge-postgis">POSTGIS</span>' : ''}
@@ -2245,11 +2442,16 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
           <div class="entity-columns">
             \${colsHtml}
           </div>
+          <div class="card-resize-handle" title="${isFr ? 'Glisser pour ajuster la largeur' : 'Drag to resize width'}"></div>
         \`;
 
         // Make table header draggable
         const header = card.querySelector('.entity-header');
         initTableDrag(header, table, card);
+
+        // Make card right edge resizable
+        const resizeHandle = card.querySelector('.card-resize-handle');
+        initTableResize(resizeHandle, table, card);
 
         // Highlight relations on hover
         card.addEventListener('mouseenter', () => highlightConnected(table.name, true));
@@ -2278,9 +2480,9 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
         const sourceColEl = document.getElementById('col-' + rel.sourceTable + '-' + rel.sourceColumn);
         const targetColEl = document.getElementById('col-' + rel.targetTable + '-' + rel.targetColumn);
 
-        const sWidth = sourceCard.offsetWidth || 320;
+        const sWidth = sourceTable.width || sourceCard.offsetWidth || 340;
         const sHeight = sourceCard.offsetHeight || 220;
-        const tWidth = targetCard.offsetWidth || 320;
+        const tWidth = targetTable.width || targetCard.offsetWidth || 340;
         const tHeight = targetCard.offsetHeight || 220;
 
         let sY = sourceTable.y + (sourceColEl ? sourceColEl.offsetTop + 14 : sHeight / 2);
@@ -2326,7 +2528,6 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
         linesGroup.appendChild(path);
 
         // Cardinality badges
-        // Midpoint
         const midX = (sX + tX) / 2;
         const midY = (sY + tY) / 2;
 
@@ -2354,7 +2555,7 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
         const sText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         sText.setAttribute('x', sAnchorSide === 'right' ? sX + 16 : sX - 16);
         sText.setAttribute('y', sY - 8);
-        sText.setAttribute('class', 'cardinality-text');
+        sText.setAttribute('class', 'cardinality-text font-mono');
         sText.style.fill = 'var(--accent)';
         sText.textContent = rel.sourceCardinality;
         linesGroup.appendChild(sText);
@@ -2363,7 +2564,7 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
         const tText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         tText.setAttribute('x', tAnchorSide === 'left' ? tX - 18 : tX + 18);
         tText.setAttribute('y', tY - 8);
-        tText.setAttribute('class', 'cardinality-text');
+        tText.setAttribute('class', 'cardinality-text font-mono');
         tText.style.fill = 'var(--pk-color)';
         tText.textContent = rel.targetCardinality;
         linesGroup.appendChild(tText);
@@ -2418,6 +2619,106 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
           card.style.zIndex = '20';
         }
       });
+    }
+
+    // Draggable card right-edge width resize
+    function initTableResize(handle, table, card) {
+      let isResizing = false;
+      let startX, startWidth;
+
+      handle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = table.width || card.offsetWidth || 340;
+        card.classList.add('resizing');
+        card.style.zIndex = '55';
+        document.body.style.cursor = 'ew-resize';
+        e.stopPropagation();
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const dx = (e.clientX - startX) / scale;
+        const newWidth = Math.min(Math.max(startWidth + dx, 240), 850);
+        table.width = Math.round(newWidth);
+        card.style.width = table.width + 'px';
+        renderConnections();
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isResizing) {
+          isResizing = false;
+          card.classList.remove('resizing');
+          document.body.style.cursor = '';
+          card.style.zIndex = '20';
+        }
+      });
+    }
+
+    // Set global width across all tables
+    function setGlobalTableWidth(w) {
+      const width = parseInt(w, 10);
+      const slider = document.getElementById('global-width-slider');
+      const label = document.getElementById('global-width-val');
+      if (slider) slider.value = width;
+      if (label) label.textContent = width + 'px';
+
+      document.querySelectorAll('.btn-preset').forEach(b => {
+        b.classList.toggle('active', parseInt(b.getAttribute('data-w'), 10) === width);
+      });
+
+      tablesData.forEach(table => {
+        table.width = width;
+        const card = document.getElementById('entity-' + table.name);
+        if (card) card.style.width = width + 'px';
+      });
+      renderConnections();
+    }
+
+    // Automatically fit each table's width to its longest column text
+    function autoFitAllWidths() {
+      tablesData.forEach(table => {
+        let maxChars = table.name.length + 8;
+        table.columns.forEach(c => {
+          const chars = (c.name || '').length + (c.dataType || '').length + 8;
+          if (chars > maxChars) maxChars = chars;
+        });
+        const fitted = Math.min(Math.max(maxChars * 8.5 + 46, 270), 800);
+        table.width = Math.round(fitted);
+        const card = document.getElementById('entity-' + table.name);
+        if (card) card.style.width = table.width + 'px';
+      });
+      renderConnections();
+    }
+
+    // Reorganize all tables into non-overlapping columns
+    function autoLayoutNoOverlap() {
+      const colGap = 130;
+      const rowGap = 50;
+      const numCols = Math.min(Math.max(Math.ceil(Math.sqrt(tablesData.length * 1.5)), 2), 4);
+      const colHeights = new Array(numCols).fill(40);
+
+      tablesData.forEach(table => {
+        let minCol = 0;
+        for (let c = 1; c < numCols; c++) {
+          if (colHeights[c] < colHeights[minCol]) minCol = c;
+        }
+
+        const card = document.getElementById('entity-' + table.name);
+        const w = table.width || (card ? card.offsetWidth : 340);
+        const h = card ? (card.offsetHeight || (46 + table.columns.length * 28 + 20)) : (46 + table.columns.length * 28 + 20);
+
+        table.x = 50 + minCol * (w + colGap);
+        table.y = colHeights[minCol];
+        colHeights[minCol] += h + rowGap;
+
+        if (card) {
+          card.style.left = table.x + 'px';
+          card.style.top = table.y + 'px';
+        }
+      });
+      renderConnections();
     }
 
     // Canvas pan & zoom
