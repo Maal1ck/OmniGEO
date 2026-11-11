@@ -28,7 +28,8 @@ import {
   Play,
   Globe,
   Edit3,
-  GitMerge
+  GitMerge,
+  TableProperties
 } from 'lucide-react';
 import { SpatialDataset, CRSInfo } from '../types/gis';
 import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers, parseCadFile, parseGpxFile } from '../core/formatParsers';
@@ -64,6 +65,7 @@ interface BatchWorkspaceProps {
   onOpenConcatenationModal?: (initialSelectedIds?: string[]) => void;
   onOpenPostgisModal?: (datasetId?: string) => void;
   onOpenJoinModal?: (datasetId?: string) => void;
+  onOpenPostgresReport?: () => void;
 }
 
 export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
@@ -78,6 +80,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   onOpenConcatenationModal,
   onOpenPostgisModal,
   onOpenJoinModal,
+  onOpenPostgresReport,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -948,6 +951,22 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 >
                   <Database className="w-3.5 h-3.5 text-indigo-500" />
                   <span>PostGIS Export</span>
+                </button>
+              )}
+
+              {onOpenPostgresReport && (
+                <button
+                  type="button"
+                  onClick={() => onOpenPostgresReport()}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                    theme === 'light'
+                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border-amber-700/50'
+                  }`}
+                  title="Generate global PostgreSQL database architecture & schema report (HTML)"
+                >
+                  <TableProperties className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{lang === 'fr' ? 'Rapport Base de Données' : 'DB Report'}</span>
                 </button>
               )}
 

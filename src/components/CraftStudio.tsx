@@ -53,6 +53,7 @@ interface CraftStudioProps {
   onOpenConcatenationModal?: () => void;
   onOpenPostgisModal?: () => void;
   onOpenJoinModal?: () => void;
+  onOpenPostgresReport?: () => void;
 }
 
 export const CraftStudio: React.FC<CraftStudioProps> = ({
@@ -75,6 +76,7 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
   onOpenConcatenationModal,
   onOpenPostgisModal,
   onOpenJoinModal,
+  onOpenPostgresReport,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -269,6 +271,25 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
       onExecute: () => {
         if (onOpenJoinModal) {
           onOpenJoinModal();
+        } else {
+          setActiveTab('workspace');
+        }
+      },
+    },
+    {
+      id: 'postgres-global-report',
+      title: lang === 'fr' ? 'Rapport Global Base de Données PostgreSQL' : 'Global PostgreSQL Database Architecture Report',
+      category: 'packaging',
+      description: lang === 'fr'
+        ? 'Générez un dictionnaire de données complet en HTML interactif : tables, volumétries, relations de clés étrangères et types de champs.'
+        : 'Generate a complete standalone HTML database report: tables catalog, foreign key relationships, row counts, and data types.',
+      icon: TableProperties,
+      badge: 'Database Architecture Report',
+      badgeColor: 'bg-amber-950 text-amber-300 border-amber-700/50',
+      actionLabel: lang === 'fr' ? 'Générer le Rapport HTML' : 'Generate HTML Report',
+      onExecute: () => {
+        if (onOpenPostgresReport) {
+          onOpenPostgresReport();
         } else {
           setActiveTab('workspace');
         }

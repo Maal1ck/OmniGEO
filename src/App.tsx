@@ -28,6 +28,7 @@ import { AggregationModal } from './components/AggregationModal';
 import { ConcatenationModal } from './components/ConcatenationModal';
 import { PostgisModal } from './components/PostgisModal';
 import { JoinModal } from './components/JoinModal';
+import { PostgresReportModal } from './components/PostgresReportModal';
 import { generateAutoHarmonizerRules, applySchemaHarmonization } from './core/schemaHarmonizer';
 import { createMultiLayerGeoPackage, generateQgisProjectXml, bundleConsolidatedHandoff } from './core/multiLayerGpkg';
 import { generateQAQCReportData } from './core/auditCertificate';
@@ -88,9 +89,14 @@ export default function App() {
   const [isConcatenationModalOpen, setIsConcatenationModalOpen] = useState(false);
   const [isPostgisModalOpen, setIsPostgisModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [isPostgresReportOpen, setIsPostgresReportOpen] = useState(false);
   const [concatenationInitialIds, setConcatenationInitialIds] = useState<string[]>([]);
   const [postgisTargetDatasetId, setPostgisTargetDatasetId] = useState<string | null>(null);
   const [joinTargetDatasetId, setJoinTargetDatasetId] = useState<string | null>(null);
+
+  const handleOpenPostgresReport = () => {
+    setIsPostgresReportOpen(true);
+  };
 
   const handleAddConcatenatedDataset = (newDataset: SpatialDataset) => {
     setDatasets(prev => [newDataset, ...prev]);
@@ -435,6 +441,7 @@ export default function App() {
         onOpenConcatenationModal={() => handleOpenConcatenationModal()}
         onOpenPostgisModal={() => handleOpenPostgisModal()}
         onOpenJoinModal={() => handleOpenJoinModal()}
+        onOpenPostgresReport={() => handleOpenPostgresReport()}
       />
 
       {/* Main Work Area Views */}
@@ -460,6 +467,7 @@ export default function App() {
             onOpenConcatenationModal={() => handleOpenConcatenationModal()}
             onOpenPostgisModal={() => handleOpenPostgisModal()}
             onOpenJoinModal={() => handleOpenJoinModal()}
+            onOpenPostgresReport={() => handleOpenPostgresReport()}
           />
         )}
 
@@ -477,6 +485,7 @@ export default function App() {
             onOpenConcatenationModal={handleOpenConcatenationModal}
             onOpenPostgisModal={handleOpenPostgisModal}
             onOpenJoinModal={handleOpenJoinModal}
+            onOpenPostgresReport={handleOpenPostgresReport}
           />
         )}
 
@@ -533,6 +542,7 @@ export default function App() {
             onOpenDoctor={() => setIsDoctorOpen(true)}
             onOpenCRSModal={() => setIsCRSModalOpen(true)}
             onOpenJoin={() => handleOpenJoinModal()}
+            onOpenPostgresReport={() => handleOpenPostgresReport()}
           />
         )}
       </main>
@@ -554,6 +564,7 @@ export default function App() {
         onOpenConcatenationModal={() => handleOpenConcatenationModal()}
         onOpenPostgisModal={() => handleOpenPostgisModal()}
         onOpenJoinModal={() => handleOpenJoinModal()}
+        onOpenPostgresReport={() => handleOpenPostgresReport()}
       />
 
       {/* Python Architecture & Packaging Modal */}
@@ -617,6 +628,7 @@ export default function App() {
         onClose={() => setIsPostgisModalOpen(false)}
         datasets={datasets}
         defaultDatasetId={postgisTargetDatasetId}
+        onOpenPostgresReport={() => handleOpenPostgresReport()}
       />
 
       {/* Feature: Spatial & Attribute Join Studio Modal */}
@@ -626,6 +638,13 @@ export default function App() {
         datasets={datasets}
         onAddJoinedDataset={handleAddJoinedDataset}
         initialTargetDatasetId={joinTargetDatasetId}
+      />
+
+      {/* Global PostgreSQL Database Architecture Report Modal */}
+      <PostgresReportModal
+        isOpen={isPostgresReportOpen}
+        onClose={() => setIsPostgresReportOpen(false)}
+        datasets={datasets}
       />
     </div>
   );

@@ -20,7 +20,8 @@ import {
   Play,
   Search,
   Globe,
-  ChevronDown
+  ChevronDown,
+  TableProperties
 } from 'lucide-react';
 import { SpatialDataset, CRSInfo } from '../types/gis';
 import { 
@@ -39,6 +40,7 @@ interface PostgisModalProps {
   onClose: () => void;
   datasets: SpatialDataset[];
   defaultDatasetId?: string | null;
+  onOpenPostgresReport?: () => void;
 }
 
 export const PostgisModal: React.FC<PostgisModalProps> = ({
@@ -46,6 +48,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
   onClose,
   datasets,
   defaultDatasetId,
+  onOpenPostgresReport,
 }) => {
   const { theme } = useTheme();
 
@@ -183,14 +186,34 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className={`p-1.5 rounded-lg transition-colors ${
-              theme === 'light' ? 'hover:bg-stone-200 text-stone-600' : 'hover:bg-stone-800 text-stone-400'
-            }`}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center space-x-2">
+            {onOpenPostgresReport && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenPostgresReport();
+                }}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                  theme === 'light'
+                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 shadow-2xs'
+                    : 'bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border-amber-700/50 shadow-2xs'
+                }`}
+                title="Open Global PostgreSQL Database Architecture Report"
+              >
+                <TableProperties className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden sm:inline">Rapport Global DB (HTML)</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className={`p-1.5 rounded-lg transition-colors ${
+                theme === 'light' ? 'hover:bg-stone-200 text-stone-600' : 'hover:bg-stone-800 text-stone-400'
+              }`}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}

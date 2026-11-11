@@ -56,6 +56,7 @@ interface HeaderProps {
   onOpenConcatenationModal?: () => void;
   onOpenPostgisModal?: () => void;
   onOpenJoinModal?: () => void;
+  onOpenPostgresReport?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -78,6 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenConcatenationModal,
   onOpenPostgisModal,
   onOpenJoinModal,
+  onOpenPostgresReport,
 }) => {
   const { lang, setLang, t } = useI18n();
   const { theme, toggleTheme } = useTheme();
@@ -552,6 +554,30 @@ export const Header: React.FC<HeaderProps> = ({
                     <div>
                       <div className="font-semibold text-xs">PostgreSQL / PostGIS Exporter</div>
                       <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>Generate SQL dump, ogr2ogr, and psql scripts</div>
+                    </div>
+                  </button>
+                )}
+
+                {onOpenPostgresReport && (
+                  <button
+                    onClick={() => {
+                      setIsToolsOpen(false);
+                      onOpenPostgresReport();
+                    }}
+                    className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                      theme === 'light'
+                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        : 'hover:bg-[#28211C] text-stone-200 hover:text-amber-300'
+                    }`}
+                  >
+                    <TableProperties className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                    <div>
+                      <div className="font-semibold text-xs">
+                        {lang === 'fr' ? 'Rapport Global Base de Données (PostgreSQL)' : 'Global Database Report (PostgreSQL)'}
+                      </div>
+                      <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>
+                        {lang === 'fr' ? 'Tables, relations FK, volumétrie et rapport HTML complet' : 'Tables, foreign keys, row counts, & standalone HTML report'}
+                      </div>
                     </div>
                   </button>
                 )}

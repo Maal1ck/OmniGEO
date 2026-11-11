@@ -51,6 +51,7 @@ interface ShowcaseWebsiteProps {
   onOpenDoctor?: () => void;
   onOpenCRSModal?: () => void;
   onOpenJoin?: () => void;
+  onOpenPostgresReport?: () => void;
 }
 
 export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({ 
@@ -60,6 +61,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
   onOpenDoctor,
   onOpenCRSModal,
   onOpenJoin,
+  onOpenPostgresReport,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -198,6 +200,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
         ? 'Exportez n\'importe quel jeu de données spatiales vers PostgreSQL/PostGIS sans installer d\'outils tiers complexes. Obtenez des scripts SQL optimisés avec index spatial GiST et support pgAdmin 4.'
         : 'Streamline loading geospatial data into PostgreSQL/PostGIS. Generates production-ready DDL/DML SQL scripts with GiST spatial indexes, pgAdmin 4 query workflows, and Python scripts.',
       features: [
+        lang === 'fr' ? 'Générateur de Rapport Global HTML : inventaire exhaustif des tables, volumétries, relations FK et types de champs' : 'Global HTML Database Report Generator: full tables catalog, row counts, FK relationships, & field types',
         lang === 'fr' ? 'Workflow pgAdmin 4 interactif avec explications détaillées des identifiants' : 'Interactive pgAdmin 4 guide clarifying database connection credentials',
         lang === 'fr' ? 'Recherche parmi l\'ensemble des 6 942 SRID/EPSG pour la colonne géométrique' : 'Full 6,942 EPSG/SRID selector for target geometry column',
         lang === 'fr' ? 'Script SQL complet avec DROP TABLE IF EXISTS et index spatial USING GIST(geom)' : 'Complete PostGIS SQL script with transaction safety and spatial indexing',

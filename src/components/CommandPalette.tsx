@@ -48,6 +48,7 @@ interface CommandPaletteProps {
   onOpenConcatenationModal?: () => void;
   onOpenPostgisModal?: () => void;
   onOpenJoinModal?: () => void;
+  onOpenPostgresReport?: () => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
@@ -66,6 +67,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onOpenConcatenationModal,
   onOpenPostgisModal,
   onOpenJoinModal,
+  onOpenPostgresReport,
 }) => {
   const [query, setQuery] = useState('');
 
@@ -196,6 +198,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       category: 'Action',
       icon: <GitMerge className="w-4 h-4 text-purple-400" />,
       run: () => { onOpenJoinModal?.(); onClose(); },
+    },
+    {
+      id: 'act-postgres-report',
+      title: 'Generate Global PostgreSQL Database Architecture Report (HTML)',
+      category: 'Action',
+      icon: <TableProperties className="w-4 h-4 text-amber-400" />,
+      run: () => { onOpenPostgresReport?.(); onClose(); },
     },
     {
       id: 'act-python',
