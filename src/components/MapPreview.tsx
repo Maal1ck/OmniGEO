@@ -721,41 +721,25 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             <span>{isLegendOpen ? t.map.hideLegend : t.map.showLegend}</span>
           </button>
 
-          {/* Dataset Switcher */}
-          <div className="flex items-center space-x-2">
-            <span className={`font-medium ${theme === 'light' ? 'text-stone-600' : 'text-stone-400'}`}>{t.map.layerLabel}:</span>
-            <select
-              value={dataset?.id || ''}
-              onChange={(e) => {
-                const found = datasets.find(d => d.id === e.target.value);
-                if (found) onSelectDataset(found);
-              }}
-              className={`border rounded-lg px-2.5 py-1 font-medium focus:border-amber-500 focus:outline-none max-w-xs truncate cursor-pointer text-xs ${
-                theme === 'light'
-                  ? 'bg-white border-[#D6CEBE] text-stone-900'
-                  : 'bg-[#13110E] border-stone-700 text-stone-100'
-              }`}
-            >
-              {datasets.map((d) => (
-                <option key={d.id} value={d.id} className={theme === 'light' ? 'bg-white text-stone-900' : 'bg-stone-900 text-stone-100'}>
-                  {d.name} ({d.geometryType}, {d.featureCount} {t.common.features})
-                </option>
-              ))}
-            </select>
-          </div>
-
+          {/* Active Layer Info Badge */}
           {dataset && (
-            <div className={`hidden sm:flex items-center space-x-2 font-mono text-xs ${
-              theme === 'light' ? 'text-stone-600' : 'text-stone-400'
+            <div className={`flex items-center space-x-2 text-xs ${
+              theme === 'light' ? 'text-stone-700' : 'text-stone-300'
             }`}>
-              <span className={`px-2 py-0.5 rounded-md border ${
+              <Layers className="w-3.5 h-3.5 text-amber-500" />
+              <span className="font-semibold truncate max-w-[200px]" title={dataset.name}>
+                {dataset.name}
+              </span>
+              <span className={`px-2 py-0.5 rounded-md border font-mono text-[10px] ${
                 theme === 'light'
                   ? 'bg-amber-100 text-amber-900 border-amber-300 font-semibold'
                   : 'bg-amber-950/80 text-amber-300 border-amber-700/50'
               }`}>
                 {dataset.detectedCRS?.code || 'EPSG:4326'}
               </span>
-              <span>{dataset.featureCount} {t.common.features}</span>
+              <span className="font-mono text-stone-400 hidden sm:inline">
+                {dataset.featureCount} {t.common.features}
+              </span>
             </div>
           )}
 
@@ -766,7 +750,6 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 ? 'bg-white border-[#E2DBD0] text-stone-700'
                 : 'bg-[#201A16] border-stone-800 text-stone-300'
             }`}>
-              <Layers className="w-3 h-3 text-amber-500" />
               <span>
                 <strong className={theme === 'light' ? 'text-amber-700' : 'text-amber-400'}>{visibleLayerIds.size}</strong>/{datasets.length} visible
               </span>
@@ -776,19 +759,6 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
         {/* Map View & Analytical Controls */}
         <div className="flex items-center space-x-2">
-          {/* Zoom to Africa Button */}
-          <button
-            onClick={resetToAfrica}
-            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
-              theme === 'light'
-                ? 'bg-white border-[#D6CEBE] text-stone-700 hover:bg-[#F2ECE3]'
-                : 'bg-stone-850 border-stone-700 text-stone-200 hover:bg-stone-800'
-            }`}
-            title="Reset Map View to Africa Continent"
-          >
-            <Globe className="w-3.5 h-3.5 text-amber-500" />
-            <span>Africa</span>
-          </button>
 
           {/* Zoom to extent */}
           <button
@@ -927,50 +897,24 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             </button>
           )}
 
-          {/* Basemap Switcher */}
-          <div className={`flex items-center border rounded-lg p-0.5 ${
-            theme === 'light' ? 'bg-[#F2ECE3] border-[#E2DBD0]' : 'bg-[#13110E] border-stone-800'
-          }`}>
-            <button
-              onClick={() => setBasemap('dark')}
-              className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-                basemap === 'dark'
-                  ? 'bg-amber-600 text-white font-bold shadow-xs'
-                  : (theme === 'light' ? 'text-stone-600 hover:text-stone-900' : 'text-stone-400 hover:text-stone-200')
+          {/* Basemap Switcher Dropdown List */}
+          <div className="flex items-center space-x-1.5">
+            <Globe className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`} />
+            <select
+              value={basemap}
+              onChange={(e) => setBasemap(e.target.value as any)}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium border focus:border-amber-500 focus:outline-none cursor-pointer transition-colors ${
+                theme === 'light'
+                  ? 'bg-white border-[#D6CEBE] text-stone-900 hover:border-amber-600'
+                  : 'bg-[#181310] border-stone-700 text-stone-100 hover:border-amber-500'
               }`}
+              title="Sélectionner le fond cartographique"
             >
-              {t.map.basemapDark}
-            </button>
-            <button
-              onClick={() => setBasemap('osm')}
-              className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-                basemap === 'osm'
-                  ? 'bg-amber-600 text-white font-bold shadow-xs'
-                  : (theme === 'light' ? 'text-stone-600 hover:text-stone-900' : 'text-stone-400 hover:text-stone-200')
-              }`}
-            >
-              {t.map.basemapOsm}
-            </button>
-            <button
-              onClick={() => setBasemap('satellite')}
-              className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-                basemap === 'satellite'
-                  ? 'bg-amber-600 text-white font-bold shadow-xs'
-                  : (theme === 'light' ? 'text-stone-600 hover:text-stone-900' : 'text-stone-400 hover:text-stone-200')
-              }`}
-            >
-              {t.map.basemapSatellite}
-            </button>
-            <button
-              onClick={() => setBasemap('offline_grid')}
-              className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-                basemap === 'offline_grid'
-                  ? 'bg-amber-600 text-white font-bold shadow-xs'
-                  : (theme === 'light' ? 'text-stone-600 hover:text-stone-900' : 'text-stone-400 hover:text-stone-200')
-              }`}
-            >
-              {t.map.basemapGrid}
-            </button>
+              <option value="dark">{t.map.basemapDark}</option>
+              <option value="osm">{t.map.basemapOsm}</option>
+              <option value="satellite">{t.map.basemapSatellite}</option>
+              <option value="offline_grid">{t.map.basemapGrid}</option>
+            </select>
           </div>
         </div>
       </div>
@@ -1562,9 +1506,10 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   </span>
                   <button
                     onClick={() => setSelectedFeatureProps(null)}
-                    className="text-stone-400 hover:text-white text-xs px-1 font-bold"
+                    className="text-stone-400 hover:text-white p-1 rounded-sm hover:bg-stone-800 transition-colors"
+                    aria-label="Close"
                   >
-                    ✕
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
                 <div className="max-h-48 overflow-y-auto mt-2 space-y-1.5 font-mono text-xs">

@@ -4,6 +4,7 @@
  */
 
 import { SpatialDataset } from '../types/gis';
+import * as XLSX from 'xlsx';
 
 export interface PostgresColumnSchema {
   name: string;
@@ -352,8 +353,8 @@ try:
     with open(out_filename, 'w', encoding='utf-8') as f:
         json.dump(report_json, f, indent=2, ensure_ascii=False)
         
-    print(f"[✓] Successfully generated report data: {out_filename}")
-    print(f"[✓] You can paste or drag this JSON into OmniGeo to view and download both Data Dictionary and MPD HTML reports!")
+    print(f"[OK] Successfully generated report data: {out_filename}")
+    print(f"[OK] You can paste or drag this JSON into OmniGeo to view and download both Data Dictionary and MPD HTML reports!")
     cur.close()
     conn.close()
 except Exception as e:
@@ -1000,6 +1001,315 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
   },
 };
 
+export interface TableProfileSheetData {
+  service: string;
+  tableName: string;
+  nature: string;
+  identifiantMetier: string;
+  rattachement: string;
+  champsTemporels: string;
+  champsQuantitatifs: string;
+  nombreEnregistrements: string;
+  controles: string;
+  etatValidation: string;
+}
+
+/**
+ * Computes structured table profile metadata matching the normalized data dictionary card.
+ * (1- Une fiche par table)
+ */
+export function computeTableProfile(
+  table: PostgresTableSchema,
+  schema: PostgresDatabaseSchema,
+  lang: 'fr' | 'en' = 'fr'
+): TableProfileSheetData {
+  const isFr = lang === 'fr';
+
+  // 1. Service / Schéma d'appartenance
+  let service = table.schema || 'public';
+  if (service.toLowerCase() === 'sde') {
+    service = isFr ? 'Gestion et Développement des Ressources en Eau' : 'Water Resources Planning & GIS';
+  } else if (service.toLowerCase() === 'cadastre') {
+    service = isFr ? 'Direction Générale du Cadastre & Conservation Foncière' : 'General Directorate of Cadastre & Land Registry';
+  } else if (service.toLowerCase() === 'public') {
+    service = isFr ? 'Référentiel Spatial et Territorial' : 'Spatial & Territorial Reference Data';
+  }
+
+  // 2. Table name
+  const tableName = `${table.schema ? table.schema + '.' : ''}${table.name}`;
+
+  // 3. Nature
+  let nature = isFr ? 'Donnée tabulaire' : 'Tabular data';
+  if (table.isSpatial) {
+    const geomCol = (table.columns || []).find(c => c.isGeometry);
+    const geomType = geomCol?.geometryType || (table.columns || []).find(c => /geom/i.test(c.name))?.geometryType || 'Geometry';
+    const srid = geomCol?.srid || (geomCol?.dataType.match(/\d{4,5}/)?.[0]) || '4326';
+    nature = isFr 
+      ? `Donnée spatiale (${geomType}, EPSG:${srid})`
+      : `Spatial vector data (${geomType}, EPSG:${srid})`;
+  }
+
+  // 4. Identifiant métier (Primary Key)
+  const pkCols = table.primaryKeys && table.primaryKeys.length > 0
+    ? table.primaryKeys.join(', ')
+    : (table.columns || []).find(c => c.isPrimaryKey)?.name
+    || (table.columns || []).find(c => /^(id|gid|ogc_fid|code|num|objectid)/i.test(c.name))?.name
+    || (isFr ? 'Non défini (Aucune PK explicite)' : 'Not defined (No explicit PK)');
+  const identifiantMetier = pkCols;
+
+  // 5. Rattachement (Clés étrangères)
+  const rels = (schema.relationships || []).filter(
+    r => r.sourceTable === table.name || r.sourceTable === tableName
+  );
+  let rattachement = isFr ? 'Aucun (Table racine / primaire)' : 'None (Root / primary table)';
+  if (rels.length > 0) {
+    rattachement = rels.map(r => `${r.sourceColumn} -> ${r.targetTable}.${r.targetColumn}`).join(' ; ');
+  } else {
+    const fkCols = (table.columns || []).filter(c => c.isForeignKey);
+    if (fkCols.length > 0) {
+      rattachement = fkCols.map(c => c.name).join(', ');
+    }
+  }
+
+  // 6. Champs temporels
+  const temporalCols = (table.columns || []).filter(c => {
+    const dt = (c.dataType || '').toLowerCase();
+    const nm = c.name.toLowerCase();
+    return dt.includes('date') || dt.includes('time') || dt.includes('year') || dt.includes('interval')
+      || /date|annee|year|mois|month|jour|day|time|horodate|timestamp|created|updated|debut|fin/i.test(nm);
+  });
+  const champsTemporels = temporalCols.length > 0
+    ? temporalCols.map(c => c.name).join(', ')
+    : (isFr ? 'Aucun' : 'None');
+
+  // 7. Champs quantitatifs
+  const quantCols = (table.columns || []).filter(c => {
+    const dt = (c.dataType || '').toLowerCase();
+    const nm = c.name.toLowerCase();
+    if (c.isPrimaryKey || c.isForeignKey || c.isGeometry) return false;
+    if (/^(id|gid|code|uuid|guid|matricule)/i.test(nm)) return false;
+    return dt.includes('int') || dt.includes('numeric') || dt.includes('decimal')
+      || dt.includes('real') || dt.includes('double') || dt.includes('float')
+      || /cote|volume|debit|surface|hauteur|longueur|larg|capacite|taux|montant|valeur|prix|pente|aire|area|length|density|quantite|stock|mesure|solde/i.test(nm);
+  });
+  const champsQuantitatifs = quantCols.length > 0
+    ? quantCols.map(c => c.name).join(', ') + (quantCols.length > 7 ? ' (etc.)' : '')
+    : (isFr ? 'Aucun' : 'None');
+
+  // 8. Nombre d'enregistrements
+  const nombreEnregistrements = table.estimatedRows !== undefined && table.estimatedRows !== null && table.estimatedRows > 0
+    ? table.estimatedRows.toLocaleString()
+    : '';
+
+  // 9. Contrôles
+  const controles = isFr
+    ? 'À renseigner selon les rapports de contrôle'
+    : 'To be specified according to audit control reports';
+
+  // 10. État de validation
+  const etatValidation = isFr
+    ? 'À confirmer selon le périmètre contrôlé'
+    : 'To be confirmed according to controlled perimeter';
+
+  return {
+    service,
+    tableName,
+    nature,
+    identifiantMetier,
+    rattachement,
+    champsTemporels,
+    champsQuantitatifs,
+    nombreEnregistrements,
+    controles,
+    etatValidation,
+  };
+}
+
+/**
+ * Generates an Excel (.xlsx) file with the normalized 2-section profile sheet layout.
+ * Section 1: "1- Une fiche par table"
+ * Section 2: "2- Dictionnaire de données physique (champs, types, identifiants et contraintes)"
+ */
+export function generateProfileSheetExcel(schema: PostgresDatabaseSchema, lang: 'fr' | 'en' = 'fr'): Uint8Array {
+  const isFr = lang === 'fr';
+  const wb = XLSX.utils.book_new();
+
+  // Master Sheet with all tables
+  const masterRows: any[][] = [];
+  masterRows.push([isFr ? `RÉFÉRENTIEL DES DONNÉES - ${schema.databaseName.toUpperCase()}` : `DATA DICTIONARY - ${schema.databaseName.toUpperCase()}`, '']);
+  masterRows.push([isFr ? `Généré par OmniGeo • ${new Date().toLocaleDateString()}` : `Generated by OmniGeo • ${new Date().toLocaleDateString()}`, '']);
+  masterRows.push(['', '']);
+
+  for (const table of schema.tables || []) {
+    const profile = computeTableProfile(table, schema, lang);
+
+    // 1- Une fiche par table
+    masterRows.push([isFr ? '1- Une fiche par table' : '1- Table Profile Sheet', '']);
+    masterRows.push([isFr ? 'Service' : 'Service', profile.service]);
+    masterRows.push([isFr ? 'Table' : 'Table', profile.tableName]);
+    masterRows.push([isFr ? 'Nature' : 'Nature', profile.nature]);
+    masterRows.push([isFr ? 'Identifiant métier' : 'Business Identifier', profile.identifiantMetier]);
+    masterRows.push([isFr ? 'Rattachement' : 'Relationship / Foreign Keys', profile.rattachement]);
+    masterRows.push([isFr ? 'Champs temporels' : 'Temporal Fields', profile.champsTemporels]);
+    masterRows.push([isFr ? 'Champs quantitatifs' : 'Quantitative Fields', profile.champsQuantitatifs]);
+    masterRows.push([isFr ? "Nombre d'enregistrements" : 'Record Count', profile.nombreEnregistrements]);
+    masterRows.push([isFr ? 'Contrôles' : 'Controls', profile.controles]);
+    masterRows.push([isFr ? 'État de validation' : 'Validation Status', profile.etatValidation]);
+    masterRows.push(['', '']);
+
+    // 2- Dictionnaire de données physique
+    masterRows.push([isFr ? '2- Dictionnaire de données physique (champs, types, identifiants et contraintes)' : '2- Physical Data Dictionary (fields, types, keys and constraints)', '', '', '', '']);
+    masterRows.push([
+      isFr ? 'Nom du champ' : 'Field Name',
+      isFr ? 'Type de données' : 'Data Type',
+      isFr ? 'Nullable' : 'Nullable',
+      isFr ? 'Clé / Rôle' : 'Key / Role',
+      isFr ? 'Description / Rôle' : 'Description / Role'
+    ]);
+
+    for (const col of table.columns || []) {
+      const canonicalType = normalizeToPostgresType(col.dataType || 'text');
+      const keyRole = col.isPrimaryKey ? 'PK' : col.isForeignKey ? 'FK' : col.isGeometry ? 'GEOMETRY' : '-';
+      const nullableStr = col.isNullable ? (isFr ? 'Optionnel (NULL)' : 'Optional (NULL)') : (isFr ? 'Obligatoire (NOT NULL)' : 'Required (NOT NULL)');
+      masterRows.push([
+        col.name,
+        canonicalType,
+        nullableStr,
+        keyRole,
+        col.comment || (col.isPrimaryKey ? (isFr ? 'Identifiant unique' : 'Primary key') : '-')
+      ]);
+    }
+
+    masterRows.push(['', '', '', '', '']);
+    masterRows.push(['──────────────────────────────────────────────────', '──────────────────────────────────────────────────', '', '', '']);
+    masterRows.push(['', '', '', '', '']);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(masterRows);
+  ws['!cols'] = [
+    { wch: 30 },
+    { wch: 45 },
+    { wch: 22 },
+    { wch: 15 },
+    { wch: 45 }
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, isFr ? 'Fiches_Synthèse' : 'Summary_Sheets');
+
+  // Also create a dedicated tab for each table
+  for (const table of (schema.tables || []).slice(0, 25)) {
+    const profile = computeTableProfile(table, schema, lang);
+    const tableRows: any[][] = [];
+
+    tableRows.push([isFr ? '1- Une fiche par table' : '1- Table Profile Sheet', '']);
+    tableRows.push([isFr ? 'Service' : 'Service', profile.service]);
+    tableRows.push([isFr ? 'Table' : 'Table', profile.tableName]);
+    tableRows.push([isFr ? 'Nature' : 'Nature', profile.nature]);
+    tableRows.push([isFr ? 'Identifiant métier' : 'Business Identifier', profile.identifiantMetier]);
+    tableRows.push([isFr ? 'Rattachement' : 'Relationship / Foreign Keys', profile.rattachement]);
+    tableRows.push([isFr ? 'Champs temporels' : 'Temporal Fields', profile.champsTemporels]);
+    tableRows.push([isFr ? 'Champs quantitatifs' : 'Quantitative Fields', profile.champsQuantitatifs]);
+    tableRows.push([isFr ? "Nombre d'enregistrements" : 'Record Count', profile.nombreEnregistrements]);
+    tableRows.push([isFr ? 'Contrôles' : 'Controls', profile.controles]);
+    tableRows.push([isFr ? 'État de validation' : 'Validation Status', profile.etatValidation]);
+    tableRows.push(['', '']);
+
+    tableRows.push([isFr ? '2- Dictionnaire de données physique (champs, types, identifiants et contraintes)' : '2- Physical Data Dictionary (fields, types, keys and constraints)', '', '', '', '']);
+    tableRows.push([
+      isFr ? 'Nom du champ' : 'Field Name',
+      isFr ? 'Type de données' : 'Data Type',
+      isFr ? 'Nullable' : 'Nullable',
+      isFr ? 'Clé / Rôle' : 'Key / Role',
+      isFr ? 'Description / Rôle' : 'Description / Role'
+    ]);
+
+    for (const col of table.columns || []) {
+      const canonicalType = normalizeToPostgresType(col.dataType || 'text');
+      const keyRole = col.isPrimaryKey ? 'PK' : col.isForeignKey ? 'FK' : col.isGeometry ? 'GEOMETRY' : '-';
+      const nullableStr = col.isNullable ? (isFr ? 'Optionnel (NULL)' : 'Optional (NULL)') : (isFr ? 'Obligatoire (NOT NULL)' : 'Required (NOT NULL)');
+      tableRows.push([
+        col.name,
+        canonicalType,
+        nullableStr,
+        keyRole,
+        col.comment || '-'
+      ]);
+    }
+
+    const tableWs = XLSX.utils.aoa_to_sheet(tableRows);
+    tableWs['!cols'] = [{ wch: 30 }, { wch: 45 }, { wch: 20 }, { wch: 15 }, { wch: 40 }];
+    const safeSheetName = table.name.replace(/[:\\/?*[\]]/g, '_').substring(0, 31);
+    XLSX.utils.book_append_sheet(wb, tableWs, safeSheetName);
+  }
+
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Uint8Array(out);
+}
+
+/**
+ * Generates an RFC-compliant CSV with UTF-8 BOM matching the screenshot profile sheet layout.
+ */
+export function generateProfileSheetCsv(schema: PostgresDatabaseSchema, lang: 'fr' | 'en' = 'fr'): string {
+  const isFr = lang === 'fr';
+  const sep = ';';
+  const lines: string[] = [];
+
+  const escapeCsv = (str: string | number | null | undefined): string => {
+    if (str === null || str === undefined) return '';
+    const s = String(str);
+    if (s.includes('"') || s.includes(sep) || s.includes('\n') || s.includes('\r')) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  lines.push(`${escapeCsv(isFr ? `RÉFÉRENTIEL DES DONNÉES - ${schema.databaseName.toUpperCase()}` : `DATA DICTIONARY - ${schema.databaseName.toUpperCase()}`)}${sep}`);
+  lines.push('');
+
+  for (const table of schema.tables || []) {
+    const profile = computeTableProfile(table, schema, lang);
+
+    lines.push(`${escapeCsv(isFr ? '1- Une fiche par table' : '1- Table Profile Sheet')}${sep}`);
+    lines.push(`${escapeCsv(isFr ? 'Service' : 'Service')}${sep}${escapeCsv(profile.service)}`);
+    lines.push(`${escapeCsv(isFr ? 'Table' : 'Table')}${sep}${escapeCsv(profile.tableName)}`);
+    lines.push(`${escapeCsv(isFr ? 'Nature' : 'Nature')}${sep}${escapeCsv(profile.nature)}`);
+    lines.push(`${escapeCsv(isFr ? 'Identifiant métier' : 'Business Identifier (PK)')}${sep}${escapeCsv(profile.identifiantMetier)}`);
+    lines.push(`${escapeCsv(isFr ? 'Rattachement' : 'Relationship / Foreign Keys')}${sep}${escapeCsv(profile.rattachement)}`);
+    lines.push(`${escapeCsv(isFr ? 'Champs temporels' : 'Temporal Fields')}${sep}${escapeCsv(profile.champsTemporels)}`);
+    lines.push(`${escapeCsv(isFr ? 'Champs quantitatifs' : 'Quantitative Fields')}${sep}${escapeCsv(profile.champsQuantitatifs)}`);
+    lines.push(`${escapeCsv(isFr ? "Nombre d'enregistrements" : 'Record Count')}${sep}${escapeCsv(profile.nombreEnregistrements)}`);
+    lines.push(`${escapeCsv(isFr ? 'Contrôles' : 'Controls')}${sep}${escapeCsv(profile.controles)}`);
+    lines.push(`${escapeCsv(isFr ? 'État de validation' : 'Validation Status')}${sep}${escapeCsv(profile.etatValidation)}`);
+    lines.push('');
+
+    lines.push(`${escapeCsv(isFr ? '2- Dictionnaire de données physique (champs, types, identifiants et contraintes)' : '2- Physical Data Dictionary (fields, types, keys and constraints)')}${sep}${sep}${sep}${sep}`);
+    lines.push([
+      escapeCsv(isFr ? 'Nom du champ' : 'Field Name'),
+      escapeCsv(isFr ? 'Type de données' : 'Data Type'),
+      escapeCsv(isFr ? 'Nullable' : 'Nullable'),
+      escapeCsv(isFr ? 'Clé / Rôle' : 'Key / Role'),
+      escapeCsv(isFr ? 'Description / Rôle' : 'Description / Role'),
+    ].join(sep));
+
+    for (const col of table.columns || []) {
+      const canonicalType = normalizeToPostgresType(col.dataType || 'text');
+      const keyRole = col.isPrimaryKey ? 'PK' : col.isForeignKey ? 'FK' : col.isGeometry ? 'GEOMETRY' : '-';
+      const nullableStr = col.isNullable ? (isFr ? 'Optionnel (NULL)' : 'Optional (NULL)') : (isFr ? 'Obligatoire (NOT NULL)' : 'Required (NOT NULL)');
+      lines.push([
+        escapeCsv(col.name),
+        escapeCsv(canonicalType),
+        escapeCsv(nullableStr),
+        escapeCsv(keyRole),
+        escapeCsv(col.comment || (col.isPrimaryKey ? (isFr ? 'Identifiant unique' : 'Primary key') : '-')),
+      ].join(sep));
+    }
+
+    lines.push('');
+    lines.push('');
+  }
+
+  return '\uFEFF' + lines.join('\r\n');
+}
+
 /**
  * Generates an executive, publication-grade standalone HTML Data Dictionary Report.
  * Supports French ('fr') or English ('en').
@@ -1092,6 +1402,8 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
       `;
     }).join('\n');
 
+    const profile = computeTableProfile(table, schema, lang);
+
     return `
       <section class="table-card" id="tbl-${escapeHtml(table.name)}">
         <div class="table-card-header">
@@ -1108,6 +1420,58 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
           </div>
         </div>
         ${table.comment ? `<p class="table-description">${escapeHtml(table.comment)}</p>` : ''}
+
+        <!-- 1- Une fiche par table -->
+        <div class="fiche-box">
+          <div class="fiche-box-title">1- ${isFr ? 'Une fiche par table' : 'Table Profile Sheet'}</div>
+          <table class="fiche-table">
+            <tbody>
+              <tr>
+                <td class="fiche-label">${isFr ? 'Service' : 'Service'}</td>
+                <td class="fiche-value">${escapeHtml(profile.service)}</td>
+              </tr>
+              <tr>
+                <td class="fiche-label">${isFr ? 'Table' : 'Table'}</td>
+                <td class="fiche-value font-mono font-bold">${escapeHtml(profile.tableName)}</td>
+              </tr>
+              <tr>
+                <td class="fiche-label">${isFr ? 'Nature' : 'Nature'}</td>
+                <td class="fiche-value">${escapeHtml(profile.nature)}</td>
+              </tr>
+              <tr>
+                <td class="fiche-label">${isFr ? 'Identifiant métier' : 'Business Identifier (PK)'}</td>
+                <td class="fiche-value font-mono font-bold text-accent">${escapeHtml(profile.identifiantMetier)}</td>
+              </tr>
+              <tr>
+                <td class="fiche-label">${isFr ? 'Rattachement' : 'Relationship / Foreign Keys'}</td>
+                <td class="fiche-value font-mono">${escapeHtml(profile.rattachement)}</td>
+              </tr>
+              <tr>
+                <td class="fiche-label">${isFr ? 'Champs temporels' : 'Temporal Fields'}</td>
+                <td class="fiche-value font-mono">${escapeHtml(profile.champsTemporels)}</td>
+              </tr>
+              <tr>
+                <td class="fiche-label">${isFr ? 'Champs quantitatifs' : 'Quantitative Fields'}</td>
+                <td class="fiche-value font-mono">${escapeHtml(profile.champsQuantitatifs)}</td>
+              </tr>
+              <tr>
+                <td class="fiche-label">${isFr ? "Nombre d'enregistrements" : 'Record Count'}</td>
+                <td class="fiche-value font-mono">${escapeHtml(profile.nombreEnregistrements)}</td>
+              </tr>
+              <tr>
+                <td class="fiche-label">${isFr ? 'Contrôles' : 'Integrity Controls'}</td>
+                <td class="fiche-value">${escapeHtml(profile.controles)}</td>
+              </tr>
+              <tr>
+                <td class="fiche-label">${isFr ? 'État de validation' : 'Validation Status'}</td>
+                <td class="fiche-value">${escapeHtml(profile.etatValidation)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2- Dictionnaire de données physique -->
+        <div class="fiche-box-title" style="margin-top: 20px;">2- ${isFr ? 'Dictionnaire de données physique (champs, types, identifiants et contraintes)' : 'Physical Data Dictionary (fields, types, keys and constraints)'}</div>
         <div class="table-wrap">
           <table class="data-table">
             <thead>
@@ -1415,6 +1779,60 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
       color: var(--text-muted);
       font-size: 13px;
       font-style: italic;
+    }
+
+    /* Fiche Par Table (Section 1) */
+    .fiche-box {
+      margin: 16px 24px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--card-bg);
+    }
+    .fiche-box-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #D97706;
+      padding: 10px 24px;
+      letter-spacing: -0.01em;
+      border-bottom: 1px solid var(--border);
+      background: rgba(217, 119, 6, 0.05);
+    }
+    .fiche-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .fiche-table td {
+      padding: 9px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      vertical-align: middle;
+      line-height: 1.4;
+    }
+    .fiche-table tr:last-child td {
+      border-bottom: none;
+    }
+    .fiche-label {
+      width: 260px;
+      font-weight: 700;
+      color: #1C1917;
+      background: rgba(0, 0, 0, 0.02);
+      border-right: 1px solid var(--border);
+    }
+    .fiche-value {
+      color: #44403C;
+      word-break: break-word;
+    }
+    .dark-theme .fiche-label {
+      color: #FAF6F0;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .dark-theme .fiche-value {
+      color: #D6D3D1;
+    }
+    .dark-theme .fiche-box-title {
+      background: rgba(217, 119, 6, 0.12);
     }
 
     /* Tables */
@@ -2315,17 +2733,17 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
 
       <!-- Auto Layout (No Overlap) Button -->
       <button class="btn-ctrl" onclick="autoLayoutNoOverlap()" title="${isFr ? 'Réorganiser proprement toutes les tables sans aucun chevauchement' : 'Pack tables neatly with zero overlap'}">
-        <span>📐</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
         <span>${isFr ? 'Auto-Disposition' : 'Auto-Layout'}</span>
       </button>
 
       <button class="btn-ctrl" onclick="toggleTheme()">
-        <span id="theme-icon">☀️</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
         <span id="theme-text">${isFr ? 'Thème' : 'Theme'}</span>
       </button>
 
       <button class="btn-ctrl" onclick="resetZoom()">
-        <span>🎯</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
         <span>${isFr ? 'Centrer' : 'Reset View'}</span>
       </button>
 
@@ -2775,8 +3193,6 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
 
     function toggleTheme() {
       document.body.classList.toggle('light-theme');
-      const isLight = document.body.classList.contains('light-theme');
-      document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
     }
 
     // Initial render

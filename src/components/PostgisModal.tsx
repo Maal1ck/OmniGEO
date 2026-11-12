@@ -477,7 +477,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                         <span className="font-semibold text-stone-900 dark:text-stone-100">Load the SQL Script</span>
                       </div>
                       <p className="text-stone-600 dark:text-stone-400 text-[11px] leading-relaxed">
-                        In pgAdmin&apos;s Query Tool, click the <strong>Open File (📁)</strong> icon or paste the SQL from OmniGeo. The script contains the table schema, SRID {srid} validation, and geometries.
+                        In pgAdmin&apos;s Query Tool, click the <strong>Open File</strong> icon or paste the SQL from OmniGeo. The script contains the table schema, SRID {srid} validation, and geometries.
                       </p>
                     </div>
                     <div className="mt-3 pt-2 border-t border-stone-200 dark:border-stone-800">
@@ -501,7 +501,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                         <span className="font-semibold text-stone-900 dark:text-stone-100">Execute & Visualize</span>
                       </div>
                       <p className="text-stone-600 dark:text-stone-400 text-[11px] leading-relaxed">
-                        Press <strong>Execute (▶ or F5)</strong>. PostGIS creates <code className="font-mono text-amber-600 dark:text-amber-400">{schemaName}.{tableName}</code> with {createSpatialIndex ? 'a GIST spatial index' : 'features'}. Click the eye icon next to the <code className="font-mono">geom</code> column to view geometries on pgAdmin&apos;s map!
+                        Press <strong>Execute (F5)</strong>. PostGIS creates <code className="font-mono text-amber-600 dark:text-amber-400">{schemaName}.{tableName}</code> with {createSpatialIndex ? 'a GIST spatial index' : 'features'}. Click the eye icon next to the <code className="font-mono">geom</code> column to view geometries on pgAdmin&apos;s map!
                       </p>
                     </div>
                     <div className="mt-3 pt-2 border-t border-stone-200 dark:border-stone-800">

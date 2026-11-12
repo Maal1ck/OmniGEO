@@ -291,7 +291,7 @@ export const GpkgLayerModal: React.FC<GpkgLayerModalProps> = ({
                     title={lang === 'fr' ? 'Isoler uniquement cette couche' : 'Isolate only this layer'}
                   >
                     {isSelected && selectedTables.size === 1
-                      ? (lang === 'fr' ? '✔ Isolée seule' : '✔ Isolated')
+                      ? (lang === 'fr' ? 'Isolée seule' : 'Isolated')
                       : (lang === 'fr' ? 'Isoler seule' : 'Isolate')}
                   </button>
                 </div>

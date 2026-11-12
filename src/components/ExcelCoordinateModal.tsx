@@ -456,12 +456,14 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                             <span>{cfg.rowCount.toLocaleString()} r</span>
                             <span>·</span>
                             {isReady ? (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold truncate">
-                                ✓ {cfg.xCol}/{cfg.yCol}
+                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold truncate flex items-center space-x-0.5">
+                                <Check className="w-2.5 h-2.5 shrink-0 mr-0.5" />
+                                <span>{cfg.xCol}/{cfg.yCol}</span>
                               </span>
                             ) : (
-                              <span className="text-amber-600 dark:text-amber-400 font-semibold truncate">
-                                ⚠ X/Y requis
+                              <span className="text-amber-600 dark:text-amber-400 font-semibold truncate flex items-center space-x-0.5">
+                                <AlertCircle className="w-2.5 h-2.5 shrink-0 mr-0.5" />
+                                <span>X/Y requis</span>
                               </span>
                             )}
                           </div>

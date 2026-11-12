@@ -605,7 +605,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                       <span className={`w-3 h-3 rounded-xs border flex items-center justify-center text-[9px] ${
                         isChecked ? 'bg-amber-500 text-stone-950 font-bold' : 'border-stone-400'
                       }`}>
-                        {isChecked && '✓'}
+                        {isChecked && <Check className="w-2.5 h-2.5" />}
                       </span>
                       <span>{f.name}</span>
                     </button>

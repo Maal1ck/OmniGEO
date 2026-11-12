@@ -20,7 +20,10 @@ import {
   ChevronDown, 
   ChevronUp, 
   Network,
-  Key
+  Key,
+  FileSpreadsheet,
+  FileText,
+  LayoutList
 } from 'lucide-react';
 import { SpatialDataset } from '../types/gis';
 import { 
@@ -36,7 +39,10 @@ import {
   categorizeDataType,
   parsePostgresDDL, 
   buildSchemaFromDatasets,
-  generatePythonReportScript
+  generatePythonReportScript,
+  computeTableProfile,
+  generateProfileSheetExcel,
+  generateProfileSheetCsv
 } from '../core/postgresReportEngine';
 import { useTheme } from '../core/theme';
 import { useI18n } from '../core/i18n';
@@ -116,6 +122,45 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // Dictionary view mode: 'profile' (matching user screenshot: 1- Une fiche par table + 2- Dictionnaire physique) vs 'compact'
+  const [dictionaryViewMode, setDictionaryViewMode] = useState<'profile' | 'compact'>('profile');
+
+  // Download Profile Sheet Excel (.xlsx) file handler
+  const handleDownloadProfileExcel = () => {
+    try {
+      const u8 = generateProfileSheetExcel(schema, reportLang);
+      const blob = new Blob([u8.buffer as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${schema.databaseName}_fiche_dictionnaire_${reportLang}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error generating Excel file:', err);
+    }
+  };
+
+  // Download Profile Sheet CSV (.csv) file handler
+  const handleDownloadProfileCsv = () => {
+    try {
+      const csvStr = generateProfileSheetCsv(schema, reportLang);
+      const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${schema.databaseName}_fiche_dictionnaire_${reportLang}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error generating CSV file:', err);
+    }
   };
 
   // Download Physical Data Model (MPD) HTML file handler
@@ -413,6 +458,30 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               <span>{isFr ? 'Imprimer / PDF' : 'Print / PDF'}</span>
             </button>
 
+            {/* Download Profile Sheet Excel (.xlsx) */}
+            <button
+              onClick={handleDownloadProfileExcel}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950/20 transition-all active:scale-95 cursor-pointer"
+              title={isFr ? "Exporter le dictionnaire sous forme de fiches au format Excel (.xlsx)" : "Export data dictionary profile sheets to Excel (.xlsx)"}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-white" />
+              <span>Excel (.xlsx)</span>
+            </button>
+
+            {/* Download Profile Sheet CSV (.csv) */}
+            <button
+              onClick={handleDownloadProfileCsv}
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all active:scale-95 cursor-pointer ${
+                theme === 'light'
+                  ? 'bg-white hover:bg-stone-100 text-stone-800 border-[#D6CEBE]'
+                  : 'bg-stone-900 hover:bg-stone-800 text-stone-200 border-stone-700'
+              }`}
+              title={isFr ? "Exporter le dictionnaire sous forme de fiches au format CSV (.csv)" : "Export data dictionary profile sheets to CSV (.csv)"}
+            >
+              <FileText className="w-3.5 h-3.5 text-sky-400" />
+              <span>CSV</span>
+            </button>
+
             {/* Download Data Dictionary HTML */}
             <button
               onClick={handleDownloadDataDictHtml}
@@ -684,6 +753,38 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </div>
 
                 <div className="flex items-center space-x-2">
+                  {/* View Mode Switcher: Fiche par table (Matching screenshot) vs Compact */}
+                  <div className={`flex items-center p-0.5 rounded-xl border text-xs font-semibold ${
+                    theme === 'light' ? 'bg-[#F5EFE6] border-[#D6CEBE]' : 'bg-stone-900 border-stone-800'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => setDictionaryViewMode('profile')}
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                        dictionaryViewMode === 'profile'
+                          ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                      title={isFr ? "Mode Fiche normalisée (1- Une fiche par table + 2- Dictionnaire physique)" : "Profile Sheet Mode (1- Table Profile + 2- Physical Dictionary)"}
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>{isFr ? 'Fiche par Table' : 'Profile Sheet'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDictionaryViewMode('compact')}
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                        dictionaryViewMode === 'compact'
+                          ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                      title={isFr ? "Mode Tableau condensé standard" : "Compact table view"}
+                    >
+                      <TableProperties className="w-3.5 h-3.5" />
+                      <span>{isFr ? 'Tableau Standard' : 'Standard View'}</span>
+                    </button>
+                  </div>
+
                   <span className="text-[11px] font-mono text-stone-500 uppercase">Schema:</span>
                   <select
                     value={selectedSchemaFilter}
@@ -756,9 +857,80 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Columns Table */}
+                      {/* Columns Table & Profile Sheet */}
                       {!isCollapsed && (
-                        <div className="overflow-x-auto w-full">
+                        <div>
+                          {dictionaryViewMode === 'profile' && (() => {
+                            const profile = computeTableProfile(table, schema, reportLang);
+                            return (
+                              <div className="p-5 border-b border-stone-800/80 space-y-3">
+                                <div className={`text-xs font-display font-bold uppercase tracking-wider flex items-center space-x-2 ${
+                                  theme === 'light' ? 'text-amber-800' : 'text-amber-400'
+                                }`}>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                  <span>1- {isFr ? 'Une fiche par table' : 'Table Profile Sheet'}</span>
+                                </div>
+                                <div className={`rounded-xl border overflow-hidden ${
+                                  theme === 'light' ? 'border-[#E2DBD0] bg-white' : 'border-stone-800 bg-[#120E0C]'
+                                }`}>
+                                  <table className="w-full text-xs font-mono border-collapse table-fixed">
+                                    <tbody className={`divide-y ${theme === 'light' ? 'divide-[#EBE5DC]' : 'divide-stone-800/80'}`}>
+                                      <tr>
+                                        <td className={`w-52 sm:w-64 px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Service' : 'Service'}</td>
+                                        <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.service}</td>
+                                      </tr>
+                                      <tr>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Table' : 'Table'}</td>
+                                        <td className={`px-4 py-2.5 font-bold ${theme === 'light' ? 'text-stone-900' : 'text-amber-400'}`}>{profile.tableName}</td>
+                                      </tr>
+                                      <tr>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Nature' : 'Nature'}</td>
+                                        <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.nature}</td>
+                                      </tr>
+                                      <tr>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Identifiant métier' : 'Business Identifier'}</td>
+                                        <td className={`px-4 py-2.5 font-bold ${theme === 'light' ? 'text-amber-800' : 'text-amber-300'}`}>{profile.identifiantMetier}</td>
+                                      </tr>
+                                      <tr>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Rattachement' : 'Relationship'}</td>
+                                        <td className={`px-4 py-2.5 ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.rattachement}</td>
+                                      </tr>
+                                      <tr>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Champs temporels' : 'Temporal Fields'}</td>
+                                        <td className={`px-4 py-2.5 ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.champsTemporels}</td>
+                                      </tr>
+                                      <tr>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Champs quantitatifs' : 'Quantitative Fields'}</td>
+                                        <td className={`px-4 py-2.5 ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.champsQuantitatifs}</td>
+                                      </tr>
+                                      <tr>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? "Nombre d'enregistrements" : 'Record Count'}</td>
+                                        <td className={`px-4 py-2.5 font-bold ${theme === 'light' ? 'text-stone-900' : 'text-stone-200'}`}>{profile.nombreEnregistrements}</td>
+                                      </tr>
+                                      <tr>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Contrôles' : 'Controls'}</td>
+                                        <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.controles}</td>
+                                      </tr>
+                                      <tr>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'État de validation' : 'Validation Status'}</td>
+                                        <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.etatValidation}</td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {dictionaryViewMode === 'profile' && (
+                            <div className={`px-5 py-2.5 font-display font-bold text-xs uppercase tracking-wider border-b ${
+                              theme === 'light' ? 'bg-[#FDFBF8] text-stone-900 border-[#E2DBD0]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800'
+                            }`}>
+                              2- {isFr ? 'Dictionnaire de données physique (champs, types, identifiants et contraintes)' : 'Physical Data Dictionary (fields, types, keys and constraints)'}
+                            </div>
+                          )}
+
+                          <div className="overflow-x-auto w-full">
                           <table className="w-full text-left text-xs table-fixed border-collapse">
                             <thead className={`text-[10px] uppercase font-mono font-bold border-b ${
                               theme === 'light' ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-slate-900/60 text-slate-400 border-slate-800'
@@ -828,7 +1000,8 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                             </tbody>
                           </table>
                         </div>
-                      )}
+                      </div>
+                    )}
                     </div>
                   );
                 })}
