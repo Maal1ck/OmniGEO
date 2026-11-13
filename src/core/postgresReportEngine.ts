@@ -5,6 +5,7 @@
 
 import { SpatialDataset } from '../types/gis';
 import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
 
 export interface PostgresColumnSchema {
   name: string;
@@ -1015,6 +1016,185 @@ export interface TableProfileSheetData {
 }
 
 /**
+ * Determines if a PostgreSQL table is a business/domain table ("table métier")
+ * as opposed to internal PostgreSQL, PostGIS, ArcSDE, or GDB system/registry/delta tables.
+ */
+export function isBusinessTable(table: PostgresTableSchema): boolean {
+  const name = (table.name || '').toLowerCase();
+  const schema = (table.schema || 'public').toLowerCase();
+
+  if (['pg_catalog', 'information_schema', 'topology', 'tiger', 'tiger_data'].includes(schema)) {
+    return false;
+  }
+
+  if (
+    name.startsWith('sde_') ||
+    name.startsWith('gdb_') ||
+    name.startsWith('st_') ||
+    name.startsWith('rel_sde_') ||
+    name.startsWith('pg_') ||
+    name.startsWith('sql_') ||
+    name.startsWith('keyset_') ||
+    name.startsWith('tmp_') ||
+    name.startsWith('temp_')
+  ) {
+    return false;
+  }
+
+  // ArcSDE versioned delta / spatial index / auxiliary tables (a123, d123, i123, f123, s123, s123_idx$)
+  if (/^[adifs]\d+(_idx\$?)?$/i.test(name)) {
+    return false;
+  }
+
+  if ([
+    'spatial_ref_sys',
+    'geometry_columns',
+    'geography_columns',
+    'raster_columns',
+    'raster_overviews',
+    'layer',
+    'topology',
+    'schema_migrations',
+    'flyway_schema_history',
+    'spatial_index',
+  ].includes(name)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Classifies a table into a logical thematic family ("famille de tables")
+ * combining technical status, domain semantics, shared naming prefixes, and schema names.
+ */
+export function classifyTableFamily(
+  table: PostgresTableSchema,
+  allTables: PostgresTableSchema[] = [],
+  lang: 'fr' | 'en' = 'fr'
+): string {
+  const isFr = lang === 'fr';
+
+  if (!isBusinessTable(table)) {
+    return isFr ? 'Tables Système & Techniques' : 'System & Technical Tables';
+  }
+
+  const name = (table.name || '').toLowerCase();
+  const schema = (table.schema || 'public').toLowerCase();
+
+  // Semantic business domain families (works even when all tables share a single schema like 'sde' or 'public')
+  const domainRules: { regex: RegExp; fr: string; en: string }[] = [
+    {
+      regex: /(bilan|hydraul|hydrolog|apport|evapor|volume_utile|cote_plan|flux_eau|debit|crue)/i,
+      fr: 'Bilans & Suivi Hydraulique',
+      en: 'Hydraulic Balances & Flows',
+    },
+    {
+      regex: /(barrage|retenue|digue|seuil|station_pomp|pompage|vanne|reservoir|chateau_eau|ouvrage)/i,
+      fr: 'Barrages & Ouvrages Hydrauliques',
+      en: 'Dams & Hydraulic Works',
+    },
+    {
+      regex: /(conduite|canalis|reseau|troncon|noeud|aep|assainis|collecteur|egout|regard|branchement)/i,
+      fr: 'Réseaux & Canalisations',
+      en: 'Networks & Pipelines',
+    },
+    {
+      regex: /(forage|nappe|piezo|puits|aquifere|souce_eau|hydrogeo|rabattement)/i,
+      fr: 'Eaux Souterraines & Piézométrie',
+      en: 'Groundwater & Piezometry',
+    },
+    {
+      regex: /(pluie|pluvio|meteo|climat|station_meteo|precipit|evapotransp|temperature)/i,
+      fr: 'Météorologie & Climatologie',
+      en: 'Meteorology & Climatology',
+    },
+    {
+      regex: /(parcelle|foncier|titre|borne|ilot|cadastre|conservation|immatr|bornage)/i,
+      fr: 'Foncier & Cadastre',
+      en: 'Land Registry & Cadastre',
+    },
+    {
+      regex: /(proprietaire|droit|acte|contrat|titulaire|occupant|locataire|cession|mutation)/i,
+      fr: 'Propriétaires & Droits Réels',
+      en: 'Owners & Property Rights',
+    },
+    {
+      regex: /(zonage|plu|urban|batiment|construction|permis|equipement|voirie|occupation_sol)/i,
+      fr: 'Urbanisme & Aménagement',
+      en: 'Urban Planning & Zoning',
+    },
+    {
+      regex: /(commune|province|prefecture|region|cercle|caidat|douar|pays|secteur|bassin|territoire|admin|limite)/i,
+      fr: 'Territoire & Découpage Administratif',
+      en: 'Administrative & Territory Boundaries',
+    },
+    {
+      regex: /(intervention|fuite|maintenance|reparation|incident|alerte|qualite|analyse|prelevement|controle)/i,
+      fr: 'Interventions, Qualité & Exploitation',
+      en: 'Operations, Quality & Maintenance',
+    },
+    {
+      regex: /^(ref_|referentiel|nomenclature|type_|categorie_|statut_|param_|liste_)/i,
+      fr: 'Référentiels & Nomenclatures',
+      en: 'Reference & Lookup Tables',
+    },
+  ];
+
+  for (const rule of domainRules) {
+    if (rule.regex.test(name)) {
+      return isFr ? rule.fr : rule.en;
+    }
+  }
+
+  // Check if at least 2 business tables share the same prefix before '_'
+  const parts = name.split('_').filter(Boolean);
+  if (parts.length >= 2 && parts[0].length >= 3 && !['tbl', 'tab', 'dim', 'fact', 'vue', 'view'].includes(parts[0])) {
+    const prefix = parts[0];
+    const siblingCount = allTables.filter(
+      t => isBusinessTable(t) && (t.name || '').toLowerCase().startsWith(prefix + '_')
+    ).length;
+    if (siblingCount >= 2) {
+      const titlePrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+      return isFr ? `Famille ${titlePrefix}` : `${titlePrefix} Family`;
+    }
+  }
+
+  // Fallback to non-generic schema name
+  if (schema && !['public', 'sde', 'dbo', 'gis', 'data'].includes(schema)) {
+    const formattedSchema = schema
+      .split('_')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+    return isFr ? `Schéma ${formattedSchema}` : `${formattedSchema} Schema`;
+  }
+
+  return isFr ? 'Autres Tables Métiers' : 'Other Business Tables';
+}
+
+function sanitizeArchiveName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 50) || 'Famille';
+}
+
+function buildUniqueSheetName(rawName: string, usedNames: Set<string>): string {
+  const base = rawName.replace(/[:\\/?*[\]]/g, '_').slice(0, 28) || 'Table';
+  let candidate = base;
+  let counter = 2;
+  while (usedNames.has(candidate.toLowerCase())) {
+    const suffix = `_${counter}`;
+    candidate = base.slice(0, 31 - suffix.length) + suffix;
+    counter++;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
+/**
  * Computes structured table profile metadata matching the normalized data dictionary card.
  * (1- Une fiche par table)
  */
@@ -1126,119 +1306,133 @@ export function computeTableProfile(
 }
 
 /**
- * Generates an Excel (.xlsx) file with the normalized 2-section profile sheet layout.
- * Section 1: "1- Une fiche par table"
- * Section 2: "2- Dictionnaire de données physique (champs, types, identifiants et contraintes)"
+ * Generates an Excel (.xlsx) workbook for a specific subset of tables (a single family or whole DB).
+ * Features renamed headers per table:
+ * - Banner per table: "FICHE TABLE : schema.table"
+ * - Section 1: "1- Fiche descriptive — <tableName>" with headers ("Rubrique" | "Spécification / Valeur")
+ * - Section 2: "2- Dictionnaire physique des champs — <tableName>" with unified headers
  */
-export function generateProfileSheetExcel(schema: PostgresDatabaseSchema, lang: 'fr' | 'en' = 'fr'): Uint8Array {
+export function buildFamilyExcelWorkbook(
+  tables: PostgresTableSchema[],
+  schema: PostgresDatabaseSchema,
+  familyTitle: string,
+  lang: 'fr' | 'en' = 'fr'
+): Uint8Array {
   const isFr = lang === 'fr';
   const wb = XLSX.utils.book_new();
+  const usedSheetNames = new Set<string>();
 
-  // Master Sheet with all tables
-  const masterRows: any[][] = [];
-  masterRows.push([isFr ? `RÉFÉRENTIEL DES DONNÉES - ${schema.databaseName.toUpperCase()}` : `DATA DICTIONARY - ${schema.databaseName.toUpperCase()}`, '']);
-  masterRows.push([isFr ? `Généré par OmniGeo • ${new Date().toLocaleDateString()}` : `Generated by OmniGeo • ${new Date().toLocaleDateString()}`, '']);
-  masterRows.push(['', '']);
+  const summaryRows: any[][] = [];
+  summaryRows.push([
+    isFr ? `DICTIONNAIRE DE DONNÉES — FAMILLE : ${familyTitle.toUpperCase()}` : `DATA DICTIONARY — FAMILY: ${familyTitle.toUpperCase()}`,
+    '', '', '', '', ''
+  ]);
+  summaryRows.push([
+    isFr ? `Base de données : ${schema.databaseName} | Tables : ${tables.length} | Généré le ${new Date().toLocaleDateString()}` : `Database: ${schema.databaseName} | Tables: ${tables.length} | Generated on ${new Date().toLocaleDateString()}`,
+    '', '', '', '', ''
+  ]);
+  summaryRows.push(['', '', '', '', '', '']);
 
-  for (const table of schema.tables || []) {
+  const buildTableRows = (table: PostgresTableSchema, targetRows: any[][]) => {
     const profile = computeTableProfile(table, schema, lang);
 
-    // 1- Une fiche par table
-    masterRows.push([isFr ? '1- Une fiche par table' : '1- Table Profile Sheet', '']);
-    masterRows.push([isFr ? 'Service' : 'Service', profile.service]);
-    masterRows.push([isFr ? 'Table' : 'Table', profile.tableName]);
-    masterRows.push([isFr ? 'Nature' : 'Nature', profile.nature]);
-    masterRows.push([isFr ? 'Identifiant métier' : 'Business Identifier', profile.identifiantMetier]);
-    masterRows.push([isFr ? 'Rattachement' : 'Relationship / Foreign Keys', profile.rattachement]);
-    masterRows.push([isFr ? 'Champs temporels' : 'Temporal Fields', profile.champsTemporels]);
-    masterRows.push([isFr ? 'Champs quantitatifs' : 'Quantitative Fields', profile.champsQuantitatifs]);
-    masterRows.push([isFr ? "Nombre d'enregistrements" : 'Record Count', profile.nombreEnregistrements]);
-    masterRows.push([isFr ? 'Contrôles' : 'Controls', profile.controles]);
-    masterRows.push([isFr ? 'État de validation' : 'Validation Status', profile.etatValidation]);
-    masterRows.push(['', '']);
+    // Explicitly renamed table header banner
+    targetRows.push([
+      isFr ? `TABLE : ${profile.tableName}` : `TABLE: ${profile.tableName}`,
+      isFr ? `Classification : ${isBusinessTable(table) ? 'Table Métier' : 'Table Technique'}` : `Classification: ${isBusinessTable(table) ? 'Business Table' : 'Technical Table'}`,
+      '', '', '', ''
+    ]);
 
-    // 2- Dictionnaire de données physique
-    masterRows.push([isFr ? '2- Dictionnaire de données physique (champs, types, identifiants et contraintes)' : '2- Physical Data Dictionary (fields, types, keys and constraints)', '', '', '', '']);
-    masterRows.push([
+    // Section 1: Profile Sheet
+    targetRows.push([
+      isFr ? `1- Fiche descriptive : ${table.name}` : `1- Table Profile: ${table.name}`,
+      ''
+    ]);
+    targetRows.push([
+      isFr ? 'Rubrique' : 'Property',
+      isFr ? 'Spécification / Valeur' : 'Specification / Value'
+    ]);
+    targetRows.push([isFr ? 'Service' : 'Service', profile.service]);
+    targetRows.push([isFr ? 'Table' : 'Table', profile.tableName]);
+    targetRows.push([isFr ? 'Nature' : 'Nature', profile.nature]);
+    targetRows.push([isFr ? 'Identifiant métier' : 'Business Identifier (PK)', profile.identifiantMetier]);
+    targetRows.push([isFr ? 'Rattachement' : 'Foreign Key Links', profile.rattachement]);
+    targetRows.push([isFr ? 'Champs temporels' : 'Temporal Fields', profile.champsTemporels]);
+    targetRows.push([isFr ? 'Champs quantitatifs' : 'Quantitative Fields', profile.champsQuantitatifs]);
+    targetRows.push([isFr ? "Nombre d'enregistrements" : 'Record Count', profile.nombreEnregistrements]);
+    targetRows.push([isFr ? 'Contrôles' : 'Integrity Controls', profile.controles]);
+    targetRows.push([isFr ? 'État de validation' : 'Validation Status', profile.etatValidation]);
+    targetRows.push(['', '', '', '', '', '']);
+
+    // Section 2: Physical Data Dictionary
+    targetRows.push([
+      isFr ? `2- Structure physique des champs : ${table.name}` : `2- Physical Fields Structure: ${table.name}`,
+      '', '', '', '', ''
+    ]);
+    targetRows.push([
       isFr ? 'Nom du champ' : 'Field Name',
-      isFr ? 'Type de données' : 'Data Type',
-      isFr ? 'Nullable' : 'Nullable',
-      isFr ? 'Clé / Rôle' : 'Key / Role',
-      isFr ? 'Description / Rôle' : 'Description / Role'
+      isFr ? 'Type PostgreSQL' : 'PostgreSQL Type',
+      isFr ? 'Nullabilité' : 'Nullability',
+      isFr ? 'Contrainte / Clé' : 'Key / Constraint',
+      isFr ? 'Valeur par défaut' : 'Default Value',
+      isFr ? 'Description / Commentaire' : 'Description / Notes'
     ]);
 
     for (const col of table.columns || []) {
       const canonicalType = normalizeToPostgresType(col.dataType || 'text');
-      const keyRole = col.isPrimaryKey ? 'PK' : col.isForeignKey ? 'FK' : col.isGeometry ? 'GEOMETRY' : '-';
+      const keyParts: string[] = [];
+      if (col.isPrimaryKey) keyParts.push('PK');
+      if (col.isForeignKey) {
+        keyParts.push(col.foreignKeyTarget ? `FK -> ${col.foreignKeyTarget.table}.${col.foreignKeyTarget.column}` : 'FK');
+      }
+      if (col.isGeometry) keyParts.push(`GEOM(${col.srid || 4326})`);
+      const keyRole = keyParts.length > 0 ? keyParts.join(' | ') : '-';
       const nullableStr = col.isNullable ? (isFr ? 'Optionnel (NULL)' : 'Optional (NULL)') : (isFr ? 'Obligatoire (NOT NULL)' : 'Required (NOT NULL)');
-      masterRows.push([
+      targetRows.push([
         col.name,
         canonicalType,
         nullableStr,
         keyRole,
+        col.defaultValue || '-',
         col.comment || (col.isPrimaryKey ? (isFr ? 'Identifiant unique' : 'Primary key') : '-')
       ]);
     }
+  };
 
-    masterRows.push(['', '', '', '', '']);
-    masterRows.push(['──────────────────────────────────────────────────', '──────────────────────────────────────────────────', '', '', '']);
-    masterRows.push(['', '', '', '', '']);
+  for (const table of tables) {
+    buildTableRows(table, summaryRows);
+    summaryRows.push(['', '', '', '', '', '']);
+    summaryRows.push(['--------------------------------------------------', '--------------------------------------------------', '', '', '', '']);
+    summaryRows.push(['', '', '', '', '', '']);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(masterRows);
-  ws['!cols'] = [
-    { wch: 30 },
-    { wch: 45 },
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSummary['!cols'] = [
+    { wch: 32 },
+    { wch: 42 },
     { wch: 22 },
-    { wch: 15 },
-    { wch: 45 }
+    { wch: 26 },
+    { wch: 22 },
+    { wch: 44 },
   ];
-  XLSX.utils.book_append_sheet(wb, ws, isFr ? 'Fiches_Synthèse' : 'Summary_Sheets');
+  const summarySheetName = buildUniqueSheetName(isFr ? 'Catalogue_Famille' : 'Family_Catalog', usedSheetNames);
+  XLSX.utils.book_append_sheet(wb, wsSummary, summarySheetName);
 
-  // Also create a dedicated tab for each table
-  for (const table of (schema.tables || []).slice(0, 25)) {
-    const profile = computeTableProfile(table, schema, lang);
+  // Individual sheet tab per table in this family
+  for (const table of tables.slice(0, 35)) {
     const tableRows: any[][] = [];
-
-    tableRows.push([isFr ? '1- Une fiche par table' : '1- Table Profile Sheet', '']);
-    tableRows.push([isFr ? 'Service' : 'Service', profile.service]);
-    tableRows.push([isFr ? 'Table' : 'Table', profile.tableName]);
-    tableRows.push([isFr ? 'Nature' : 'Nature', profile.nature]);
-    tableRows.push([isFr ? 'Identifiant métier' : 'Business Identifier', profile.identifiantMetier]);
-    tableRows.push([isFr ? 'Rattachement' : 'Relationship / Foreign Keys', profile.rattachement]);
-    tableRows.push([isFr ? 'Champs temporels' : 'Temporal Fields', profile.champsTemporels]);
-    tableRows.push([isFr ? 'Champs quantitatifs' : 'Quantitative Fields', profile.champsQuantitatifs]);
-    tableRows.push([isFr ? "Nombre d'enregistrements" : 'Record Count', profile.nombreEnregistrements]);
-    tableRows.push([isFr ? 'Contrôles' : 'Controls', profile.controles]);
-    tableRows.push([isFr ? 'État de validation' : 'Validation Status', profile.etatValidation]);
-    tableRows.push(['', '']);
-
-    tableRows.push([isFr ? '2- Dictionnaire de données physique (champs, types, identifiants et contraintes)' : '2- Physical Data Dictionary (fields, types, keys and constraints)', '', '', '', '']);
-    tableRows.push([
-      isFr ? 'Nom du champ' : 'Field Name',
-      isFr ? 'Type de données' : 'Data Type',
-      isFr ? 'Nullable' : 'Nullable',
-      isFr ? 'Clé / Rôle' : 'Key / Role',
-      isFr ? 'Description / Rôle' : 'Description / Role'
-    ]);
-
-    for (const col of table.columns || []) {
-      const canonicalType = normalizeToPostgresType(col.dataType || 'text');
-      const keyRole = col.isPrimaryKey ? 'PK' : col.isForeignKey ? 'FK' : col.isGeometry ? 'GEOMETRY' : '-';
-      const nullableStr = col.isNullable ? (isFr ? 'Optionnel (NULL)' : 'Optional (NULL)') : (isFr ? 'Obligatoire (NOT NULL)' : 'Required (NOT NULL)');
-      tableRows.push([
-        col.name,
-        canonicalType,
-        nullableStr,
-        keyRole,
-        col.comment || '-'
-      ]);
-    }
-
+    buildTableRows(table, tableRows);
     const tableWs = XLSX.utils.aoa_to_sheet(tableRows);
-    tableWs['!cols'] = [{ wch: 30 }, { wch: 45 }, { wch: 20 }, { wch: 15 }, { wch: 40 }];
-    const safeSheetName = table.name.replace(/[:\\/?*[\]]/g, '_').substring(0, 31);
-    XLSX.utils.book_append_sheet(wb, tableWs, safeSheetName);
+    tableWs['!cols'] = [
+      { wch: 32 },
+      { wch: 42 },
+      { wch: 22 },
+      { wch: 26 },
+      { wch: 22 },
+      { wch: 44 },
+    ];
+    const safeName = buildUniqueSheetName(table.name, usedSheetNames);
+    XLSX.utils.book_append_sheet(wb, tableWs, safeName);
   }
 
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -1246,7 +1440,121 @@ export function generateProfileSheetExcel(schema: PostgresDatabaseSchema, lang: 
 }
 
 /**
- * Generates an RFC-compliant CSV with UTF-8 BOM matching the screenshot profile sheet layout.
+ * Generates an Excel (.xlsx) single workbook (legacy compatibility).
+ */
+export function generateProfileSheetExcel(schema: PostgresDatabaseSchema, lang: 'fr' | 'en' = 'fr'): Uint8Array {
+  return buildFamilyExcelWorkbook(schema.tables || [], schema, schema.databaseName, lang);
+}
+
+/**
+ * Generates a ZIP archive containing individual Excel (.xlsx) files for each family of tables,
+ * plus an overall index workbook (`00_Sommaire_Familles.xlsx`).
+ */
+export async function generateProfileSheetExcelZip(
+  schema: PostgresDatabaseSchema,
+  lang: 'fr' | 'en' = 'fr'
+): Promise<{
+  zipBytes: Uint8Array;
+  familyCount: number;
+  families: { family: string; fileName: string; tableCount: number }[];
+}> {
+  const isFr = lang === 'fr';
+  const allTables = schema.tables || [];
+  const familyMap = new Map<string, PostgresTableSchema[]>();
+
+  for (const t of allTables) {
+    const fam = classifyTableFamily(t, allTables, lang);
+    if (!familyMap.has(fam)) {
+      familyMap.set(fam, []);
+    }
+    familyMap.get(fam)!.push(t);
+  }
+
+  const zip = new JSZip();
+  const familiesMeta: { family: string; fileName: string; tableCount: number }[] = [];
+  const usedFiles = new Set<string>();
+
+  // Sort families so business families appear first and System/Technical last
+  const systemLabel = isFr ? 'Tables Système & Techniques' : 'System & Technical Tables';
+  const sortedEntries = Array.from(familyMap.entries()).sort(([a], [b]) => {
+    if (a === systemLabel && b !== systemLabel) return 1;
+    if (b === systemLabel && a !== systemLabel) return -1;
+    return a.localeCompare(b);
+  });
+
+  // Build index workbook rows
+  const indexRows: any[][] = [];
+  indexRows.push([
+    isFr ? `SOMMAIRE DES FAMILLES DE TABLES — ${schema.databaseName.toUpperCase()}` : `TABLE FAMILIES INDEX — ${schema.databaseName.toUpperCase()}`,
+    '', '', '', '', '', '', ''
+  ]);
+  indexRows.push([
+    isFr ? 'Famille de tables' : 'Table Family',
+    isFr ? 'Fichier Excel dédié' : 'Dedicated Excel File',
+    isFr ? 'Schéma' : 'Schema',
+    isFr ? 'Nom de la table' : 'Table Name',
+    isFr ? 'Classification' : 'Classification',
+    isFr ? 'Nature' : 'Nature',
+    isFr ? 'Nb Champs' : 'Field Count',
+    isFr ? 'Nb Enregistrements' : 'Record Count',
+  ]);
+
+  let fileIndex = 1;
+  for (const [familyName, famTables] of sortedEntries) {
+    const prefixNum = String(fileIndex).padStart(2, '0');
+    fileIndex++;
+    let baseFileName = `${prefixNum}_${sanitizeArchiveName(familyName)}_${lang}.xlsx`;
+    while (usedFiles.has(baseFileName.toLowerCase())) {
+      baseFileName = `${prefixNum}_${sanitizeArchiveName(familyName)}_${fileIndex}_${lang}.xlsx`;
+    }
+    usedFiles.add(baseFileName.toLowerCase());
+
+    const xlsxBytes = buildFamilyExcelWorkbook(famTables, schema, familyName, lang);
+    zip.file(baseFileName, xlsxBytes);
+    familiesMeta.push({ family: familyName, fileName: baseFileName, tableCount: famTables.length });
+
+    for (const t of famTables) {
+      indexRows.push([
+        familyName,
+        baseFileName,
+        t.schema || 'public',
+        t.name,
+        isBusinessTable(t) ? (isFr ? 'Table Métier' : 'Business Table') : (isFr ? 'Table Technique' : 'Technical Table'),
+        t.isSpatial ? (isFr ? 'Couche Spatiale PostGIS' : 'PostGIS Spatial Layer') : (isFr ? 'Table Tabulaire' : 'Tabular Table'),
+        (t.columns || []).length,
+        t.estimatedRows || 0,
+      ]);
+    }
+  }
+
+  // Create 00_Sommaire_Familles.xlsx
+  const indexWb = XLSX.utils.book_new();
+  const indexWs = XLSX.utils.aoa_to_sheet(indexRows);
+  indexWs['!cols'] = [
+    { wch: 34 },
+    { wch: 38 },
+    { wch: 16 },
+    { wch: 32 },
+    { wch: 18 },
+    { wch: 24 },
+    { wch: 14 },
+    { wch: 20 },
+  ];
+  XLSX.utils.book_append_sheet(indexWb, indexWs, isFr ? 'Sommaire_Familles' : 'Families_Index');
+  const indexOut = XLSX.write(indexWb, { bookType: 'xlsx', type: 'array' });
+  const indexFileName = isFr ? `00_Sommaire_Familles_${lang}.xlsx` : `00_Families_Index_${lang}.xlsx`;
+  zip.file(indexFileName, new Uint8Array(indexOut));
+
+  const zipBytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+  return {
+    zipBytes,
+    familyCount: familiesMeta.length,
+    families: familiesMeta,
+  };
+}
+
+/**
+ * Generates an RFC-compliant CSV with UTF-8 BOM matching the normalized profile sheet layout.
  */
 export function generateProfileSheetCsv(schema: PostgresDatabaseSchema, lang: 'fr' | 'en' = 'fr'): string {
   const isFr = lang === 'fr';
@@ -1262,43 +1570,51 @@ export function generateProfileSheetCsv(schema: PostgresDatabaseSchema, lang: 'f
     return s;
   };
 
-  lines.push(`${escapeCsv(isFr ? `RÉFÉRENTIEL DES DONNÉES - ${schema.databaseName.toUpperCase()}` : `DATA DICTIONARY - ${schema.databaseName.toUpperCase()}`)}${sep}`);
+  lines.push(`${escapeCsv(isFr ? `DICTIONNAIRE DE DONNÉES - ${schema.databaseName.toUpperCase()}` : `DATA DICTIONARY - ${schema.databaseName.toUpperCase()}`)}${sep}`);
   lines.push('');
 
   for (const table of schema.tables || []) {
     const profile = computeTableProfile(table, schema, lang);
 
-    lines.push(`${escapeCsv(isFr ? '1- Une fiche par table' : '1- Table Profile Sheet')}${sep}`);
+    lines.push(`${escapeCsv(isFr ? `TABLE : ${profile.tableName}` : `TABLE: ${profile.tableName}`)}${sep}`);
+    lines.push(`${escapeCsv(isFr ? `1- Fiche descriptive : ${table.name}` : `1- Table Profile: ${table.name}`)}${sep}`);
+    lines.push(`${escapeCsv(isFr ? 'Rubrique' : 'Property')}${sep}${escapeCsv(isFr ? 'Spécification / Valeur' : 'Specification / Value')}`);
     lines.push(`${escapeCsv(isFr ? 'Service' : 'Service')}${sep}${escapeCsv(profile.service)}`);
     lines.push(`${escapeCsv(isFr ? 'Table' : 'Table')}${sep}${escapeCsv(profile.tableName)}`);
     lines.push(`${escapeCsv(isFr ? 'Nature' : 'Nature')}${sep}${escapeCsv(profile.nature)}`);
     lines.push(`${escapeCsv(isFr ? 'Identifiant métier' : 'Business Identifier (PK)')}${sep}${escapeCsv(profile.identifiantMetier)}`);
-    lines.push(`${escapeCsv(isFr ? 'Rattachement' : 'Relationship / Foreign Keys')}${sep}${escapeCsv(profile.rattachement)}`);
+    lines.push(`${escapeCsv(isFr ? 'Rattachement' : 'Foreign Key Links')}${sep}${escapeCsv(profile.rattachement)}`);
     lines.push(`${escapeCsv(isFr ? 'Champs temporels' : 'Temporal Fields')}${sep}${escapeCsv(profile.champsTemporels)}`);
     lines.push(`${escapeCsv(isFr ? 'Champs quantitatifs' : 'Quantitative Fields')}${sep}${escapeCsv(profile.champsQuantitatifs)}`);
     lines.push(`${escapeCsv(isFr ? "Nombre d'enregistrements" : 'Record Count')}${sep}${escapeCsv(profile.nombreEnregistrements)}`);
-    lines.push(`${escapeCsv(isFr ? 'Contrôles' : 'Controls')}${sep}${escapeCsv(profile.controles)}`);
+    lines.push(`${escapeCsv(isFr ? 'Contrôles' : 'Integrity Controls')}${sep}${escapeCsv(profile.controles)}`);
     lines.push(`${escapeCsv(isFr ? 'État de validation' : 'Validation Status')}${sep}${escapeCsv(profile.etatValidation)}`);
     lines.push('');
 
-    lines.push(`${escapeCsv(isFr ? '2- Dictionnaire de données physique (champs, types, identifiants et contraintes)' : '2- Physical Data Dictionary (fields, types, keys and constraints)')}${sep}${sep}${sep}${sep}`);
+    lines.push(`${escapeCsv(isFr ? `2- Structure physique des champs : ${table.name}` : `2- Physical Fields Structure: ${table.name}`)}${sep}${sep}${sep}${sep}${sep}`);
     lines.push([
       escapeCsv(isFr ? 'Nom du champ' : 'Field Name'),
-      escapeCsv(isFr ? 'Type de données' : 'Data Type'),
-      escapeCsv(isFr ? 'Nullable' : 'Nullable'),
-      escapeCsv(isFr ? 'Clé / Rôle' : 'Key / Role'),
-      escapeCsv(isFr ? 'Description / Rôle' : 'Description / Role'),
+      escapeCsv(isFr ? 'Type PostgreSQL' : 'PostgreSQL Type'),
+      escapeCsv(isFr ? 'Nullabilité' : 'Nullability'),
+      escapeCsv(isFr ? 'Contrainte / Clé' : 'Key / Constraint'),
+      escapeCsv(isFr ? 'Valeur par défaut' : 'Default Value'),
+      escapeCsv(isFr ? 'Description / Commentaire' : 'Description / Notes'),
     ].join(sep));
 
     for (const col of table.columns || []) {
       const canonicalType = normalizeToPostgresType(col.dataType || 'text');
-      const keyRole = col.isPrimaryKey ? 'PK' : col.isForeignKey ? 'FK' : col.isGeometry ? 'GEOMETRY' : '-';
+      const keyParts: string[] = [];
+      if (col.isPrimaryKey) keyParts.push('PK');
+      if (col.isForeignKey) keyParts.push(col.foreignKeyTarget ? `FK -> ${col.foreignKeyTarget.table}.${col.foreignKeyTarget.column}` : 'FK');
+      if (col.isGeometry) keyParts.push(`GEOM(${col.srid || 4326})`);
+      const keyRole = keyParts.length > 0 ? keyParts.join(' | ') : '-';
       const nullableStr = col.isNullable ? (isFr ? 'Optionnel (NULL)' : 'Optional (NULL)') : (isFr ? 'Obligatoire (NOT NULL)' : 'Required (NOT NULL)');
       lines.push([
         escapeCsv(col.name),
         escapeCsv(canonicalType),
         escapeCsv(nullableStr),
         escapeCsv(keyRole),
+        escapeCsv(col.defaultValue || '-'),
         escapeCsv(col.comment || (col.isPrimaryKey ? (isFr ? 'Identifiant unique' : 'Primary key') : '-')),
       ].join(sep));
     }
@@ -1313,7 +1629,7 @@ export function generateProfileSheetCsv(schema: PostgresDatabaseSchema, lang: 'f
 /**
  * Generates an executive, publication-grade standalone HTML Data Dictionary Report.
  * Supports French ('fr') or English ('en').
- * Self-contained with CSS, print-friendly, search filter, and interactive badges.
+ * Self-contained with CSS, print-friendly, multi-criteria filtering, and interactive badges.
  */
 export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lang: 'fr' | 'en' = 'fr'): string {
   const isFr = lang === 'fr';
@@ -1321,6 +1637,10 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
   const title = isFr
     ? `Dictionnaire de Données & Architecture PostgreSQL - ${schema.databaseName}`
     : `PostgreSQL Data Dictionary & Schema Architecture - ${schema.databaseName}`;
+
+  const allTables = schema.tables || [];
+  const uniqueSchemas = Array.from(new Set(allTables.map(t => t.schema || 'public'))).sort();
+  const uniqueFamilies = Array.from(new Set(allTables.map(t => classifyTableFamily(t, allTables, lang)))).sort();
 
   const i18n = {
     brand: isFr ? 'OmniGeo • Dictionnaire PostgreSQL' : 'OmniGeo • PostgreSQL Data Dictionary',
@@ -1331,8 +1651,8 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     viewMpdBtn: isFr ? 'Schéma MPD' : 'MPD Schema',
     genAt: isFr ? 'Généré le :' : 'Generated on:',
     serverVer: isFr ? 'Version serveur :' : 'Server version:',
-    kpiTables: isFr ? 'Tables Métier' : 'Relational Tables',
-    kpiTablesSub: isFr ? 'Total des tables relationnelles' : 'Total relational tables',
+    kpiTables: isFr ? 'Tables Base' : 'Total Tables',
+    kpiTablesSub: isFr ? 'Total des tables inventoriées' : 'Total inventoried tables',
     kpiSpatial: isFr ? 'Couches Spatiales (PostGIS)' : 'Spatial Layers (PostGIS)',
     kpiSpatialSub: isFr ? 'Colonnes géométriques indexées' : 'Indexed geometry columns',
     kpiRecords: isFr ? 'Total Enregistrements' : 'Total Records',
@@ -1342,34 +1662,39 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     kpiRels: isFr ? 'Relations (Clés Étrangères)' : 'Foreign Key Relations',
     kpiRelsSub: isFr ? "Liens d'intégrité référentielle" : 'Referential integrity links',
     distLabel: isFr ? 'Distribution des Types PostgreSQL :' : 'PostgreSQL Canonical Types Distribution:',
-    relSectionTitle: isFr ? 'Modèle Relationnel & Clés Étrangères' : 'Relational Model & Foreign Keys',
-    relSectionSub: isFr ? 'Matrice des liaisons référentielles et intégrité de la base' : 'Referential integrity matrix and constraint mapping',
+    relSectionTitle: isFr ? 'Matrice des Relations & Clés Étrangères' : 'Relational Model & Foreign Keys Matrix',
+    relSectionSub: isFr ? 'Liaisons référentielles et intégrité entre les tables' : 'Referential integrity links and constraint mapping',
     activeLinks: isFr ? 'liaisons actives' : 'active relationships',
-    thConstraint: isFr ? 'Contrainte' : 'Constraint Name',
-    thSource: isFr ? 'Table Source (FK)' : 'Source Table (FK)',
+    thConstraint: isFr ? 'Contrainte FK' : 'FK Constraint',
+    thSource: isFr ? 'Table & Champ Source (FK)' : 'Source Table & Column (FK)',
     thCard: isFr ? 'Cardinalité' : 'Cardinality',
-    thTarget: isFr ? 'Table Cible (PK)' : 'Target Table (PK)',
-    thRule: isFr ? 'Règle de Suppression' : 'Delete Rule',
+    thTarget: isFr ? 'Table & Champ Cible (PK)' : 'Target Table & Column (PK)',
+    thRule: isFr ? "Règle d'Intégrité" : 'Integrity Rule',
     noRels: isFr ? 'Aucune contrainte de clé étrangère explicite détectée.' : 'No explicit foreign key constraints detected.',
-    catSectionTitle: isFr ? 'Dictionnaire des Tables & Champs' : 'Tables & Columns Data Dictionary',
-    catSectionSub: isFr ? 'Détail exhaustif des champs, types PostgreSQL canoniques et contraintes par table' : 'Exhaustive column specifications, canonical PostgreSQL types, and constraints',
+    catSectionTitle: isFr ? 'Catalogue & Dictionnaire des Tables' : 'Tables & Columns Data Dictionary',
+    catSectionSub: isFr ? 'Recherche avancée et fiches détaillées par table' : 'Advanced filtering and detailed specifications per table',
     docTables: isFr ? 'tables documentées' : 'documented tables',
-    searchPlaceholder: isFr ? 'Filtrer instantanément par nom de table ou nom de champ...' : 'Filter instantly by table or column name...',
-    thColName: isFr ? 'Nom du Champ' : 'Column Name',
-    thColType: isFr ? 'Type PostgreSQL Canonique' : 'PostgreSQL Canonical Type',
-    thNullable: isFr ? 'Nullabilité' : 'Nullable',
-    thKeys: isFr ? 'Contraintes & Clés' : 'Keys & Constraints',
+    searchPlaceholder: isFr ? 'Rechercher par table, colonne, type PostgreSQL, commentaire ou FK...' : 'Search by table, column, PostgreSQL type, comment or FK...',
+    thColName: isFr ? 'Nom du Champ' : 'Field Name',
+    thColType: isFr ? 'Type PostgreSQL' : 'PostgreSQL Type',
+    thNullable: isFr ? 'Nullabilité' : 'Nullability',
+    thKeys: isFr ? 'Contrainte / Clé' : 'Key / Constraint',
     thDefault: isFr ? 'Valeur par Défaut' : 'Default Value',
     thDesc: isFr ? 'Description' : 'Description',
     fieldsWord: isFr ? 'champs' : 'columns',
     recordsWord: isFr ? 'enregistrements' : 'records',
     spatialBadge: isFr ? 'COUCHE POSTGIS' : 'POSTGIS LAYER',
+    techBadge: isFr ? 'TECHNIQUE' : 'SYSTEM',
   };
 
   // Tables catalog rows
-  const tablesHtml = (schema.tables || []).map(table => {
+  const tablesHtml = allTables.map(table => {
+    const tableFamily = classifyTableFamily(table, allTables, lang);
+    const isBiz = isBusinessTable(table);
+
     const columnsHtml = (table.columns || []).map(col => {
       const canonicalType = normalizeToPostgresType(col.dataType || 'text');
+      const category = categorizeDataType(canonicalType);
       const pkBadge = col.isPrimaryKey ? `<span class="badge badge-pk">PK</span>` : '';
       const fkBadge = col.isForeignKey && col.foreignKeyTarget 
         ? `<span class="badge badge-fk" title="Liaison vers ${escapeHtml(col.foreignKeyTarget.table)}.${escapeHtml(col.foreignKeyTarget.column)}">FK &rarr; ${escapeHtml(col.foreignKeyTarget.table)}</span>` 
@@ -1382,8 +1707,16 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
         ? `<span class="nullable-tag tag-null">NULL</span>` 
         : `<span class="nullable-tag tag-notnull">NOT NULL</span>`;
 
+      const fkText = col.foreignKeyTarget ? `${col.foreignKeyTarget.table}.${col.foreignKeyTarget.column}` : '';
+
       return `
-        <tr class="col-row">
+        <tr class="col-row"
+            data-category="${escapeHtml(category)}"
+            data-pk="${col.isPrimaryKey ? '1' : '0'}"
+            data-fk="${col.isForeignKey ? '1' : '0'}"
+            data-notnull="${!col.isNullable ? '1' : '0'}"
+            data-comment="${escapeHtml((col.comment || '').toLowerCase())}"
+            data-fktarget="${escapeHtml(fkText.toLowerCase())}">
           <td class="col-name font-mono font-bold" title="${escapeHtml(col.name)}">${escapeHtml(col.name)}</td>
           <td class="col-type-cell" title="${escapeHtml(canonicalType)}">
             <span class="type-badge font-mono">${escapeHtml(canonicalType)}</span>
@@ -1405,89 +1738,107 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     const profile = computeTableProfile(table, schema, lang);
 
     return `
-      <section class="table-card" id="tbl-${escapeHtml(table.name)}">
-        <div class="table-card-header">
+      <section class="table-card"
+               id="tbl-${escapeHtml(table.name)}"
+               data-schema="${escapeHtml((table.schema || 'public').toLowerCase())}"
+               data-family="${escapeHtml(tableFamily)}"
+               data-spatial="${table.isSpatial ? '1' : '0'}"
+               data-business="${isBiz ? '1' : '0'}"
+               data-rows="${table.estimatedRows || 0}"
+               data-comment="${escapeHtml((table.comment || '').toLowerCase())}">
+        <div class="table-card-header" onclick="toggleCardBody(this)">
           <div class="table-title-group">
             <span class="schema-tag font-mono">${escapeHtml(table.schema || 'public')}</span>
             <h3 class="table-name font-mono" title="${escapeHtml(table.name)}">${escapeHtml(table.name)}</h3>
+            <span class="family-pill">${escapeHtml(tableFamily)}</span>
             ${table.isSpatial ? `<span class="badge badge-postgis">${i18n.spatialBadge}</span>` : ''}
+            ${!isBiz ? `<span class="badge" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;">${i18n.techBadge}</span>` : ''}
           </div>
           <div class="table-meta-row font-mono">
             <span><strong>${(table.columns || []).length}</strong> ${i18n.fieldsWord}</span>
             <span class="meta-sep">&bull;</span>
             <span><strong>${(table.estimatedRows || 0).toLocaleString()}</strong> ${i18n.recordsWord}</span>
             ${table.sizeFormatted ? `<span class="meta-sep">&bull;</span><span>${escapeHtml(table.sizeFormatted)}</span>` : ''}
+            <span class="collapse-chevron" style="margin-left:8px; font-weight:700; opacity:0.6;">&#9662;</span>
           </div>
         </div>
-        ${table.comment ? `<p class="table-description">${escapeHtml(table.comment)}</p>` : ''}
+        <div class="table-card-body">
+          ${table.comment ? `<p class="table-description">${escapeHtml(table.comment)}</p>` : ''}
 
-        <!-- 1- Une fiche par table -->
-        <div class="fiche-box">
-          <div class="fiche-box-title">1- ${isFr ? 'Une fiche par table' : 'Table Profile Sheet'}</div>
-          <table class="fiche-table">
-            <tbody>
-              <tr>
-                <td class="fiche-label">${isFr ? 'Service' : 'Service'}</td>
-                <td class="fiche-value">${escapeHtml(profile.service)}</td>
-              </tr>
-              <tr>
-                <td class="fiche-label">${isFr ? 'Table' : 'Table'}</td>
-                <td class="fiche-value font-mono font-bold">${escapeHtml(profile.tableName)}</td>
-              </tr>
-              <tr>
-                <td class="fiche-label">${isFr ? 'Nature' : 'Nature'}</td>
-                <td class="fiche-value">${escapeHtml(profile.nature)}</td>
-              </tr>
-              <tr>
-                <td class="fiche-label">${isFr ? 'Identifiant métier' : 'Business Identifier (PK)'}</td>
-                <td class="fiche-value font-mono font-bold text-accent">${escapeHtml(profile.identifiantMetier)}</td>
-              </tr>
-              <tr>
-                <td class="fiche-label">${isFr ? 'Rattachement' : 'Relationship / Foreign Keys'}</td>
-                <td class="fiche-value font-mono">${escapeHtml(profile.rattachement)}</td>
-              </tr>
-              <tr>
-                <td class="fiche-label">${isFr ? 'Champs temporels' : 'Temporal Fields'}</td>
-                <td class="fiche-value font-mono">${escapeHtml(profile.champsTemporels)}</td>
-              </tr>
-              <tr>
-                <td class="fiche-label">${isFr ? 'Champs quantitatifs' : 'Quantitative Fields'}</td>
-                <td class="fiche-value font-mono">${escapeHtml(profile.champsQuantitatifs)}</td>
-              </tr>
-              <tr>
-                <td class="fiche-label">${isFr ? "Nombre d'enregistrements" : 'Record Count'}</td>
-                <td class="fiche-value font-mono">${escapeHtml(profile.nombreEnregistrements)}</td>
-              </tr>
-              <tr>
-                <td class="fiche-label">${isFr ? 'Contrôles' : 'Integrity Controls'}</td>
-                <td class="fiche-value">${escapeHtml(profile.controles)}</td>
-              </tr>
-              <tr>
-                <td class="fiche-label">${isFr ? 'État de validation' : 'Validation Status'}</td>
-                <td class="fiche-value">${escapeHtml(profile.etatValidation)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <!-- 1- Fiche descriptive par table -->
+          <div class="fiche-box">
+            <div class="fiche-box-title">1- ${isFr ? `Fiche descriptive : ${escapeHtml(table.name)}` : `Table Profile: ${escapeHtml(table.name)}`}</div>
+            <table class="fiche-table">
+              <thead>
+                <tr>
+                  <th class="fiche-th-label">${isFr ? 'Rubrique' : 'Property'}</th>
+                  <th class="fiche-th-value">${isFr ? 'Spécification / Valeur' : 'Specification / Value'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="fiche-label">${isFr ? 'Service' : 'Service'}</td>
+                  <td class="fiche-value">${escapeHtml(profile.service)}</td>
+                </tr>
+                <tr>
+                  <td class="fiche-label">${isFr ? 'Table' : 'Table'}</td>
+                  <td class="fiche-value font-mono font-bold">${escapeHtml(profile.tableName)}</td>
+                </tr>
+                <tr>
+                  <td class="fiche-label">${isFr ? 'Nature' : 'Nature'}</td>
+                  <td class="fiche-value">${escapeHtml(profile.nature)}</td>
+                </tr>
+                <tr>
+                  <td class="fiche-label">${isFr ? 'Identifiant métier' : 'Business Identifier (PK)'}</td>
+                  <td class="fiche-value font-mono font-bold text-accent">${escapeHtml(profile.identifiantMetier)}</td>
+                </tr>
+                <tr>
+                  <td class="fiche-label">${isFr ? 'Rattachement' : 'Foreign Key Links'}</td>
+                  <td class="fiche-value font-mono">${escapeHtml(profile.rattachement)}</td>
+                </tr>
+                <tr>
+                  <td class="fiche-label">${isFr ? 'Champs temporels' : 'Temporal Fields'}</td>
+                  <td class="fiche-value font-mono">${escapeHtml(profile.champsTemporels)}</td>
+                </tr>
+                <tr>
+                  <td class="fiche-label">${isFr ? 'Champs quantitatifs' : 'Quantitative Fields'}</td>
+                  <td class="fiche-value font-mono">${escapeHtml(profile.champsQuantitatifs)}</td>
+                </tr>
+                <tr>
+                  <td class="fiche-label">${isFr ? "Nombre d'enregistrements" : 'Record Count'}</td>
+                  <td class="fiche-value font-mono">${escapeHtml(profile.nombreEnregistrements)}</td>
+                </tr>
+                <tr>
+                  <td class="fiche-label">${isFr ? 'Contrôles' : 'Integrity Controls'}</td>
+                  <td class="fiche-value">${escapeHtml(profile.controles)}</td>
+                </tr>
+                <tr>
+                  <td class="fiche-label">${isFr ? 'État de validation' : 'Validation Status'}</td>
+                  <td class="fiche-value">${escapeHtml(profile.etatValidation)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <!-- 2- Dictionnaire de données physique -->
-        <div class="fiche-box-title" style="margin-top: 20px;">2- ${isFr ? 'Dictionnaire de données physique (champs, types, identifiants et contraintes)' : 'Physical Data Dictionary (fields, types, keys and constraints)'}</div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 24%">${i18n.thColName}</th>
-                <th style="width: 25%">${i18n.thColType}</th>
-                <th style="width: 12%" class="text-center">${i18n.thNullable}</th>
-                <th style="width: 17%">${i18n.thKeys}</th>
-                <th style="width: 12%">${i18n.thDefault}</th>
-                <th style="width: 10%">${i18n.thDesc}</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${columnsHtml}
-            </tbody>
-          </table>
+          <!-- 2- Structure physique des champs -->
+          <div class="fiche-box-title" style="margin-top: 20px;">2- ${isFr ? `Structure physique des champs : ${escapeHtml(table.name)}` : `Physical Fields Structure: ${escapeHtml(table.name)}`}</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 24%">${i18n.thColName}</th>
+                  <th style="width: 24%">${i18n.thColType}</th>
+                  <th style="width: 12%" class="text-center">${i18n.thNullable}</th>
+                  <th style="width: 18%">${i18n.thKeys}</th>
+                  <th style="width: 11%">${i18n.thDefault}</th>
+                  <th style="width: 11%">${i18n.thDesc}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${columnsHtml}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
     `;
@@ -1702,27 +2053,158 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     .dist-name { color: #44403C; }
     .dist-count { color: var(--primary); }
 
-    /* Quick Filter & Search Bar */
-    .filter-bar {
-      margin-bottom: 20px;
+    /* Quick Filter & Search Panel */
+    .filter-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
       display: flex;
+      flex-direction: column;
       gap: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+    .filter-top-row {
+      display: flex;
+      gap: 10px;
       align-items: center;
+      flex-wrap: wrap;
     }
     .search-input {
       flex: 1;
-      background: #FFFFFF;
+      min-width: 240px;
+      background: #FAF8F5;
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px 16px;
-      font-size: 14px;
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-size: 13px;
       outline: none;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      font-family: var(--font-sans);
     }
     .search-input:focus {
       border-color: #B45309;
+      background: #FFFFFF;
       box-shadow: 0 0 0 3px rgba(180,83,9,0.1);
     }
+    .filter-controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 155px;
+      flex: 1;
+    }
+    .filter-group label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .filter-select {
+      background: #FAF8F5;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: var(--font-sans);
+      color: var(--text);
+      outline: none;
+      cursor: pointer;
+    }
+    .filter-select:focus {
+      border-color: var(--accent);
+      background: #FFFFFF;
+    }
+    .filter-bottom-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .filter-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+    }
+    .filter-checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: #44403C;
+      font-weight: 500;
+      user-select: none;
+    }
+    .filter-checkbox input {
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+    .filter-status-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .match-counter {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border: 1px solid #BFDBFE;
+    }
+    .btn-filter-mini {
+      background: #FAF8F5;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #44403C;
+    }
+    .btn-filter-mini:hover {
+      background: #F1F5F9;
+      border-color: var(--border-dark);
+    }
+    .family-pill {
+      font-size: 10px;
+      font-weight: 600;
+      background: #F1F5F9;
+      color: #475569;
+      border: 1px solid #CBD5E1;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+    .empty-filter-state {
+      display: none;
+      text-align: center;
+      padding: 40px 24px;
+      background: var(--card-bg);
+      border: 1px dashed var(--border-dark);
+      border-radius: 16px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+    .table-card-header { cursor: pointer; }
+    .table-card.collapsed .table-card-body { display: none; }
+    .table-card.collapsed .collapse-chevron { transform: rotate(-90deg); display: inline-block; }
 
     /* Table Cards */
     .table-card {
@@ -1802,6 +2284,21 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
+    }
+    .fiche-table th {
+      padding: 8px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      text-align: left;
+      background: #F8FAFC;
+      color: #475569;
+    }
+    .fiche-table th.fiche-th-label {
+      width: 260px;
+      border-right: 1px solid var(--border);
     }
     .fiche-table td {
       padding: 9px 18px;
@@ -1957,7 +2454,7 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     @media print {
       body { background: #FFFFFF; padding: 0; font-size: 11px; }
       .container { max-width: 100%; }
-      .header-actions, .filter-bar { display: none !important; }
+      .header-actions, .filter-panel { display: none !important; }
       .table-card { break-inside: avoid; border-color: #CCCCCC; box-shadow: none; margin-bottom: 20px; }
       header.report-header { box-shadow: none; border-color: #CCCCCC; }
     }
@@ -2058,9 +2555,92 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
       <span class="font-mono text-muted" style="font-size: 12px;">${schema.tables.length} ${escapeHtml(i18n.docTables)}</span>
     </div>
 
-    <!-- Real-time Quick Filter -->
-    <div class="filter-bar">
-      <input type="text" class="search-input" id="tableFilter" placeholder="${escapeHtml(i18n.searchPlaceholder)}" oninput="filterReport()">
+    <!-- Advanced Multi-Criteria Search & Filter Panel -->
+    <div class="filter-panel" id="search-filter-panel">
+      <div class="filter-top-row">
+        <input type="text" class="search-input" id="tableFilter" placeholder="${escapeHtml(i18n.searchPlaceholder)}" oninput="filterReport()">
+        <span class="match-counter" id="matchCounter">${allTables.length} / ${allTables.length} ${isFr ? 'tables' : 'tables'}</span>
+        <button type="button" class="btn-filter-mini" onclick="toggleAllCards(true)">${isFr ? 'Tout déplier' : 'Expand All'}</button>
+        <button type="button" class="btn-filter-mini" onclick="toggleAllCards(false)">${isFr ? 'Tout replier' : 'Collapse All'}</button>
+        <button type="button" class="btn-filter-mini" onclick="resetFilters()">${isFr ? 'Réinitialiser' : 'Reset'}</button>
+      </div>
+
+      <div class="filter-controls-row">
+        <div class="filter-group">
+          <label for="filterSchema">${isFr ? 'Schéma' : 'Schema'}</label>
+          <select id="filterSchema" class="filter-select" onchange="filterReport()">
+            <option value="all">${isFr ? `Tous les schémas (${uniqueSchemas.length})` : `All Schemas (${uniqueSchemas.length})`}</option>
+            ${uniqueSchemas.map(s => `<option value="${escapeHtml(s.toLowerCase())}">${escapeHtml(s)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filterFamily">${isFr ? 'Famille de tables' : 'Table Family'}</label>
+          <select id="filterFamily" class="filter-select" onchange="filterReport()">
+            <option value="all">${isFr ? `Toutes les familles (${uniqueFamilies.length})` : `All Families (${uniqueFamilies.length})`}</option>
+            ${uniqueFamilies.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filterScope">${isFr ? 'Classification / Nature' : 'Table Scope'}</label>
+          <select id="filterScope" class="filter-select" onchange="filterReport()">
+            <option value="all">${isFr ? 'Toutes les tables' : 'All Tables'}</option>
+            <option value="business">${isFr ? 'Tables métiers uniquement' : 'Business Tables Only'}</option>
+            <option value="spatial">${isFr ? 'Couches spatiales (PostGIS)' : 'Spatial Layers (PostGIS)'}</option>
+            <option value="tabular">${isFr ? 'Tables tabulaires uniquement' : 'Tabular Tables Only'}</option>
+            <option value="system">${isFr ? 'Tables techniques / système' : 'Technical / System Tables'}</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filterColType">${isFr ? 'Type de champ PostgreSQL' : 'PostgreSQL Field Type'}</label>
+          <select id="filterColType" class="filter-select" onchange="filterReport()">
+            <option value="all">${isFr ? 'Tous les types' : 'All Types'}</option>
+            <option value="Spatial (PostGIS)">Spatial (geometry / geography)</option>
+            <option value="Numeric">${isFr ? 'Numérique (int, numeric, double)' : 'Numeric (int, numeric, double)'}</option>
+            <option value="Text / String">${isFr ? 'Texte (varchar, text)' : 'Text (varchar, text)'}</option>
+            <option value="Temporal (Date/Time)">${isFr ? 'Temporel (date, timestamp)' : 'Temporal (date, timestamp)'}</option>
+            <option value="Boolean">${isFr ? 'Booléen (boolean)' : 'Boolean'}</option>
+            <option value="Special (JSON/UUID)">${isFr ? 'Spécial (jsonb, uuid, bytea)' : 'Special (jsonb, uuid, bytea)'}</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filterConstraint">${isFr ? 'Contraintes & Clés' : 'Keys & Constraints'}</label>
+          <select id="filterConstraint" class="filter-select" onchange="filterReport()">
+            <option value="all">${isFr ? 'Toutes les colonnes' : 'All Columns'}</option>
+            <option value="pk">${isFr ? 'Clés Primaires (PK)' : 'Primary Keys (PK)'}</option>
+            <option value="fk">${isFr ? 'Clés Étrangères (FK)' : 'Foreign Keys (FK)'}</option>
+            <option value="notnull">${isFr ? 'Obligatoires (NOT NULL)' : 'Required (NOT NULL)'}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-bottom-row">
+        <div class="filter-toggles">
+          <label class="filter-checkbox">
+            <input type="checkbox" id="filterHideEmpty" onchange="filterReport()">
+            <span>${isFr ? 'Masquer les tables vides (0 enregistrement)' : 'Hide empty tables (0 rows)'}</span>
+          </label>
+          <label class="filter-checkbox">
+            <input type="checkbox" id="filterMatchingColsOnly" onchange="filterReport()">
+            <span>${isFr ? 'Afficher uniquement les champs correspondants lors du filtrage' : 'Show matching columns only when filtering'}</span>
+          </label>
+        </div>
+        <div class="filter-status-actions">
+          <span class="text-muted" id="colMatchSummary"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty-filter-state" id="emptyFilterState">
+      <p style="font-size: 14px; font-weight: 600; margin-bottom: 10px;">
+        ${isFr ? 'Aucune table ou colonne ne correspond aux critères sélectionnés.' : 'No tables or columns match the selected filters.'}
+      </p>
+      <button type="button" class="btn-action" onclick="resetFilters()">
+        ${isFr ? 'Réinitialiser tous les filtres' : 'Reset all filters'}
+      </button>
     </div>
 
     <!-- Tables List -->
@@ -2070,45 +2650,136 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
   </div>
 
   <script>
-    function filterReport() {
-      const q = document.getElementById('tableFilter').value.toLowerCase().trim();
-      const cards = document.querySelectorAll('.table-card[id^="tbl-"]');
-      
-      cards.forEach(card => {
-        if (!q) {
-          card.style.display = '';
-          const rows = card.querySelectorAll('.col-row');
-          rows.forEach(r => r.style.display = '');
-          return;
-        }
+    function toggleCardBody(headerEl) {
+      const card = headerEl.closest('.table-card');
+      if (card) card.classList.toggle('collapsed');
+    }
 
-        const tableName = card.querySelector('h3.table-name').textContent.toLowerCase();
+    function toggleAllCards(expand) {
+      document.querySelectorAll('.table-card[id^="tbl-"]').forEach(card => {
+        if (expand) card.classList.remove('collapsed');
+        else card.classList.add('collapsed');
+      });
+    }
+
+    function resetFilters() {
+      document.getElementById('tableFilter').value = '';
+      document.getElementById('filterSchema').value = 'all';
+      document.getElementById('filterFamily').value = 'all';
+      document.getElementById('filterScope').value = 'all';
+      document.getElementById('filterColType').value = 'all';
+      document.getElementById('filterConstraint').value = 'all';
+      document.getElementById('filterHideEmpty').checked = false;
+      document.getElementById('filterMatchingColsOnly').checked = false;
+      filterReport();
+    }
+
+    function filterReport() {
+      const q = (document.getElementById('tableFilter').value || '').toLowerCase().trim();
+      const schemaVal = document.getElementById('filterSchema').value;
+      const familyVal = document.getElementById('filterFamily').value;
+      const scopeVal = document.getElementById('filterScope').value;
+      const colTypeVal = document.getElementById('filterColType').value;
+      const constraintVal = document.getElementById('filterConstraint').value;
+      const hideEmpty = document.getElementById('filterHideEmpty').checked;
+      const matchingColsOnly = document.getElementById('filterMatchingColsOnly').checked;
+
+      const cards = document.querySelectorAll('.table-card[id^="tbl-"]');
+      const totalTables = cards.length;
+      let visibleTables = 0;
+      let visibleCols = 0;
+
+      const hasColFilter = Boolean(q || colTypeVal !== 'all' || constraintVal !== 'all');
+
+      cards.forEach(card => {
+        const cSchema = card.getAttribute('data-schema') || '';
+        const cFamily = card.getAttribute('data-family') || '';
+        const cSpatial = card.getAttribute('data-spatial') === '1';
+        const cBiz = card.getAttribute('data-business') === '1';
+        const cRows = parseInt(card.getAttribute('data-rows') || '0', 10);
+        const cComment = card.getAttribute('data-comment') || '';
+        const tableName = (card.querySelector('h3.table-name')?.textContent || '').toLowerCase();
+
+        // Table-level filters
+        if (schemaVal !== 'all' && cSchema !== schemaVal) { card.style.display = 'none'; return; }
+        if (familyVal !== 'all' && cFamily !== familyVal) { card.style.display = 'none'; return; }
+        if (scopeVal === 'business' && !cBiz) { card.style.display = 'none'; return; }
+        if (scopeVal === 'spatial' && !cSpatial) { card.style.display = 'none'; return; }
+        if (scopeVal === 'tabular' && cSpatial) { card.style.display = 'none'; return; }
+        if (scopeVal === 'system' && cBiz) { card.style.display = 'none'; return; }
+        if (hideEmpty && cRows <= 0) { card.style.display = 'none'; return; }
+
+        const tableTextMatch = !q || tableName.includes(q) || cComment.includes(q) || cFamily.toLowerCase().includes(q) || cSchema.includes(q);
         const rows = card.querySelectorAll('.col-row');
-        let hasMatchingCol = false;
+        let matchingRowsInCard = 0;
 
         rows.forEach(r => {
-          const colNameEl = r.querySelector('.col-name');
-          const colTypeEl = r.querySelector('.type-badge') || r.querySelector('.type-pill');
-          const colName = colNameEl ? colNameEl.textContent.toLowerCase() : '';
-          const colType = colTypeEl ? colTypeEl.textContent.toLowerCase() : '';
-          if (colName.includes(q) || colType.includes(q)) {
+          const colName = (r.querySelector('.col-name')?.textContent || '').toLowerCase();
+          const colType = (r.querySelector('.type-badge')?.textContent || '').toLowerCase();
+          const colCat = r.getAttribute('data-category') || '';
+          const isPk = r.getAttribute('data-pk') === '1';
+          const isFk = r.getAttribute('data-fk') === '1';
+          const isNotNull = r.getAttribute('data-notnull') === '1';
+          const colComment = r.getAttribute('data-comment') || '';
+          const fkTarget = r.getAttribute('data-fktarget') || '';
+
+          const matchesType = colTypeVal === 'all' || colCat === colTypeVal;
+          const matchesConstraint =
+            constraintVal === 'all' ||
+            (constraintVal === 'pk' && isPk) ||
+            (constraintVal === 'fk' && isFk) ||
+            (constraintVal === 'notnull' && isNotNull);
+          const matchesQuery =
+            !q ||
+            colName.includes(q) ||
+            colType.includes(q) ||
+            colComment.includes(q) ||
+            fkTarget.includes(q);
+
+          const isColMatch = matchesType && matchesConstraint && matchesQuery;
+          if (isColMatch) matchingRowsInCard++;
+
+          if (!hasColFilter) {
             r.style.display = '';
-            hasMatchingCol = true;
+          } else if (matchingColsOnly) {
+            r.style.display = isColMatch ? '' : 'none';
+          } else if (colTypeVal !== 'all' || constraintVal !== 'all') {
+            r.style.display = isColMatch ? '' : 'none';
           } else {
-            r.style.display = 'none';
+            // Only text query active and table header didn't match -> filter rows
+            r.style.display = tableTextMatch ? '' : (isColMatch ? '' : 'none');
           }
         });
 
-        if (tableName.includes(q) || hasMatchingCol) {
+        const colCriteriaRequired = colTypeVal !== 'all' || constraintVal !== 'all';
+        const showCard = colCriteriaRequired
+          ? (matchingRowsInCard > 0 && (tableTextMatch || matchingRowsInCard > 0))
+          : (tableTextMatch || matchingRowsInCard > 0);
+
+        if (showCard) {
           card.style.display = '';
-          if (tableName.includes(q)) {
-            rows.forEach(r => r.style.display = '');
-          }
+          visibleTables++;
+          rows.forEach(r => { if (r.style.display !== 'none') visibleCols++; });
         } else {
           card.style.display = 'none';
         }
       });
+
+      const counterEl = document.getElementById('matchCounter');
+      if (counterEl) {
+        counterEl.textContent = visibleTables + ' / ' + totalTables + ' ${isFr ? 'tables' : 'tables'}';
+      }
+      const colSummaryEl = document.getElementById('colMatchSummary');
+      if (colSummaryEl) {
+        colSummaryEl.textContent = visibleCols + ' ${isFr ? 'champs affichés' : 'fields visible'}';
+      }
+      const emptyEl = document.getElementById('emptyFilterState');
+      if (emptyEl) {
+        emptyEl.style.display = visibleTables === 0 ? 'block' : 'none';
+      }
     }
+
+    document.addEventListener('DOMContentLoaded', () => { filterReport(); });
   </script>
 </body>
 </html>`;
@@ -2116,24 +2787,33 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
 
 /**
  * Generates an interactive, standalone HTML document containing the
- * Modèle Physique de Données (MPD) / Physical Data Model ERD.
- * Shows entity cards with PK, FK, canonical PostgreSQL types,
- * and dynamic SVG relationship lines with cardinalities (1:N, 1:1, 0:N) and arrows.
- * 100% self-contained, no external CDN dependencies, works offline, and supports zoom/pan/drag.
+ * Modèle Physique de Données (MPD) / Physical Data Model ERD (MCD).
+ * Filters out system/technical tables by default (`businessOnly = true`) so the MCD
+ * displays strictly business tables ("tables métiers") without visual overload.
  */
-export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, lang: 'fr' | 'en' = 'fr'): string {
+export function generatePhysicalDataModelHtml(
+  schema: PostgresDatabaseSchema,
+  lang: 'fr' | 'en' = 'fr',
+  options: { businessOnly?: boolean } = { businessOnly: true }
+): string {
   const isFr = lang === 'fr';
+  const businessOnly = options.businessOnly !== false;
   const title = isFr 
-    ? `Modèle Physique de Données (MPD) - PostgreSQL ${schema.databaseName}`
-    : `Physical Data Model (ERD) - PostgreSQL ${schema.databaseName}`;
-  const generatedTimeStr = new Date(schema.generatedAt).toUTCString();
+    ? `Modèle Physique & Conceptuel (MCD/MPD) - PostgreSQL ${schema.databaseName}`
+    : `Physical & Conceptual Data Model (MCD/MPD) - PostgreSQL ${schema.databaseName}`;
 
-  // Compute collision-free initial layout positions
-  const rawTables = schema.tables || [];
+  const allTables = schema.tables || [];
+  const rawTables = businessOnly ? allTables.filter(isBusinessTable) : allTables;
+  const includedTableNames = new Set(rawTables.map(t => t.name));
+  const filteredRelationships = (schema.relationships || []).filter(
+    r => includedTableNames.has(r.sourceTable) && includedTableNames.has(r.targetTable)
+  );
+  const hiddenTechnicalCount = allTables.length - rawTables.length;
+
   const defaultCardWidth = 340;
   const colGap = 130;
   const rowGap = 50;
-  const numCols = Math.min(Math.max(Math.ceil(Math.sqrt(rawTables.length * 1.5)), 2), 4);
+  const numCols = Math.min(Math.max(Math.ceil(Math.sqrt(Math.max(rawTables.length, 1) * 1.5)), 2), 4);
   const colHeights = new Array(numCols).fill(40);
 
   const tablesJson = JSON.stringify(rawTables.map((t, idx) => {
@@ -2168,7 +2848,7 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
     };
   }));
 
-  const relsJson = JSON.stringify((schema.relationships || []).map((r, rIdx) => ({
+  const relsJson = JSON.stringify(filteredRelationships.map((r, rIdx) => ({
     id: r.id ? `${r.id}_${rIdx}` : `rel_${r.sourceTable}_${r.sourceColumn}_${rIdx}`,
     constraintName: r.constraintName || `fk_${r.sourceTable}_${r.sourceColumn}_${rIdx}`,
     sourceTable: r.sourceTable || '',
@@ -2702,9 +3382,9 @@ export function generatePhysicalDataModelHtml(schema: PostgresDatabaseSchema, la
   <!-- Top Navigation Bar -->
   <header class="mpd-navbar">
     <div class="brand-title-group">
-      <span class="badge-mpd">${isFr ? 'Modèle Physique (MPD)' : 'Physical Model (ERD)'}</span>
+      <span class="badge-mpd">${isFr ? 'MCD / MPD (Tables Métiers)' : 'MCD / ERD (Business Tables)'}</span>
       <h1 class="db-title">${escapeHtml(schema.databaseName)}</h1>
-      <span class="db-meta">(${schema.tables.length} tables &bull; ${schema.relationships.length} ${isFr ? 'relations' : 'relationships'})</span>
+      <span class="db-meta">(${rawTables.length} ${isFr ? 'tables métiers' : 'business tables'}${hiddenTechnicalCount > 0 ? (isFr ? ` • ${hiddenTechnicalCount} tech. masquées` : ` • ${hiddenTechnicalCount} tech. hidden`) : ''} &bull; ${filteredRelationships.length} ${isFr ? 'relations' : 'relationships'})</span>
     </div>
 
     <div class="nav-actions">

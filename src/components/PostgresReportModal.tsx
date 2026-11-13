@@ -23,7 +23,8 @@ import {
   Key,
   FileSpreadsheet,
   FileText,
-  LayoutList
+  Archive,
+  RotateCcw
 } from 'lucide-react';
 import { SpatialDataset } from '../types/gis';
 import { 
@@ -41,8 +42,10 @@ import {
   buildSchemaFromDatasets,
   generatePythonReportScript,
   computeTableProfile,
-  generateProfileSheetExcel,
-  generateProfileSheetCsv
+  generateProfileSheetExcelZip,
+  generateProfileSheetCsv,
+  isBusinessTable,
+  classifyTableFamily
 } from '../core/postgresReportEngine';
 import { useTheme } from '../core/theme';
 import { useI18n } from '../core/i18n';
@@ -82,15 +85,22 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
   const [parseError, setParseError] = useState<string | null>(null);
   const [parseSuccess, setParseSuccess] = useState<string | null>(null);
 
-  // Search filter inside preview
+  // Search & advanced filters inside preview
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedSchemaFilter, setSelectedSchemaFilter] = useState<string>('all');
+  const [selectedFamilyFilter, setSelectedFamilyFilter] = useState<string>('all');
+  const [selectedScopeFilter, setSelectedScopeFilter] = useState<'all' | 'business' | 'spatial' | 'tabular' | 'system'>('all');
+  const [selectedColTypeFilter, setSelectedColTypeFilter] = useState<string>('all');
+  const [selectedConstraintFilter, setSelectedConstraintFilter] = useState<'all' | 'pk' | 'fk' | 'notnull'>('all');
+  const [hideEmptyTables, setHideEmptyTables] = useState<boolean>(false);
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
 
-  // MPD interactive selected entity & card width customizer
+  // MPD interactive selected entity, business-only filter, & card width customizer
   const [selectedMpdTable, setSelectedMpdTable] = useState<string | null>(null);
   const [mpdCardWidth, setMpdCardWidth] = useState<number>(360);
   const [tableWidthOverrides, setTableWidthOverrides] = useState<Record<string, number>>({});
+  const [mpdBusinessOnly, setMpdBusinessOnly] = useState<boolean>(true);
+  const [isGeneratingZip, setIsGeneratingZip] = useState<boolean>(false);
 
   // Copy status
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -106,10 +116,10 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     return generateStandaloneHtmlReport(schema, reportLang);
   }, [schema, reportLang]);
 
-  // Generate HTML Physical Data Model (MPD) report string in chosen language
+  // Generate HTML Physical Data Model (MPD / MCD) report string in chosen language
   const standaloneMpdHtml = useMemo(() => {
-    return generatePhysicalDataModelHtml(schema, reportLang);
-  }, [schema, reportLang]);
+    return generatePhysicalDataModelHtml(schema, reportLang, { businessOnly: mpdBusinessOnly });
+  }, [schema, reportLang, mpdBusinessOnly]);
 
   // Download Data Dictionary HTML file handler
   const handleDownloadDataDictHtml = () => {
@@ -124,24 +134,28 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Dictionary view mode: 'profile' (matching user screenshot: 1- Une fiche par table + 2- Dictionnaire physique) vs 'compact'
+  // Dictionary view mode: 'profile' (matching user screenshot: 1- Fiche descriptive + 2- Structure physique) vs 'compact'
   const [dictionaryViewMode, setDictionaryViewMode] = useState<'profile' | 'compact'>('profile');
 
-  // Download Profile Sheet Excel (.xlsx) file handler
-  const handleDownloadProfileExcel = () => {
+  // Download ZIP archive with one Excel (.xlsx) workbook per family of tables
+  const handleDownloadProfileExcelZip = async () => {
+    if (isGeneratingZip) return;
+    setIsGeneratingZip(true);
     try {
-      const u8 = generateProfileSheetExcel(schema, reportLang);
-      const blob = new Blob([u8.buffer as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const { zipBytes } = await generateProfileSheetExcelZip(schema, reportLang);
+      const blob = new Blob([zipBytes.buffer as ArrayBuffer], { type: 'application/zip' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${schema.databaseName}_fiche_dictionnaire_${reportLang}.xlsx`;
+      a.download = `${schema.databaseName}_dictionnaire_familles_${reportLang}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Error generating Excel file:', err);
+      console.error('Error generating Excel ZIP archive:', err);
+    } finally {
+      setIsGeneratingZip(false);
     }
   };
 
@@ -345,39 +359,109 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     }));
   };
 
-  // Schemas list for dropdown
+  // Schemas & families lists for dropdowns
   const uniqueSchemas = useMemo(() => {
     const s = new Set<string>();
     (schema.tables || []).forEach(t => {
       if (t.schema) s.add(t.schema);
     });
-    return Array.from(s);
+    return Array.from(s).sort();
   }, [schema]);
+
+  const uniqueFamilies = useMemo(() => {
+    const all = schema.tables || [];
+    const f = new Set<string>();
+    all.forEach(t => f.add(classifyTableFamily(t, all, reportLang)));
+    return Array.from(f).sort();
+  }, [schema, reportLang]);
 
   // Filtered tables for preview
   const filteredTables = useMemo(() => {
-    if (!schema.tables) return [];
-    return schema.tables.filter(t => {
-      const matchesSchema = selectedSchemaFilter === 'all' || t.schema === selectedSchemaFilter;
-      if (!matchesSchema) return false;
+    const all = schema.tables || [];
+    if (!all.length) return [];
+    const q = searchQuery.toLowerCase().trim();
 
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
+    return all.filter(t => {
+      if (selectedSchemaFilter !== 'all' && t.schema !== selectedSchemaFilter) return false;
+
+      const family = classifyTableFamily(t, all, reportLang);
+      if (selectedFamilyFilter !== 'all' && family !== selectedFamilyFilter) return false;
+
+      const isBiz = isBusinessTable(t);
+      if (selectedScopeFilter === 'business' && !isBiz) return false;
+      if (selectedScopeFilter === 'spatial' && !t.isSpatial) return false;
+      if (selectedScopeFilter === 'tabular' && t.isSpatial) return false;
+      if (selectedScopeFilter === 'system' && isBiz) return false;
+
+      if (hideEmptyTables && (t.estimatedRows || 0) <= 0) return false;
+
+      const cols = t.columns || [];
+      if (selectedColTypeFilter !== 'all') {
+        const hasType = cols.some(c => categorizeDataType(normalizeToPostgresType(c.dataType || 'text')) === selectedColTypeFilter);
+        if (!hasType) return false;
+      }
+
+      if (selectedConstraintFilter === 'pk' && !cols.some(c => c.isPrimaryKey)) return false;
+      if (selectedConstraintFilter === 'fk' && !cols.some(c => c.isForeignKey)) return false;
+      if (selectedConstraintFilter === 'notnull' && !cols.some(c => !c.isNullable)) return false;
+
+      if (!q) return true;
       const matchTableName = (t.name || '').toLowerCase().includes(q);
-      const matchCols = (t.columns || []).some(c => 
-        (c.name || '').toLowerCase().includes(q) || (c.dataType || '').toLowerCase().includes(q)
+      const matchComment = (t.comment || '').toLowerCase().includes(q);
+      const matchFamily = family.toLowerCase().includes(q);
+      const matchCols = cols.some(c =>
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.dataType || '').toLowerCase().includes(q) ||
+        (c.comment || '').toLowerCase().includes(q) ||
+        (c.foreignKeyTarget?.table || '').toLowerCase().includes(q)
       );
-      return matchTableName || matchCols;
+      return matchTableName || matchComment || matchFamily || matchCols;
     });
-  }, [schema, searchQuery, selectedSchemaFilter]);
+  }, [
+    schema,
+    reportLang,
+    searchQuery,
+    selectedSchemaFilter,
+    selectedFamilyFilter,
+    selectedScopeFilter,
+    selectedColTypeFilter,
+    selectedConstraintFilter,
+    hideEmptyTables,
+  ]);
+
+  const resetPreviewFilters = () => {
+    setSearchQuery('');
+    setSelectedSchemaFilter('all');
+    setSelectedFamilyFilter('all');
+    setSelectedScopeFilter('all');
+    setSelectedColTypeFilter('all');
+    setSelectedConstraintFilter('all');
+    setHideEmptyTables(false);
+  };
+
+  // Business-filtered tables & relationships for MCD/MPD tab
+  const mpdTables = useMemo(() => {
+    const all = schema.tables || [];
+    return mpdBusinessOnly ? all.filter(isBusinessTable) : all;
+  }, [schema, mpdBusinessOnly]);
+
+  const mpdTableNamesSet = useMemo(() => {
+    return new Set(mpdTables.map(t => t.name));
+  }, [mpdTables]);
+
+  const mpdRelationships = useMemo(() => {
+    return (schema.relationships || []).filter(
+      r => mpdTableNamesSet.has(r.sourceTable) && mpdTableNamesSet.has(r.targetTable)
+    );
+  }, [schema, mpdTableNamesSet]);
 
   // Related tables for the selected table in MPD tab
   const mpdHighlightedRelations = useMemo(() => {
-    if (!selectedMpdTable || !schema.relationships) return [];
-    return schema.relationships.filter(
+    if (!selectedMpdTable) return [];
+    return mpdRelationships.filter(
       r => r.sourceTable === selectedMpdTable || r.targetTable === selectedMpdTable
     );
-  }, [schema, selectedMpdTable]);
+  }, [mpdRelationships, selectedMpdTable]);
 
   if (!isOpen) return null;
 
@@ -458,14 +542,15 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               <span>{isFr ? 'Imprimer / PDF' : 'Print / PDF'}</span>
             </button>
 
-            {/* Download Profile Sheet Excel (.xlsx) */}
+            {/* Download ZIP of Excel files per table family */}
             <button
-              onClick={handleDownloadProfileExcel}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950/20 transition-all active:scale-95 cursor-pointer"
-              title={isFr ? "Exporter le dictionnaire sous forme de fiches au format Excel (.xlsx)" : "Export data dictionary profile sheets to Excel (.xlsx)"}
+              onClick={handleDownloadProfileExcelZip}
+              disabled={isGeneratingZip}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white shadow-md shadow-emerald-950/20 transition-all active:scale-95 cursor-pointer"
+              title={isFr ? "Télécharger une archive ZIP contenant un fichier Excel par famille de tables" : "Download a ZIP archive containing individual Excel files per table family"}
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-white" />
-              <span>Excel (.xlsx)</span>
+              <Archive className="w-3.5 h-3.5 text-white" />
+              <span>{isGeneratingZip ? (isFr ? 'Génération...' : 'Packing...') : (isFr ? 'Excel Familles (.zip)' : 'Excel Families (.zip)')}</span>
             </button>
 
             {/* Download Profile Sheet CSV (.csv) */}
@@ -544,9 +629,9 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               }`}
             >
               <Network className="w-3.5 h-3.5 text-purple-400" />
-              <span>{isFr ? 'Modèle Physique (MPD / ERD)' : 'Physical Model (MPD / ERD)'}</span>
+              <span>{isFr ? 'MCD / MPD (Tables Métiers)' : 'MCD / MPD (Business)'}</span>
               <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-bold">
-                {(schema.relationships || []).length} rels
+                {mpdTables.length}
               </span>
             </button>
 
@@ -702,11 +787,11 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         theme === 'light' ? 'bg-[#FAF8F5] text-stone-600 border-[#E2DBD0]' : 'bg-stone-900/60 text-stone-400 border-stone-800'
                       }`}>
                         <tr>
-                          <th className="py-2.5 px-4">{isFr ? 'Contrainte' : 'Constraint'}</th>
-                          <th className="py-2.5 px-4">{isFr ? 'Table Source (FK)' : 'Source Table (FK)'}</th>
+                          <th className="py-2.5 px-4">{isFr ? 'Contrainte FK' : 'FK Constraint'}</th>
+                          <th className="py-2.5 px-4">{isFr ? 'Table & Champ Source (FK)' : 'Source Table & Column (FK)'}</th>
                           <th className="py-2.5 px-4 text-center">{isFr ? 'Cardinalité' : 'Cardinality'}</th>
-                          <th className="py-2.5 px-4">{isFr ? 'Table Cible (PK)' : 'Target Table (PK)'}</th>
-                          <th className="py-2.5 px-4">{isFr ? 'Règle' : 'Rule'}</th>
+                          <th className="py-2.5 px-4">{isFr ? 'Table & Champ Cible (PK)' : 'Target Table & Column (PK)'}</th>
+                          <th className="py-2.5 px-4">{isFr ? "Règle d'Intégrité" : 'Integrity Rule'}</th>
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${theme === 'light' ? 'divide-[#F0ECE4]' : 'divide-stone-800/60'}`}>
@@ -735,71 +820,170 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </div>
               )}
 
-              {/* Filter and Search Bar for Tables */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <div className="relative flex-1 min-w-[260px]">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={isFr ? 'Rechercher une table ou un champ...' : 'Search table or field name...'}
-                    className={`w-full rounded-xl pl-9 pr-3 py-2 text-xs border outline-none focus:ring-2 focus:ring-amber-500/30 transition-all ${
-                      theme === 'light'
-                        ? 'bg-white border-[#D6CEBE] text-stone-900 placeholder-stone-400'
-                        : 'bg-[#181310] border-stone-800 text-stone-100 placeholder-stone-500'
-                    }`}
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  {/* View Mode Switcher: Fiche par table (Matching screenshot) vs Compact */}
-                  <div className={`flex items-center p-0.5 rounded-xl border text-xs font-semibold ${
-                    theme === 'light' ? 'bg-[#F5EFE6] border-[#D6CEBE]' : 'bg-stone-900 border-stone-800'
-                  }`}>
-                    <button
-                      type="button"
-                      onClick={() => setDictionaryViewMode('profile')}
-                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                        dictionaryViewMode === 'profile'
-                          ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
-                          : 'text-stone-400 hover:text-stone-200'
+              {/* Advanced Search & Multi-Criteria Filter Panel */}
+              <div className={`p-4 rounded-xl border space-y-3 ${
+                theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="relative flex-1 min-w-[260px]">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder={isFr ? 'Rechercher une table, un champ, un type PostgreSQL, commentaire ou FK...' : 'Search table, field, PostgreSQL type, comment or FK...'}
+                      className={`w-full rounded-xl pl-9 pr-3 py-2 text-xs border outline-none focus:ring-2 focus:ring-amber-500/30 transition-all ${
+                        theme === 'light'
+                          ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900 placeholder-stone-400'
+                          : 'bg-[#120E0C] border-stone-800 text-stone-100 placeholder-stone-500'
                       }`}
-                      title={isFr ? "Mode Fiche normalisée (1- Une fiche par table + 2- Dictionnaire physique)" : "Profile Sheet Mode (1- Table Profile + 2- Physical Dictionary)"}
-                    >
-                      <FileSpreadsheet className="w-3.5 h-3.5" />
-                      <span>{isFr ? 'Fiche par Table' : 'Profile Sheet'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDictionaryViewMode('compact')}
-                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                        dictionaryViewMode === 'compact'
-                          ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
-                          : 'text-stone-400 hover:text-stone-200'
-                      }`}
-                      title={isFr ? "Mode Tableau condensé standard" : "Compact table view"}
-                    >
-                      <TableProperties className="w-3.5 h-3.5" />
-                      <span>{isFr ? 'Tableau Standard' : 'Standard View'}</span>
-                    </button>
+                    />
                   </div>
 
-                  <span className="text-[11px] font-mono text-stone-500 uppercase">Schema:</span>
-                  <select
-                    value={selectedSchemaFilter}
-                    onChange={(e) => setSelectedSchemaFilter(e.target.value)}
-                    className={`rounded-xl px-3 py-2 text-xs font-mono border focus:outline-none cursor-pointer ${
-                      theme === 'light'
-                        ? 'bg-white border-[#D6CEBE] text-stone-900'
-                        : 'bg-[#181310] border-stone-800 text-stone-200'
-                    }`}
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                      {filteredTables.length} / {(schema.tables || []).length} {isFr ? 'tables' : 'tables'}
+                    </span>
+
+                    {/* View Mode Switcher: Fiche par table vs Tableau Standard */}
+                    <div className={`flex items-center p-0.5 rounded-xl border text-xs font-semibold ${
+                      theme === 'light' ? 'bg-[#F5EFE6] border-[#D6CEBE]' : 'bg-stone-900 border-stone-800'
+                    }`}>
+                      <button
+                        type="button"
+                        onClick={() => setDictionaryViewMode('profile')}
+                        className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                          dictionaryViewMode === 'profile'
+                            ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
+                            : 'text-stone-400 hover:text-stone-200'
+                        }`}
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5" />
+                        <span>{isFr ? 'Fiche par Table' : 'Profile Sheet'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDictionaryViewMode('compact')}
+                        className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                          dictionaryViewMode === 'compact'
+                            ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
+                            : 'text-stone-400 hover:text-stone-200'
+                        }`}
+                      >
+                        <TableProperties className="w-3.5 h-3.5" />
+                        <span>{isFr ? 'Tableau Standard' : 'Standard View'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Multi-Criteria Filter Dropdowns */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5 pt-1">
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase text-stone-500 mb-1">{isFr ? 'Schéma' : 'Schema'}</label>
+                    <select
+                      value={selectedSchemaFilter}
+                      onChange={(e) => setSelectedSchemaFilter(e.target.value)}
+                      className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none cursor-pointer ${
+                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                      }`}
+                    >
+                      <option value="all">{isFr ? `Tous (${uniqueSchemas.length})` : `All (${uniqueSchemas.length})`}</option>
+                      {uniqueSchemas.map((s, idx) => (
+                        <option key={`schema-opt-${s}-${idx}`} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase text-stone-500 mb-1">{isFr ? 'Famille de tables' : 'Table Family'}</label>
+                    <select
+                      value={selectedFamilyFilter}
+                      onChange={(e) => setSelectedFamilyFilter(e.target.value)}
+                      className={`w-full rounded-lg px-2.5 py-1.5 text-xs border focus:outline-none cursor-pointer ${
+                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                      }`}
+                    >
+                      <option value="all">{isFr ? `Toutes (${uniqueFamilies.length})` : `All (${uniqueFamilies.length})`}</option>
+                      {uniqueFamilies.map((f, idx) => (
+                        <option key={`fam-opt-${f}-${idx}`} value={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase text-stone-500 mb-1">{isFr ? 'Classification' : 'Classification'}</label>
+                    <select
+                      value={selectedScopeFilter}
+                      onChange={(e) => setSelectedScopeFilter(e.target.value as any)}
+                      className={`w-full rounded-lg px-2.5 py-1.5 text-xs border focus:outline-none cursor-pointer ${
+                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                      }`}
+                    >
+                      <option value="all">{isFr ? 'Toutes les tables' : 'All Tables'}</option>
+                      <option value="business">{isFr ? 'Tables métiers uniquement' : 'Business Tables Only'}</option>
+                      <option value="spatial">{isFr ? 'Couches spatiales (PostGIS)' : 'Spatial Layers (PostGIS)'}</option>
+                      <option value="tabular">{isFr ? 'Tables tabulaires' : 'Tabular Tables'}</option>
+                      <option value="system">{isFr ? 'Tables système / techniques' : 'System / Technical Tables'}</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase text-stone-500 mb-1">{isFr ? 'Type de champ' : 'Field Type'}</label>
+                    <select
+                      value={selectedColTypeFilter}
+                      onChange={(e) => setSelectedColTypeFilter(e.target.value)}
+                      className={`w-full rounded-lg px-2.5 py-1.5 text-xs border focus:outline-none cursor-pointer ${
+                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                      }`}
+                    >
+                      <option value="all">{isFr ? 'Tous les types' : 'All Types'}</option>
+                      <option value="Spatial (PostGIS)">Spatial (PostGIS)</option>
+                      <option value="Numeric">{isFr ? 'Numérique' : 'Numeric'}</option>
+                      <option value="Text / String">{isFr ? 'Texte' : 'Text / String'}</option>
+                      <option value="Temporal (Date/Time)">{isFr ? 'Temporel' : 'Temporal'}</option>
+                      <option value="Boolean">{isFr ? 'Booléen' : 'Boolean'}</option>
+                      <option value="Special (JSON/UUID)">Special (JSON/UUID)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase text-stone-500 mb-1">{isFr ? 'Clés & Contraintes' : 'Keys & Constraints'}</label>
+                    <select
+                      value={selectedConstraintFilter}
+                      onChange={(e) => setSelectedConstraintFilter(e.target.value as any)}
+                      className={`w-full rounded-lg px-2.5 py-1.5 text-xs border focus:outline-none cursor-pointer ${
+                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                      }`}
+                    >
+                      <option value="all">{isFr ? 'Toutes' : 'All'}</option>
+                      <option value="pk">{isFr ? 'Avec Clé Primaire (PK)' : 'With Primary Key (PK)'}</option>
+                      <option value="fk">{isFr ? 'Avec Clé Étrangère (FK)' : 'With Foreign Key (FK)'}</option>
+                      <option value="notnull">{isFr ? 'Avec champs NOT NULL' : 'With NOT NULL fields'}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Bottom filter utilities */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-stone-800/40 text-xs">
+                  <label className="flex items-center space-x-2 cursor-pointer text-stone-400 hover:text-stone-200 select-none">
+                    <input
+                      type="checkbox"
+                      checked={hideEmptyTables}
+                      onChange={(e) => setHideEmptyTables(e.target.checked)}
+                      className="rounded border-stone-600 accent-amber-500 cursor-pointer"
+                    />
+                    <span>{isFr ? 'Masquer les tables vides (0 enregistrement)' : 'Hide empty tables (0 rows)'}</span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={resetPreviewFilters}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-stone-700 hover:border-amber-500/60 text-stone-300 text-[11px] font-medium transition-colors cursor-pointer"
                   >
-                    <option value="all">ALL SCHEMAS ({uniqueSchemas.length})</option>
-                    {uniqueSchemas.map((s, idx) => (
-                      <option key={`schema-opt-${s}-${idx}`} value={s}>{s}</option>
-                    ))}
-                  </select>
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{isFr ? 'Réinitialiser filtres' : 'Reset filters'}</span>
+                  </button>
                 </div>
               </div>
 
@@ -807,6 +991,8 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               <div className="space-y-4">
                 {filteredTables.map((table, tIdx) => {
                   const isCollapsed = expandedTables[table.name] === false;
+                  const tableFamily = classifyTableFamily(table, schema.tables || [], reportLang);
+                  const isBiz = isBusinessTable(table);
 
                   return (
                     <div 
@@ -822,16 +1008,24 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                           theme === 'light' ? 'bg-[#FDFBF8] hover:bg-stone-50 border-[#E2DBD0]' : 'bg-[#1F1915] hover:bg-[#251E19] border-stone-800'
                         }`}
                       >
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
                           <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-stone-500/20 text-stone-400 uppercase">
                             {table.schema || 'public'}
                           </span>
                           <span className="font-mono font-bold text-sm text-amber-500">
                             {table.name}
                           </span>
+                          <span className="text-[10px] font-sans font-semibold px-2 py-0.5 rounded bg-slate-500/15 text-slate-300 border border-slate-500/30">
+                            {tableFamily}
+                          </span>
                           {table.isSpatial && (
                             <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase">
                               {isFr ? 'COUCHE POSTGIS' : 'POSTGIS LAYER'}
+                            </span>
+                          )}
+                          {!isBiz && (
+                            <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-stone-700/60 text-stone-300 uppercase">
+                              {isFr ? 'TECHNIQUE' : 'SYSTEM'}
                             </span>
                           )}
                           {table.comment && (
@@ -868,12 +1062,20 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                                   theme === 'light' ? 'text-amber-800' : 'text-amber-400'
                                 }`}>
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                  <span>1- {isFr ? 'Une fiche par table' : 'Table Profile Sheet'}</span>
+                                  <span>1- {isFr ? `Fiche descriptive : ${table.name}` : `Table Profile: ${table.name}`}</span>
                                 </div>
                                 <div className={`rounded-xl border overflow-hidden ${
                                   theme === 'light' ? 'border-[#E2DBD0] bg-white' : 'border-stone-800 bg-[#120E0C]'
                                 }`}>
                                   <table className="w-full text-xs font-mono border-collapse table-fixed">
+                                    <thead className={`text-[10px] uppercase font-mono font-bold border-b ${
+                                      theme === 'light' ? 'bg-[#F5EFE6] text-stone-600 border-[#E2DBD0]' : 'bg-stone-900/70 text-stone-400 border-stone-800'
+                                    }`}>
+                                      <tr>
+                                        <th className="w-52 sm:w-64 px-4 py-2 text-left border-r border-stone-800/40">{isFr ? 'Rubrique' : 'Property'}</th>
+                                        <th className="px-4 py-2 text-left">{isFr ? 'Spécification / Valeur' : 'Specification / Value'}</th>
+                                      </tr>
+                                    </thead>
                                     <tbody className={`divide-y ${theme === 'light' ? 'divide-[#EBE5DC]' : 'divide-stone-800/80'}`}>
                                       <tr>
                                         <td className={`w-52 sm:w-64 px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Service' : 'Service'}</td>
@@ -892,7 +1094,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                                         <td className={`px-4 py-2.5 font-bold ${theme === 'light' ? 'text-amber-800' : 'text-amber-300'}`}>{profile.identifiantMetier}</td>
                                       </tr>
                                       <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Rattachement' : 'Relationship'}</td>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Rattachement' : 'Foreign Key Links'}</td>
                                         <td className={`px-4 py-2.5 ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.rattachement}</td>
                                       </tr>
                                       <tr>
@@ -908,7 +1110,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                                         <td className={`px-4 py-2.5 font-bold ${theme === 'light' ? 'text-stone-900' : 'text-stone-200'}`}>{profile.nombreEnregistrements}</td>
                                       </tr>
                                       <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Contrôles' : 'Controls'}</td>
+                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Contrôles' : 'Integrity Controls'}</td>
                                         <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.controles}</td>
                                       </tr>
                                       <tr>
@@ -926,7 +1128,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                             <div className={`px-5 py-2.5 font-display font-bold text-xs uppercase tracking-wider border-b ${
                               theme === 'light' ? 'bg-[#FDFBF8] text-stone-900 border-[#E2DBD0]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800'
                             }`}>
-                              2- {isFr ? 'Dictionnaire de données physique (champs, types, identifiants et contraintes)' : 'Physical Data Dictionary (fields, types, keys and constraints)'}
+                              2- {isFr ? `Structure physique des champs : ${table.name}` : `Physical Fields Structure: ${table.name}`}
                             </div>
                           )}
 
@@ -936,10 +1138,10 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                               theme === 'light' ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-slate-900/60 text-slate-400 border-slate-800'
                             }`}>
                               <tr>
-                                <th className="py-2.5 px-4 w-[25%] truncate">{isFr ? 'Nom du Champ' : 'Column Name'}</th>
-                                <th className="py-2.5 px-4 w-[26%] truncate">{isFr ? 'Type PostgreSQL Canonique' : 'PostgreSQL Canonical Type'}</th>
-                                <th className="py-2.5 px-4 w-[12%] text-center truncate">{isFr ? 'Nullabilité' : 'Nullable'}</th>
-                                <th className="py-2.5 px-4 w-[22%] truncate">{isFr ? 'Clés & Contraintes' : 'Keys & Constraints'}</th>
+                                <th className="py-2.5 px-4 w-[25%] truncate">{isFr ? 'Nom du Champ' : 'Field Name'}</th>
+                                <th className="py-2.5 px-4 w-[26%] truncate">{isFr ? 'Type PostgreSQL' : 'PostgreSQL Type'}</th>
+                                <th className="py-2.5 px-4 w-[12%] text-center truncate">{isFr ? 'Nullabilité' : 'Nullability'}</th>
+                                <th className="py-2.5 px-4 w-[22%] truncate">{isFr ? 'Contrainte / Clé' : 'Key / Constraint'}</th>
                                 <th className="py-2.5 px-4 w-[15%] truncate">{isFr ? 'Valeur par Défaut' : 'Default Value'}</th>
                               </tr>
                             </thead>
@@ -1005,6 +1207,24 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                     </div>
                   );
                 })}
+
+                {filteredTables.length === 0 && (
+                  <div className={`p-8 rounded-xl border border-dashed text-center space-y-3 ${
+                    theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-600' : 'bg-[#181310] border-stone-800 text-stone-400'
+                  }`}>
+                    <p className="text-sm font-semibold">
+                      {isFr ? 'Aucune table ou colonne ne correspond aux filtres sélectionnés.' : 'No tables or columns match the selected filters.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={resetPreviewFilters}
+                      className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>{isFr ? 'Réinitialiser tous les filtres' : 'Reset all filters'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1022,17 +1242,33 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <Network className="w-5 h-5 text-blue-500 shrink-0" />
                   <div>
                     <h3 className="text-xs font-bold font-sans">
-                      {isFr ? 'Modèle Physique de Données (MPD) Schématique' : 'Physical Data Model (ERD) Schematic'}
+                      {isFr ? 'Modèle Conceptuel & Physique (MCD / MPD) — Tables Métiers' : 'Conceptual & Physical Data Model (MCD / ERD) — Business Tables'}
                     </h3>
                     <p className="text-[11px] text-slate-400">
                       {isFr 
-                        ? 'Vue graphique des entités relationnelles, largeurs éditables et types PostgreSQL canoniques.'
-                        : 'Visual layout of relational entities with editable card widths and canonical PostgreSQL types.'}
+                        ? `Affichage épuré : ${mpdTables.length} tables métiers affichées sur ${(schema.tables || []).length} tables totales.`
+                        : `Clean view: ${mpdTables.length} business tables shown out of ${(schema.tables || []).length} total tables.`}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Business-Only Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setMpdBusinessOnly(prev => !prev)}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                      mpdBusinessOnly
+                        ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                    }`}
+                    title={isFr ? 'Masquer les tables système/techniques (sde_*, gdb_*, pg_*, index) pour ne pas surcharger le MCD' : 'Hide system/technical tables to keep the model clean'}
+                  >
+                    {mpdBusinessOnly
+                      ? (isFr ? `Tables métiers uniquement (${mpdTables.length}/${(schema.tables || []).length})` : `Business Only (${mpdTables.length}/${(schema.tables || []).length})`)
+                      : (isFr ? `Toutes les tables (${(schema.tables || []).length})` : `All Tables (${(schema.tables || []).length})`)}
+                  </button>
+
                   {/* Card Width Slider & Presets */}
                   <div className={`flex items-center space-x-2 px-2.5 py-1 rounded-lg border text-xs ${
                     theme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-800 border-slate-700'
@@ -1071,7 +1307,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       <button
                         onClick={() => {
                           const overrides: Record<string, number> = {};
-                          (schema.tables || []).forEach(t => {
+                          mpdTables.forEach(t => {
                             let maxChars = t.name.length + 8;
                             (t.columns || []).forEach(c => {
                               const chars = (c.name || '').length + (c.dataType || '').length + 8;
@@ -1094,7 +1330,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                     className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>{isFr ? 'Exporter MPD (HTML)' : 'Export MPD (HTML)'}</span>
+                    <span>{isFr ? 'Exporter MCD/MPD (HTML)' : 'Export MCD/ERD (HTML)'}</span>
                   </button>
 
                   <button
@@ -1109,14 +1345,16 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
               {/* In-app flexible non-overlapping container of Entity Cards */}
               <div className="flex flex-wrap gap-4 items-start justify-start">
-                {(schema.tables || []).map((table, tIdx) => {
+                {mpdTables.map((table, tIdx) => {
                   const isSelected = selectedMpdTable === table.name;
                   const isLinkedToSelected = selectedMpdTable && mpdHighlightedRelations.some(
                     r => (r.sourceTable === table.name && r.targetTable === selectedMpdTable) ||
                          (r.targetTable === table.name && r.sourceTable === selectedMpdTable)
                   );
 
-                  const safeForeignKeys = Array.isArray(table.foreignKeys) ? table.foreignKeys : [];
+                  const safeForeignKeys = (Array.isArray(table.foreignKeys) ? table.foreignKeys : []).filter(
+                    fk => mpdTableNamesSet.has(fk.targetTable)
+                  );
                   const currentWidth = mpdCardWidth >= 900 
                     ? '100%' 
                     : `${tableWidthOverrides[table.name] || mpdCardWidth}px`;
