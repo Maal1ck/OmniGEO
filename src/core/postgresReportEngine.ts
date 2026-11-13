@@ -762,7 +762,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '48.2 MB',
         isSpatial: true,
         primaryKeys: ['id_parcelle'],
-        comment: 'Unités cadastrales géoréférencées avec assiette foncière et contenance légale',
+        comment: 'Service : Conservation Foncière & Cadastre | Unités cadastrales géoréférencées avec assiette foncière',
         columns: [
           { name: 'id_parcelle', dataType: 'bigint', isNullable: false, defaultValue: "nextval('cadastre.parcelle_seq')", isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'numero_titre', dataType: 'character varying(64)', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: false, isGeometry: false },
@@ -785,7 +785,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '12.4 MB',
         isSpatial: false,
         primaryKeys: ['id_proprietaire'],
-        comment: 'Personnes physiques et morales titulaires de droits réels immobiliers',
+        comment: 'Service : Droits Réels & Propriétaires | Personnes physiques et morales titulaires de droits immobiliers',
         columns: [
           { name: 'id_proprietaire', dataType: 'bigserial', isNullable: false, defaultValue: "nextval('proprietaires_seq')", isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'cin_rc', dataType: 'character varying(32)', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: false, isGeometry: false },
@@ -804,7 +804,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '8.6 MB',
         isSpatial: false,
         primaryKeys: ['id_droit'],
-        comment: 'Table associative N:M matérialisant la quote-part et usufruit de chaque propriétaire sur la parcelle',
+        comment: 'Service : Droits Réels & Propriétaires | Table associative N:M quote-part et usufruit sur parcelle',
         columns: [
           { name: 'id_droit', dataType: 'bigserial', isNullable: false, defaultValue: null, isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'id_parcelle_fk', dataType: 'bigint', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: true, foreignKeyTarget: { table: 'parcelles_cadastrales', column: 'id_parcelle' }, isGeometry: false },
@@ -825,7 +825,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '3.1 MB',
         isSpatial: true,
         primaryKeys: ['code_commune'],
-        comment: 'Découpage administratif officiel des communes et arrondissements territoriaux',
+        comment: 'Service : Aménagement du Territoire & Urbanisme | Découpage administratif officiel des communes',
         columns: [
           { name: 'code_commune', dataType: 'character varying(10)', isNullable: false, defaultValue: null, isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'nom_commune_fr', dataType: 'character varying(100)', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: false, isGeometry: false },
@@ -843,7 +843,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '5.2 MB',
         isSpatial: true,
         primaryKeys: ['code_zone'],
-        comment: "Zones réglementaires du Plan d'Aménagement et d'Urbanisme (Urbain, Agricole, Industriel)",
+        comment: "Service : Aménagement du Territoire & Urbanisme | Zones réglementaires du Plan d'Aménagement",
         columns: [
           { name: 'code_zone', dataType: 'character varying(20)', isNullable: false, defaultValue: null, isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'libelle_zone', dataType: 'character varying(150)', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: false, isGeometry: false },
@@ -860,7 +860,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '22.0 MB',
         isSpatial: true,
         primaryKeys: ['id_borne'],
-        comment: 'Sommets et bornes cadastrales relevées par géomètre-expert',
+        comment: 'Service : Conservation Foncière & Cadastre | Sommets et bornes cadastrales relevées par géomètre',
         columns: [
           { name: 'id_borne', dataType: 'bigserial', isNullable: false, defaultValue: null, isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'numero_borne', dataType: 'character varying(20)', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: false, isGeometry: false },
@@ -909,7 +909,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '38.5 MB',
         isSpatial: true,
         primaryKeys: ['id_conduite'],
-        comment: "Tronçons de canalisation d'adduction et de distribution sous pression",
+        comment: "Service : Exploitation Réseau AEP | Tronçons de canalisation d'adduction et distribution",
         columns: [
           { name: 'id_conduite', dataType: 'bigserial', isNullable: false, defaultValue: null, isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'code_troncon', dataType: 'character varying(40)', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: false, isGeometry: false },
@@ -931,7 +931,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '1.2 MB',
         isSpatial: true,
         primaryKeys: ['id_station'],
-        comment: "Usines d'exhaure, châteaux d'eau et surpresseurs de distribution",
+        comment: "Service : Ouvrages Hydrauliques & Pompage | Usines d'exhaure et surpresseurs",
         columns: [
           { name: 'id_station', dataType: 'bigserial', isNullable: false, defaultValue: null, isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'nom_station', dataType: 'character varying(100)', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: false, isGeometry: false },
@@ -948,7 +948,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '4.8 MB',
         isSpatial: true,
         primaryKeys: ['id_vanne'],
-        comment: 'Organes de coupure et régulation de débit du réseau',
+        comment: 'Service : Exploitation Réseau AEP | Organes de coupure et régulation de débit',
         columns: [
           { name: 'id_vanne', dataType: 'bigserial', isNullable: false, defaultValue: null, isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'id_conduite_fk', dataType: 'bigint', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: true, foreignKeyTarget: { table: 'conduites_canalisations', column: 'id_conduite' }, isGeometry: false },
@@ -967,7 +967,7 @@ export const SAMPLE_POSTGRES_DATABASES: Record<string, PostgresDatabaseSchema> =
         sizeFormatted: '8.4 MB',
         isSpatial: true,
         primaryKeys: ['id_intervention'],
-        comment: 'Journal des interventions curatives et réparations de casses',
+        comment: 'Service : Maintenance & Interventions | Journal des réparations et casses réseau',
         columns: [
           { name: 'id_intervention', dataType: 'bigserial', isNullable: false, defaultValue: null, isPrimaryKey: true, isForeignKey: false, isGeometry: false },
           { name: 'id_conduite_fk', dataType: 'bigint', isNullable: false, defaultValue: null, isPrimaryKey: false, isForeignKey: true, foreignKeyTarget: { table: 'conduites_canalisations', column: 'id_conduite' }, isGeometry: false },
@@ -1065,8 +1065,72 @@ export function isBusinessTable(table: PostgresTableSchema): boolean {
 }
 
 /**
- * Classifies a table into a logical thematic family ("famille de tables")
- * combining technical status, domain semantics, shared naming prefixes, and schema names.
+ * Extracts a universal grouping label ("Service", "Famille", "Domaine", etc.)
+ * from a PostgreSQL table comment.
+ * Examples supported:
+ *  - "Service : Gestion et Développement des Ressources en Eau" -> "Gestion et Développement des Ressources en Eau"
+ *  - "Service : Eau Potable | Description..." -> "Eau Potable"
+ *  - "Domaine : Foncier & Cadastre" -> "Foncier & Cadastre"
+ *  - "Module - Ressources Humaines" -> "Ressources Humaines"
+ *  - Shared concise comment across multiple tables -> comment itself
+ */
+export function extractGroupFromComment(
+  comment?: string | null,
+  allTables: PostgresTableSchema[] = []
+): string | null {
+  if (!comment || typeof comment !== 'string') return null;
+  const trimmed = comment.trim();
+  if (!trimmed) return null;
+
+  // 1. Explicit structured label in comment (Service :, Famille :, Domaine :, Module :, Direction :, Catégorie :, etc.)
+  const labelRegex = /(?:^|\n|\|)\s*(?:Service|Famille|Family|Domaine|Domain|Direction|Département|Departement|Department|Module|Thème|Theme|Catégorie|Categorie|Category|Groupe|Group|Unité|Unite|Unit|Division|Section|Pôle|Pole|Branche)\s*[:=\-]\s*([^\n|;]+)/i;
+  const labelMatch = trimmed.match(labelRegex);
+  if (labelMatch && labelMatch[1]) {
+    const val = labelMatch[1].trim().replace(/[.\s]+$/, '');
+    if (val.length > 0) return val;
+  }
+
+  // 2. Delimited prefix format: "Group Name | Description" or "Group Name — Description"
+  const pipeOrDashParts = trimmed.split(/\s*(?:\||—|\n)\s*/);
+  if (pipeOrDashParts.length >= 2) {
+    const firstPart = pipeOrDashParts[0].trim();
+    if (firstPart.length >= 2 && firstPart.length <= 75) {
+      return firstPart;
+    }
+  }
+
+  // 3. Generic "Key : Value" on single short line
+  const colonMatch = trimmed.match(/^([^:\n]{2,35})\s*:\s*([^\n.;]{2,80})$/);
+  if (colonMatch && !/^https?$/i.test(colonMatch[1].trim())) {
+    return colonMatch[2].trim();
+  }
+
+  // 4. Shared identical comment used across >= 2 tables (universal convention)
+  const normalized = trimmed.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= 85) {
+    const sameCommentCount = allTables.filter(
+      t => (t.comment || '').replace(/\s+/g, ' ').trim().toLowerCase() === normalized.toLowerCase()
+    ).length;
+    if (sameCommentCount >= 2) {
+      return normalized;
+    }
+  }
+
+  // 5. Concise single-phrase comment without full-sentence punctuation
+  if (normalized.length <= 55 && !normalized.includes('. ')) {
+    return normalized.replace(/\.+$/, '');
+  }
+
+  return null;
+}
+
+/**
+ * Classifies a table universally across ANY PostgreSQL database:
+ * 1. System / Technical tables -> "Tables Système & Techniques"
+ * 2. Table `comment` (e.g., "Service : Gestion et Développement des Ressources en Eau")
+ * 3. Shared naming prefix among >= 2 business tables (e.g., `rh_*`, `sig_*`, `bilan_*`)
+ * 4. Non-generic PostgreSQL schema name (if other than public/sde/dbo/gis/data)
+ * 5. Default fallback ("Autres Tables Métiers")
  */
 export function classifyTableFamily(
   table: PostgresTableSchema,
@@ -1079,88 +1143,29 @@ export function classifyTableFamily(
     return isFr ? 'Tables Système & Techniques' : 'System & Technical Tables';
   }
 
+  // Priority 1: Extract directly from PostgreSQL table comment (e.g., "Service : ...")
+  const commentGroup = extractGroupFromComment(table.comment, allTables);
+  if (commentGroup) {
+    return commentGroup;
+  }
+
   const name = (table.name || '').toLowerCase();
   const schema = (table.schema || 'public').toLowerCase();
 
-  // Semantic business domain families (works even when all tables share a single schema like 'sde' or 'public')
-  const domainRules: { regex: RegExp; fr: string; en: string }[] = [
-    {
-      regex: /(bilan|hydraul|hydrolog|apport|evapor|volume_utile|cote_plan|flux_eau|debit|crue)/i,
-      fr: 'Bilans & Suivi Hydraulique',
-      en: 'Hydraulic Balances & Flows',
-    },
-    {
-      regex: /(barrage|retenue|digue|seuil|station_pomp|pompage|vanne|reservoir|chateau_eau|ouvrage)/i,
-      fr: 'Barrages & Ouvrages Hydrauliques',
-      en: 'Dams & Hydraulic Works',
-    },
-    {
-      regex: /(conduite|canalis|reseau|troncon|noeud|aep|assainis|collecteur|egout|regard|branchement)/i,
-      fr: 'Réseaux & Canalisations',
-      en: 'Networks & Pipelines',
-    },
-    {
-      regex: /(forage|nappe|piezo|puits|aquifere|souce_eau|hydrogeo|rabattement)/i,
-      fr: 'Eaux Souterraines & Piézométrie',
-      en: 'Groundwater & Piezometry',
-    },
-    {
-      regex: /(pluie|pluvio|meteo|climat|station_meteo|precipit|evapotransp|temperature)/i,
-      fr: 'Météorologie & Climatologie',
-      en: 'Meteorology & Climatology',
-    },
-    {
-      regex: /(parcelle|foncier|titre|borne|ilot|cadastre|conservation|immatr|bornage)/i,
-      fr: 'Foncier & Cadastre',
-      en: 'Land Registry & Cadastre',
-    },
-    {
-      regex: /(proprietaire|droit|acte|contrat|titulaire|occupant|locataire|cession|mutation)/i,
-      fr: 'Propriétaires & Droits Réels',
-      en: 'Owners & Property Rights',
-    },
-    {
-      regex: /(zonage|plu|urban|batiment|construction|permis|equipement|voirie|occupation_sol)/i,
-      fr: 'Urbanisme & Aménagement',
-      en: 'Urban Planning & Zoning',
-    },
-    {
-      regex: /(commune|province|prefecture|region|cercle|caidat|douar|pays|secteur|bassin|territoire|admin|limite)/i,
-      fr: 'Territoire & Découpage Administratif',
-      en: 'Administrative & Territory Boundaries',
-    },
-    {
-      regex: /(intervention|fuite|maintenance|reparation|incident|alerte|qualite|analyse|prelevement|controle)/i,
-      fr: 'Interventions, Qualité & Exploitation',
-      en: 'Operations, Quality & Maintenance',
-    },
-    {
-      regex: /^(ref_|referentiel|nomenclature|type_|categorie_|statut_|param_|liste_)/i,
-      fr: 'Référentiels & Nomenclatures',
-      en: 'Reference & Lookup Tables',
-    },
-  ];
-
-  for (const rule of domainRules) {
-    if (rule.regex.test(name)) {
-      return isFr ? rule.fr : rule.en;
-    }
-  }
-
-  // Check if at least 2 business tables share the same prefix before '_'
+  // Priority 2: Shared naming prefix across >= 2 business tables without comment group
   const parts = name.split('_').filter(Boolean);
   if (parts.length >= 2 && parts[0].length >= 3 && !['tbl', 'tab', 'dim', 'fact', 'vue', 'view'].includes(parts[0])) {
     const prefix = parts[0];
     const siblingCount = allTables.filter(
-      t => isBusinessTable(t) && (t.name || '').toLowerCase().startsWith(prefix + '_')
+      t => isBusinessTable(t) && !extractGroupFromComment(t.comment, allTables) && (t.name || '').toLowerCase().startsWith(prefix + '_')
     ).length;
     if (siblingCount >= 2) {
       const titlePrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
-      return isFr ? `Famille ${titlePrefix}` : `${titlePrefix} Family`;
+      return isFr ? `Groupe ${titlePrefix}` : `${titlePrefix} Group`;
     }
   }
 
-  // Fallback to non-generic schema name
+  // Priority 3: Fallback to non-generic schema name
   if (schema && !['public', 'sde', 'dbo', 'gis', 'data'].includes(schema)) {
     const formattedSchema = schema
       .split('_')
@@ -1178,7 +1183,7 @@ function sanitizeArchiveName(name: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9_-]+/g, '_')
     .replace(/^_+|_+$/g, '')
-    .slice(0, 50) || 'Famille';
+    .slice(0, 50) || 'Groupe';
 }
 
 function buildUniqueSheetName(rawName: string, usedNames: Set<string>): string {
@@ -1196,7 +1201,7 @@ function buildUniqueSheetName(rawName: string, usedNames: Set<string>): string {
 
 /**
  * Computes structured table profile metadata matching the normalized data dictionary card.
- * (1- Une fiche par table)
+ * (1- Fiche descriptive par table)
  */
 export function computeTableProfile(
   table: PostgresTableSchema,
@@ -1205,15 +1210,9 @@ export function computeTableProfile(
 ): TableProfileSheetData {
   const isFr = lang === 'fr';
 
-  // 1. Service / Schéma d'appartenance
-  let service = table.schema || 'public';
-  if (service.toLowerCase() === 'sde') {
-    service = isFr ? 'Gestion et Développement des Ressources en Eau' : 'Water Resources Planning & GIS';
-  } else if (service.toLowerCase() === 'cadastre') {
-    service = isFr ? 'Direction Générale du Cadastre & Conservation Foncière' : 'General Directorate of Cadastre & Land Registry';
-  } else if (service.toLowerCase() === 'public') {
-    service = isFr ? 'Référentiel Spatial et Territorial' : 'Spatial & Territorial Reference Data';
-  }
+  // 1. Service / Groupe extrait du commentaire en priorité, sinon schéma PostgreSQL
+  const extractedService = extractGroupFromComment(table.comment, schema.tables || []);
+  const service = extractedService || (table.schema || 'public');
 
   // 2. Table name
   const tableName = `${table.schema ? table.schema + '.' : ''}${table.name}`;
@@ -1324,7 +1323,7 @@ export function buildFamilyExcelWorkbook(
 
   const summaryRows: any[][] = [];
   summaryRows.push([
-    isFr ? `DICTIONNAIRE DE DONNÉES — FAMILLE : ${familyTitle.toUpperCase()}` : `DATA DICTIONARY — FAMILY: ${familyTitle.toUpperCase()}`,
+    isFr ? `DICTIONNAIRE DE DONNÉES — SERVICE / GROUPE : ${familyTitle.toUpperCase()}` : `DATA DICTIONARY — SERVICE / GROUP: ${familyTitle.toUpperCase()}`,
     '', '', '', '', ''
   ]);
   summaryRows.push([
@@ -1415,7 +1414,7 @@ export function buildFamilyExcelWorkbook(
     { wch: 22 },
     { wch: 44 },
   ];
-  const summarySheetName = buildUniqueSheetName(isFr ? 'Catalogue_Famille' : 'Family_Catalog', usedSheetNames);
+  const summarySheetName = buildUniqueSheetName(isFr ? 'Catalogue_Service' : 'Service_Catalog', usedSheetNames);
   XLSX.utils.book_append_sheet(wb, wsSummary, summarySheetName);
 
   // Individual sheet tab per table in this family
@@ -1485,11 +1484,11 @@ export async function generateProfileSheetExcelZip(
   // Build index workbook rows
   const indexRows: any[][] = [];
   indexRows.push([
-    isFr ? `SOMMAIRE DES FAMILLES DE TABLES — ${schema.databaseName.toUpperCase()}` : `TABLE FAMILIES INDEX — ${schema.databaseName.toUpperCase()}`,
+    isFr ? `SOMMAIRE DES SERVICES & GROUPES (COMMENTAIRES) — ${schema.databaseName.toUpperCase()}` : `SERVICES & GROUPS INDEX (FROM COMMENTS) — ${schema.databaseName.toUpperCase()}`,
     '', '', '', '', '', '', ''
   ]);
   indexRows.push([
-    isFr ? 'Famille de tables' : 'Table Family',
+    isFr ? 'Service / Groupe' : 'Service / Group',
     isFr ? 'Fichier Excel dédié' : 'Dedicated Excel File',
     isFr ? 'Schéma' : 'Schema',
     isFr ? 'Nom de la table' : 'Table Name',
@@ -1540,9 +1539,9 @@ export async function generateProfileSheetExcelZip(
     { wch: 14 },
     { wch: 20 },
   ];
-  XLSX.utils.book_append_sheet(indexWb, indexWs, isFr ? 'Sommaire_Familles' : 'Families_Index');
+  XLSX.utils.book_append_sheet(indexWb, indexWs, isFr ? 'Sommaire_Services' : 'Services_Index');
   const indexOut = XLSX.write(indexWb, { bookType: 'xlsx', type: 'array' });
-  const indexFileName = isFr ? `00_Sommaire_Familles_${lang}.xlsx` : `00_Families_Index_${lang}.xlsx`;
+  const indexFileName = isFr ? `00_Sommaire_Services_Groupes_${lang}.xlsx` : `00_Services_Groups_Index_${lang}.xlsx`;
   zip.file(indexFileName, new Uint8Array(indexOut));
 
   const zipBytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
@@ -2575,9 +2574,9 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
         </div>
 
         <div class="filter-group">
-          <label for="filterFamily">${isFr ? 'Famille de tables' : 'Table Family'}</label>
+          <label for="filterFamily">${isFr ? 'Service / Groupe (Commentaire)' : 'Service / Group (Comment)'}</label>
           <select id="filterFamily" class="filter-select" onchange="filterReport()">
-            <option value="all">${isFr ? `Toutes les familles (${uniqueFamilies.length})` : `All Families (${uniqueFamilies.length})`}</option>
+            <option value="all">${isFr ? `Tous les services/groupes (${uniqueFamilies.length})` : `All Services/Groups (${uniqueFamilies.length})`}</option>
             ${uniqueFamilies.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('')}
           </select>
         </div>

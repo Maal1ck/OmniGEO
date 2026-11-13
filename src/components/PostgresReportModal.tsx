@@ -147,7 +147,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${schema.databaseName}_dictionnaire_familles_${reportLang}.zip`;
+      a.download = `${schema.databaseName}_dictionnaire_services_${reportLang}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -542,15 +542,15 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               <span>{isFr ? 'Imprimer / PDF' : 'Print / PDF'}</span>
             </button>
 
-            {/* Download ZIP of Excel files per table family */}
+            {/* Download ZIP of Excel files grouped by Service / Comment */}
             <button
               onClick={handleDownloadProfileExcelZip}
               disabled={isGeneratingZip}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white shadow-md shadow-emerald-950/20 transition-all active:scale-95 cursor-pointer"
-              title={isFr ? "Télécharger une archive ZIP contenant un fichier Excel par famille de tables" : "Download a ZIP archive containing individual Excel files per table family"}
+              title={isFr ? "Télécharger une archive ZIP contenant un fichier Excel par Service / Groupe (extrait du champ comment)" : "Download a ZIP archive containing individual Excel files per Service / Group (extracted from table comments)"}
             >
               <Archive className="w-3.5 h-3.5 text-white" />
-              <span>{isGeneratingZip ? (isFr ? 'Génération...' : 'Packing...') : (isFr ? 'Excel Familles (.zip)' : 'Excel Families (.zip)')}</span>
+              <span>{isGeneratingZip ? (isFr ? 'Génération...' : 'Packing...') : (isFr ? 'Excel Services (.zip)' : 'Excel Services (.zip)')}</span>
             </button>
 
             {/* Download Profile Sheet CSV (.csv) */}
@@ -896,7 +896,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-mono uppercase text-stone-500 mb-1">{isFr ? 'Famille de tables' : 'Table Family'}</label>
+                    <label className="block text-[10px] font-mono uppercase text-stone-500 mb-1">{isFr ? 'Service / Groupe' : 'Service / Group'}</label>
                     <select
                       value={selectedFamilyFilter}
                       onChange={(e) => setSelectedFamilyFilter(e.target.value)}
