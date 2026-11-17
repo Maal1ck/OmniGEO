@@ -133,28 +133,37 @@ export function executeAttributeJoin(options: AttributeJoinOptions): JoinExecuti
     features: joinedFeatures,
   };
 
+  const isTargetNonSpatial = Boolean(targetDataset.isNonSpatial || targetDataset.geometryType === 'Unknown');
   const detectedCRS = targetDataset.detectedCRS || getCRSByCode('EPSG:4326')!;
-  const bounds = computeGeoJSONBounds(geojson);
-  const fields = extractSchemaFields(geojson);
-  const validationIssues = validateDatasetGeometries(geojson, detectedCRS.code);
+  const bounds: [number, number, number, number] = isTargetNonSpatial
+    ? [0, 0, 0, 0]
+    : computeGeoJSONBounds(geojson);
+  let fields = extractSchemaFields(geojson);
+  if (fields.length === 0) {
+    fields = [...targetDataset.fields];
+  }
+  const validationIssues = isTargetNonSpatial ? [] : validateDatasetGeometries(geojson, detectedCRS.code);
 
   const cleanName = outputName.trim() || `${targetDataset.name}_joined_${sourceDataset.name}`;
   const newDataset: SpatialDataset = {
     id: `ds-join-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     name: cleanName,
-    originalFileName: `${cleanName}.geojson`,
-    format: 'geojson',
+    originalFileName: isTargetNonSpatial ? `${cleanName}.csv` : `${cleanName}.geojson`,
+    format: isTargetNonSpatial ? targetDataset.format : 'geojson',
     sizeBytes: targetDataset.sizeBytes + Math.round(sourceDataset.sizeBytes * 0.4),
     featureCount: joinedFeatures.length,
-    geometryType: targetDataset.geometryType,
+    geometryType: isTargetNonSpatial ? 'Unknown' : targetDataset.geometryType,
     detectedCRS,
-    crsStatus: 'verified',
+    crsStatus: isTargetNonSpatial ? 'verified' : (targetDataset.crsStatus || 'verified'),
     bounds,
     fields,
     geojson,
     validationIssues,
     status: validationIssues.some(i => i.severity === 'error') ? 'invalid' : validationIssues.length > 0 ? 'warning' : 'ready',
     addedAt: Date.now(),
+    isNonSpatial: isTargetNonSpatial,
+    primaryKeyColumn: targetDataset.primaryKeyColumn,
+    tableComment: targetDataset.tableComment,
   };
 
   const sampleRows = joinedFeatures.slice(0, 8).map(f => f.properties || {});

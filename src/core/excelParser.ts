@@ -192,25 +192,31 @@ export function detectCoordinateColumns(
     return { xCol: bestX, yCol: bestY, confidence };
   }
 
-  // Step 3: Numerical heuristics on sample data
+  // Step 3: Numerical heuristics on sample data (only match coordinate-specific column names, never arbitrary words like city/index/year)
   if (sampleRows.length > 0 && (!bestX || !bestY)) {
     const numericCols = headers.filter(h => {
       return sampleRows.some(row => {
-        const val = Number(row[h]);
-        return !isNaN(val) && val !== 0;
+        const raw = row[h];
+        if (raw === null || raw === undefined || String(raw).trim() === '') return false;
+        const val = Number(raw);
+        return Number.isFinite(val) && val !== 0;
       });
     });
 
     for (const col of numericCols) {
-      const vals = sampleRows.map(r => Number(r[col])).filter(n => !isNaN(n));
+      const vals = sampleRows
+        .map(r => r[col])
+        .filter(raw => raw !== null && raw !== undefined && String(raw).trim() !== '')
+        .map(raw => Number(raw))
+        .filter(n => Number.isFinite(n));
       if (vals.length === 0) continue;
       const allLatRange = vals.every(v => v >= -90 && v <= 90);
       const allLonRange = vals.every(v => v >= -180 && v <= 180);
 
       const norm = normalizeHeaderKey(col);
-      if (!bestY && allLatRange && (norm.includes('y') || norm.includes('lat') || norm.includes('north'))) {
+      if (!bestY && allLatRange && (norm === 'y' || norm.includes('coordy') || norm.includes('lat') || norm.includes('north'))) {
         bestY = col;
-      } else if (!bestX && allLonRange && (norm.includes('x') || norm.includes('lon') || norm.includes('east'))) {
+      } else if (!bestX && allLonRange && (norm === 'x' || norm.includes('coordx') || norm.includes('lon') || norm.includes('east'))) {
         bestX = col;
       }
     }
@@ -235,6 +241,15 @@ export interface ExcelParseResult {
   totalRowCount: number;
 }
 
+function parseExcelCoordNumber(raw: any): number {
+  if (raw === null || raw === undefined) return NaN;
+  if (typeof raw === 'number') return raw;
+  const s = String(raw).trim();
+  if (!s) return NaN;
+  const normalized = /^-?\d+,\d+$/.test(s) ? s.replace(',', '.') : s;
+  return Number(normalized);
+}
+
 /**
  * Inspects and parses an Excel workbook (.xlsx / .xls) buffer into a SpatialDataset or metadata for manual mapping
  */
@@ -244,7 +259,8 @@ export function inspectExcelWorkbook(
   targetSheetName?: string,
   forcedXCol?: string,
   forcedYCol?: string,
-  crsCode: string = 'EPSG:4326'
+  crsCode: string = 'EPSG:4326',
+  options?: { asNonSpatial?: boolean }
 ): ExcelParseResult {
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
   const sheetNames = workbook.SheetNames || [];
@@ -285,6 +301,57 @@ export function inspectExcelWorkbook(
   const headers = Array.from(headerSet);
 
   const previewRows = rawRows.slice(0, 10);
+  const cleanName = fileName.replace(/\.[^/.]+$/, '');
+  const detectedCRS = getCRSByCode(crsCode) || getCRSByCode('EPSG:4326')!;
+
+  // Explicit Non-Spatial Attribute Table ingestion path
+  if (options?.asNonSpatial) {
+    const features = rawRows.map((row, idx) => ({
+      type: 'Feature',
+      id: idx + 1,
+      geometry: null,
+      properties: { ...row },
+    }));
+
+    const geojson = {
+      type: 'FeatureCollection',
+      features,
+    };
+
+    let fields: AttributeField[] = extractSchemaFields(geojson);
+    if (fields.length === 0 && headers.length > 0) {
+      fields = headers.map(h => ({ name: h, type: 'string', sampleValues: [] }));
+    }
+
+    const dataset: SpatialDataset = {
+      id: `ds-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: sheetNames.length > 1 ? `${cleanName}_${selectedSheet}` : cleanName,
+      originalFileName: fileName,
+      format: 'excel',
+      sizeBytes: buffer.byteLength,
+      featureCount: features.length,
+      geometryType: 'Unknown',
+      detectedCRS,
+      crsStatus: 'verified',
+      bounds: [0, 0, 0, 0],
+      fields,
+      geojson,
+      validationIssues: [],
+      status: 'ready',
+      addedAt: Date.now(),
+      isNonSpatial: true,
+    };
+
+    return {
+      dataset,
+      sheetNames,
+      selectedSheet,
+      headers,
+      previewRows,
+      needsManualMapping: false,
+      totalRowCount,
+    };
+  }
 
   // Determine coordinate columns
   let xCol = forcedXCol;
@@ -298,7 +365,7 @@ export function inspectExcelWorkbook(
     }
   }
 
-  // If coordinate columns could not be determined, return for manual mapping in the UI
+  // If coordinate columns could not be determined, return for manual mapping or non-spatial selection in the UI
   if (!xCol || !yCol) {
     return {
       dataset: null,
@@ -317,8 +384,8 @@ export function inspectExcelWorkbook(
   const features: any[] = [];
   for (let i = 0; i < rawRows.length; i++) {
     const row = rawRows[i];
-    const xVal = Number(row[xCol]);
-    const yVal = Number(row[yCol]);
+    const xVal = parseExcelCoordNumber(row[xCol]);
+    const yVal = parseExcelCoordNumber(row[yCol]);
 
     if (!isNaN(xVal) && !isNaN(yVal) && isFinite(xVal) && isFinite(yVal)) {
       const props = { ...row };
@@ -352,12 +419,10 @@ export function inspectExcelWorkbook(
     features,
   };
 
-  const detectedCRS = getCRSByCode(crsCode) || getCRSByCode('EPSG:4326')!;
   const bounds = computeGeoJSONBounds(geojson);
   const fields = extractSchemaFields(geojson);
   const validationIssues = validateDatasetGeometries(geojson, detectedCRS.code);
 
-  const cleanName = fileName.replace(/\.[^/.]+$/, '');
   const dataset: SpatialDataset = {
     id: `ds-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     name: sheetNames.length > 1 ? `${cleanName}_${selectedSheet}` : cleanName,
@@ -374,6 +439,7 @@ export function inspectExcelWorkbook(
     validationIssues,
     status: validationIssues.some(i => i.severity === 'error') ? 'invalid' : validationIssues.length > 0 ? 'warning' : 'ready',
     addedAt: Date.now(),
+    isNonSpatial: false,
   };
 
   return {

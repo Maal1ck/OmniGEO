@@ -39,6 +39,7 @@ export interface GdbInspectionResult {
   gdbName: string;
   layers: GdbLayerSummary[];
   discoveredRelationships: DiscoveredGdbRelationship[];
+  diagnostics?: string[];
 }
 
 interface ParsedFieldDescriptor {
@@ -407,8 +408,19 @@ function detectCrsFromWkt(wkt?: string): CRSInfo {
   if (lower.includes('merchich') && lower.includes('sud')) {
     return getCRSByCode('EPSG:26192') || getCRSByCode('EPSG:4261') || wgs84;
   }
-  if (lower.includes('merchich') && lower.includes('nord')) {
+  if (lower.includes('nord_maroc') || (lower.includes('merchich') && lower.includes('nord'))) {
     return getCRSByCode('EPSG:26191') || getCRSByCode('EPSG:4261') || wgs84;
+  }
+  if (lower.includes('sud_maroc') || (lower.includes('merchich') && lower.includes('sud'))) {
+    return getCRSByCode('EPSG:26192') || getCRSByCode('EPSG:4261') || wgs84;
+  }
+  const utmMatch = wkt.match(/UTM_Zone_(\d{1,2})([NS])/i);
+  if (utmMatch && lower.includes('wgs_1984')) {
+    const zone = Number(utmMatch[1]);
+    const hemiPrefix = utmMatch[2].toUpperCase() === 'S' ? '327' : '326';
+    const epsg = `EPSG:${hemiPrefix}${String(zone).padStart(2, '0')}`;
+    const found = getCRSByCode(epsg);
+    if (found) return found;
   }
   if (lower.includes('gcs_wgs_1984') || lower.includes('wgs_1984')) {
     return wgs84;
@@ -434,11 +446,48 @@ function crsToEsriWkt(crs: CRSInfo | null): string {
   return 'GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433],AUTHORITY["EPSG",4326]]';
 }
 
+const uploadedRelPathMap = new WeakMap<File, string>();
+
+export function registerUploadedFileRelativePath(file: File, relPath: string): void {
+  const normalized = relPath.replace(/\\/g, '/').replace(/^\/+/, '');
+  uploadedRelPathMap.set(file, normalized);
+  try {
+    Object.defineProperty(file, 'webkitRelativePath', {
+      value: normalized,
+      writable: true,
+      configurable: true,
+    });
+  } catch {
+    // Fallback handled via uploadedRelPathMap
+  }
+}
+
+export function getUploadedFileRelativePath(file: File): string {
+  const mapped = uploadedRelPathMap.get(file);
+  if (mapped) return mapped;
+  return ((file as any).webkitRelativePath || file.name || '').replace(/\\/g, '/');
+}
+
+function isOsJunkFile(pathOrName: string): boolean {
+  const normalized = pathOrName.replace(/\\/g, '/');
+  const lower = normalized.toLowerCase();
+  const base = lower.split('/').pop() || '';
+  return (
+    lower.includes('__macosx/') ||
+    base.startsWith('._') ||
+    base === '.ds_store' ||
+    base === 'thumbs.db' ||
+    base.endsWith('.lock') ||
+    base.endsWith('.sr.lock')
+  );
+}
+
 export function isFileGdbFolderFiles(files: File[]): boolean {
   return files.some((f) => {
-    const rel = ((f as any).webkitRelativePath || f.name || '').toLowerCase();
+    if (isOsJunkFile(getUploadedFileRelativePath(f))) return false;
+    const rel = getUploadedFileRelativePath(f).toLowerCase();
     const base = f.name.toLowerCase();
-    return rel.includes('.gdb/') || base.endsWith('.gdbtable') || base.endsWith('.gdbtablx') || base === 'gdb';
+    return rel.includes('.gdb/') || base.endsWith('.gdbtable') || base.endsWith('.gdbtablx') || base.endsWith('.cdf') || base === 'gdb';
   });
 }
 
@@ -447,32 +496,39 @@ export function groupFileGdbFolderUploads(files: File[]): {
   remainingFiles: File[];
 } {
   const bundleMap = new Map<string, File[]>();
+  const bundleKeyToName = new Map<string, string>();
   const remainingFiles: File[] = [];
 
   for (const file of files) {
-    const rel = ((file as any).webkitRelativePath || '').replace(/\\/g, '/');
-    const gdbMatch = rel.match(/(^|.*\/)([^/]+\.gdb)\//i);
+    const rel = getUploadedFileRelativePath(file);
+    if (isOsJunkFile(rel)) continue;
+    const gdbMatch = rel.match(/^(.*?\/)?([^/]+\.gdb)\//i);
     if (gdbMatch) {
+      const fullFolderKey = `${(gdbMatch[1] || '').toLowerCase()}${gdbMatch[2].toLowerCase()}`;
       const bundleName = gdbMatch[2];
-      const existing = bundleMap.get(bundleName) || [];
+      bundleKeyToName.set(fullFolderKey, bundleName);
+      const existing = bundleMap.get(fullFolderKey) || [];
       existing.push(file);
-      bundleMap.set(bundleName, existing);
+      bundleMap.set(fullFolderKey, existing);
     } else if (
       file.name.toLowerCase().endsWith('.gdbtable') ||
       file.name.toLowerCase().endsWith('.gdbtablx') ||
+      file.name.toLowerCase().endsWith('.cdf') ||
       file.name.toLowerCase() === 'gdb' ||
       file.name.toLowerCase() === 'timestamps'
     ) {
-      const existing = bundleMap.get('imported_geodatabase.gdb') || [];
+      const key = '__loose_gdb__';
+      bundleKeyToName.set(key, 'imported_geodatabase.gdb');
+      const existing = bundleMap.get(key) || [];
       existing.push(file);
-      bundleMap.set('imported_geodatabase.gdb', existing);
+      bundleMap.set(key, existing);
     } else {
       remainingFiles.push(file);
     }
   }
 
-  const gdbBundles = Array.from(bundleMap.entries()).map(([name, bundleFiles]) => ({
-    name,
+  const gdbBundles = Array.from(bundleMap.entries()).map(([key, bundleFiles]) => ({
+    name: bundleKeyToName.get(key) || 'imported_geodatabase.gdb',
     files: bundleFiles,
   }));
 
@@ -484,60 +540,134 @@ export async function isFileGdbZipArchive(file: File): Promise<boolean> {
   if (!lower.endsWith('.zip') && !lower.endsWith('.gdb.zip')) return false;
   try {
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const keys = Object.keys(zip.files).map((k) => k.toLowerCase());
-    return keys.some((k) => k.endsWith('.gdbtable') || k.endsWith('/gdb') || k === 'gdb');
+    const keys = Object.keys(zip.files)
+      .filter((k) => !isOsJunkFile(k))
+      .map((k) => k.replace(/\\/g, '/').toLowerCase());
+    return keys.some(
+      (k) =>
+        k.endsWith('.gdbtable') ||
+        k.endsWith('.cdf') ||
+        k.endsWith('/gdb') ||
+        k === 'gdb' ||
+        /\.gdb\//i.test(k)
+    );
   } catch {
     return false;
   }
+}
+
+export async function splitFileGdbZipBundles(
+  file: File
+): Promise<{ name: string; sourceInput: File | File[] }[]> {
+  const maps = await collectGdbFileMaps(file);
+  if (maps.length <= 1) {
+    return [{ name: maps[0]?.gdbName || file.name, sourceInput: file }];
+  }
+  return maps.map((m) => {
+    const virtualFiles: File[] = [];
+    for (const [base, data] of m.entries.entries()) {
+      const f = new File([data.slice().buffer], base);
+      registerUploadedFileRelativePath(f, `${m.gdbName}/${base}`);
+      virtualFiles.push(f);
+    }
+    return { name: m.gdbName, sourceInput: virtualFiles };
+  });
 }
 
 // ============================================================================
 // Binary Table Parser (.gdbtable + optional .gdbtablx)
 // ============================================================================
 
-async function collectGdbFileMap(
+async function collectGdbFileMaps(
   input: File | File[]
-): Promise<{ gdbName: string; entries: Map<string, Uint8Array> }> {
-  const entries = new Map<string, Uint8Array>();
-  let gdbName = 'geodatabase.gdb';
-
+): Promise<{ gdbName: string; entries: Map<string, Uint8Array>; hasCdfFiles: boolean }[]> {
   if (Array.isArray(input)) {
+    const entries = new Map<string, Uint8Array>();
+    let gdbName = 'geodatabase.gdb';
+    let hasCdfFiles = false;
+
     for (const f of input) {
-      const rel = ((f as any).webkitRelativePath || f.name).replace(/\\/g, '/');
+      const rel = getUploadedFileRelativePath(f);
+      if (isOsJunkFile(rel)) continue;
       const m = rel.match(/([^/]+\.gdb)\//i);
       if (m) gdbName = m[1];
       const base = rel.split('/').pop()!.toLowerCase();
+      if (base.endsWith('.cdf')) hasCdfFiles = true;
       entries.set(base, new Uint8Array(await f.arrayBuffer()));
     }
-    return { gdbName, entries };
+    return [{ gdbName, entries, hasCdfFiles }];
   }
 
   const lowerName = input.name.toLowerCase();
   if (lowerName.endsWith('.zip')) {
     const zip = await JSZip.loadAsync(await input.arrayBuffer());
-    const rawKeys = Object.keys(zip.files);
-    const gdbFolderKey = rawKeys.find((k) => /\.gdb\//i.test(k));
-    if (gdbFolderKey) {
-      const m = gdbFolderKey.match(/([^/]+\.gdb)\//i);
-      if (m) gdbName = m[1];
-    } else {
-      gdbName = input.name.replace(/(\.gdb)?\.zip$/i, '') + '.gdb';
-    }
+    const rawKeys = Object.keys(zip.files).filter((k) => !isOsJunkFile(k));
+
+    // Group entries by .gdb folder when a zip contains one or more .gdb directories
+    const grouped = new Map<string, { gdbName: string; entries: Map<string, Uint8Array>; hasCdfFiles: boolean }>();
+
     for (const key of rawKeys) {
       const entry = zip.files[key];
       if (entry.dir) continue;
-      const base = key.replace(/\\/g, '/').split('/').pop()!.toLowerCase();
-      entries.set(base, await entry.async('uint8array'));
+      const normKey = key.replace(/\\/g, '/');
+      const m = normKey.match(/^(.*?\/)?([^/]+\.gdb)\//i);
+      const groupId = m ? `${(m[1] || '').toLowerCase()}${m[2].toLowerCase()}` : '__root__';
+      const defaultName = m ? m[2] : (input.name.replace(/(\.gdb)?\.zip$/i, '') + '.gdb');
+
+      if (!grouped.has(groupId)) {
+        grouped.set(groupId, {
+          gdbName: defaultName,
+          entries: new Map<string, Uint8Array>(),
+          hasCdfFiles: false,
+        });
+      }
+
+      const bucket = grouped.get(groupId)!;
+      const base = normKey.split('/').pop()!.toLowerCase();
+      if (base.endsWith('.cdf')) bucket.hasCdfFiles = true;
+      bucket.entries.set(base, await entry.async('uint8array'));
     }
-  } else {
-    entries.set(lowerName, new Uint8Array(await input.arrayBuffer()));
-    gdbName = input.name.replace(/\.[^.]+$/, '') + '.gdb';
+
+    // If zip had both a __root__ and named .gdb folders, keep only groups with actual GDB artifacts
+    const result = Array.from(grouped.values()).filter((g) => {
+      const keys = Array.from(g.entries.keys());
+      return keys.some((k) => k.endsWith('.gdbtable') || k.endsWith('.cdf') || k === 'gdb');
+    });
+
+    if (result.length > 0) return result;
+    return Array.from(grouped.values());
   }
 
-  return { gdbName, entries };
+  const entries = new Map<string, Uint8Array>();
+  entries.set(lowerName, new Uint8Array(await input.arrayBuffer()));
+  return [{
+    gdbName: input.name.replace(/\.[^.]+$/, '') + '.gdb',
+    entries,
+    hasCdfFiles: lowerName.endsWith('.cdf'),
+  }];
 }
 
-function parseTablxOffsets(tablxBytes?: Uint8Array): number[] | null {
+async function collectGdbFileMap(
+  input: File | File[]
+): Promise<{ gdbName: string; entries: Map<string, Uint8Array>; hasCdfFiles: boolean }> {
+  const maps = await collectGdbFileMaps(input);
+  if (maps.length === 1) return maps[0];
+
+  // Merge when multiple .gdb folders live in a single archive by prefixing keys only if colliding
+  // Note: inspectFileGdb and parseFileGdbLayers handle multi-bundle arrays cleanly via collectGdbFileMaps
+  return maps[0] || {
+    gdbName: 'geodatabase.gdb',
+    entries: new Map<string, Uint8Array>(),
+    hasCdfFiles: false,
+  };
+}
+
+interface TablxRowOffset {
+  oid: number;
+  offset: number;
+}
+
+function parseTablxOffsets(tablxBytes?: Uint8Array): TablxRowOffset[] | null {
   if (!tablxBytes || tablxBytes.length < 16) return null;
   const r = new ByteReader(tablxBytes);
   const sig = r.readU32();
@@ -547,21 +677,145 @@ function parseTablxOffsets(tablxBytes?: Uint8Array): number[] | null {
   const sizeOffsets = r.readU32();
   if (sizeOffsets < 4 || sizeOffsets > 6) return null;
 
-  const totalSlots = n1024Blocks > 0 ? Math.min(n1024Blocks * 1024, nMaxRows || n1024Blocks * 1024) : nMaxRows;
-  if (totalSlots === 0) return null;
-  if (16 + totalSlots * sizeOffsets > tablxBytes.length) return null;
+  if (n1024Blocks === 0) {
+    return nMaxRows === 0 ? [] : null;
+  }
 
-  const offsets: number[] = [];
-  for (let i = 0; i < totalSlots; i++) {
+  const maxPhysicalSlots = Math.floor((tablxBytes.length - 16) / sizeOffsets);
+  const physicalSlots = Math.min(n1024Blocks * 1024, maxPhysicalSlots);
+  if (physicalSlots <= 0) return null;
+
+  // Check optional sparse block bitmap trailer located right after the offset table
+  const physicalToLogicalBlock = new Map<number, number>();
+  const trailerOffset = 16 + n1024Blocks * 1024 * sizeOffsets;
+  if (trailerOffset + 16 <= tablxBytes.length) {
+    const dvTrailer = new DataView(tablxBytes.buffer, tablxBytes.byteOffset + trailerOffset, tablxBytes.length - trailerOffset);
+    const nBitmapInt32Words = dvTrailer.getUint32(0, true);
+    const nBitsForBlockMap = dvTrailer.getUint32(4, true);
+    const nPhysicalBlocksTrailer = dvTrailer.getUint32(8, true);
+    if (
+      nBitmapInt32Words > 0 &&
+      nPhysicalBlocksTrailer === n1024Blocks &&
+      trailerOffset + 16 + nBitmapInt32Words * 4 <= tablxBytes.length
+    ) {
+      let physIdx = 0;
+      const bitmapStart = trailerOffset + 16;
+      const maxBits = Math.min(nBitsForBlockMap, nBitmapInt32Words * 32);
+      for (let bitIdx = 0; bitIdx < maxBits && physIdx < n1024Blocks; bitIdx++) {
+        const byteVal = tablxBytes[bitmapStart + (bitIdx >> 3)];
+        if ((byteVal & (1 << (bitIdx & 7))) !== 0) {
+          physicalToLogicalBlock.set(physIdx, bitIdx);
+          physIdx++;
+        }
+      }
+    }
+  }
+
+  const rows: TablxRowOffset[] = [];
+  for (let i = 0; i < physicalSlots; i++) {
     let off = 0;
     let mult = 1;
+    const base = 16 + i * sizeOffsets;
     for (let b = 0; b < sizeOffsets; b++) {
-      off += tablxBytes[16 + i * sizeOffsets + b] * mult;
+      off += tablxBytes[base + b] * mult;
       mult *= 256;
     }
-    if (off > 0) offsets.push(off);
+    if (off > 0) {
+      const physBlock = Math.floor(i / 1024);
+      const slotInBlock = i & 1023;
+      const logicalBlock = physicalToLogicalBlock.get(physBlock) ?? physBlock;
+      rows.push({
+        oid: logicalBlock * 1024 + slotInBlock + 1,
+        offset: off,
+      });
+    }
   }
-  return offsets;
+  return rows;
+}
+
+function isValidUtf16Identifier(bytes: Uint8Array, pos: number, charLen: number): boolean {
+  if (charLen < 1 || charLen > 128) return false;
+  if (pos + charLen * 2 > bytes.length) return false;
+  for (let c = 0; c < charLen; c++) {
+    const code = bytes[pos + c * 2] | (bytes[pos + c * 2 + 1] << 8);
+    if (code === 0 || code < 32) return false;
+  }
+  return true;
+}
+
+function isValidFieldHeaderAt(
+  bytes: Uint8Array,
+  pos: number,
+  sectionEndOffset: number
+): { nextMinPos: number; fieldType: number } | null {
+  if (pos < 0 || pos + 5 > sectionEndOffset) return null;
+  const nameLen = bytes[pos];
+  if (!isValidUtf16Identifier(bytes, pos + 1, nameLen)) return null;
+  const aliasPos = pos + 1 + nameLen * 2;
+  if (aliasPos + 2 > sectionEndOffset) return null;
+  const aliasLen = bytes[aliasPos];
+  if (aliasLen > 128 || aliasPos + 1 + aliasLen * 2 + 3 > sectionEndOffset) return null;
+  // Verify alias chars have no null control characters when non-empty
+  for (let c = 0; c < aliasLen; c++) {
+    const code = bytes[aliasPos + 1 + c * 2] | (bytes[aliasPos + 1 + c * 2 + 1] << 8);
+    if (code === 0) return null;
+  }
+  const typePos = aliasPos + 1 + aliasLen * 2;
+  const fieldType = bytes[typePos];
+  if (fieldType > 16) return null;
+  return { nextMinPos: typePos + 3, fieldType };
+}
+
+function resolveGeometrySectionEndOffset(
+  tableBytes: Uint8Array,
+  posAfterXYBox: number,
+  hasZ: boolean,
+  hasM: boolean,
+  sectionEndOffset: number,
+  isLastField: boolean
+): number {
+  if (isLastField) return sectionEndOffset;
+
+  const dv = new DataView(tableBytes.buffer, tableBytes.byteOffset, tableBytes.length);
+  const candidates: number[] = [];
+
+  const zmVariants: number[] = [];
+  const exactZmBytes = (hasZ ? 16 : 0) + (hasM ? 16 : 0);
+  zmVariants.push(exactZmBytes);
+  if (hasZ && hasM) zmVariants.push(16, 0);
+  else if (hasZ || hasM) zmVariants.push(0);
+
+  for (const zmExtra of zmVariants) {
+    for (const magicByte of [1, 0]) {
+      const gridCountPos = posAfterXYBox + zmExtra + magicByte;
+      if (gridCountPos + 4 <= sectionEndOffset) {
+        const numGrids = dv.getUint32(gridCountPos, true);
+        if (numGrids <= 8) {
+          const afterGrids = gridCountPos + 4 + numGrids * 8;
+          if (afterGrids <= sectionEndOffset) candidates.push(afterGrids);
+        }
+      }
+      if (gridCountPos <= sectionEndOffset) {
+        candidates.push(gridCountPos);
+      }
+    }
+  }
+
+  for (const cand of candidates) {
+    if (isValidFieldHeaderAt(tableBytes, cand, sectionEndOffset)) {
+      return cand;
+    }
+  }
+
+  // Fallback bounded scan for the next valid field header when ArcGIS emits extra Z/M or spatial index bytes
+  const scanLimit = Math.min(sectionEndOffset, posAfterXYBox + 160);
+  for (let probe = posAfterXYBox; probe < scanLimit; probe++) {
+    if (isValidFieldHeaderAt(tableBytes, probe, sectionEndOffset)) {
+      return probe;
+    }
+  }
+
+  return Math.min(sectionEndOffset, posAfterXYBox);
 }
 
 function parseFieldDescriptions(tableBytes: Uint8Array, fieldDescOffset: number): {
@@ -570,8 +824,11 @@ function parseFieldDescriptions(tableBytes: Uint8Array, fieldDescOffset: number)
   sectionEndOffset: number;
 } {
   const r = new ByteReader(tableBytes, fieldDescOffset);
+  if (r.remaining < 14) {
+    return { geomTypeCode: 0, fields: [], sectionEndOffset: fieldDescOffset };
+  }
   const descSize = r.readU32();
-  const sectionEndOffset = fieldDescOffset + 4 + descSize;
+  const sectionEndOffset = Math.min(tableBytes.length, fieldDescOffset + 4 + descSize);
   const _version = r.readU32();
   const geomTypeCode = r.readU8();
   const _geomFlagsBytes = r.readBytes(3);
@@ -579,14 +836,21 @@ function parseFieldDescriptions(tableBytes: Uint8Array, fieldDescOffset: number)
   const fields: ParsedFieldDescriptor[] = [];
 
   for (let i = 0; i < nFields && r.pos < sectionEndOffset; i++) {
+    const isLastField = i === nFields - 1;
+    if (r.pos + 2 > sectionEndOffset) break;
     const nameLen = r.readU8();
+    if (r.pos + nameLen * 2 >= sectionEndOffset) break;
     const name = r.readUtf16(nameLen);
+    if (r.pos >= sectionEndOffset) break;
     const aliasLen = r.readU8();
+    if (r.pos + aliasLen * 2 >= sectionEndOffset) break;
     const alias = r.readUtf16(aliasLen);
+    if (r.pos >= sectionEndOffset) break;
     const fieldType = r.readU8();
 
     if (fieldType === 4) {
       // String
+      if (r.pos + 5 > sectionEndOffset) break;
       const width = r.readU32();
       const flag = r.readU8();
       if ((flag & 4) !== 0 && r.pos < sectionEndOffset) {
@@ -598,55 +862,63 @@ function parseFieldDescriptions(tableBytes: Uint8Array, fieldDescOffset: number)
       fields.push({ name, alias, fieldType, width, flag, nullable: (flag & 1) !== 0 });
     } else if (fieldType === 6) {
       // ObjectID
+      if (r.pos + 2 > sectionEndOffset) break;
       const width = r.readU8();
       const flag = r.readU8();
       fields.push({ name, alias, fieldType, width, flag, nullable: false });
     } else if (fieldType === 7) {
       // Geometry
+      if (r.pos + 4 > sectionEndOffset) break;
       const width = r.readU8();
       const flag = r.readU8();
       const wktByteLen = r.readU16();
       const wktBytes = r.readBytes(Math.min(wktByteLen, Math.max(0, sectionEndOffset - r.pos)));
       const wkt = new TextDecoder('utf-16le').decode(wktBytes).replace(/\0+$/, '');
       const geomFlags = r.pos < sectionEndOffset ? r.readU8() : 0;
-      const hasM = (geomFlags & 2) !== 0;
-      const hasZ = (geomFlags & 4) !== 0;
-      const xOrigin = r.pos + 8 <= sectionEndOffset ? r.readF64() : -400;
-      const yOrigin = r.pos + 8 <= sectionEndOffset ? r.readF64() : -400;
-      const xyScale = r.pos + 8 <= sectionEndOffset ? r.readF64() : 1000000000;
+      let hasM = (geomFlags & 2) !== 0;
+      let hasZ = (geomFlags & 4) !== 0;
+      let xOrigin = -400;
+      let yOrigin = -400;
+      let xyScale = 1000000000;
       let mOrigin = 0, mScale = 1, zOrigin = 0, zScale = 1;
-      if (hasM && r.pos + 16 <= sectionEndOffset) {
-        mOrigin = r.readF64();
-        mScale = r.readF64();
-      }
-      if (hasZ && r.pos + 16 <= sectionEndOffset) {
-        zOrigin = r.readF64();
-        zScale = r.readF64();
-      }
-      // xyTolerance (+ optional m/z tolerances)
-      if (r.pos + 8 <= sectionEndOffset) r.readF64();
-      if (hasM && r.pos + 8 <= sectionEndOffset) r.readF64();
-      if (hasZ && r.pos + 8 <= sectionEndOffset) r.readF64();
 
-      // Bounding box xmin, ymin, xmax, ymax (+ optional zmin, zmax, mmin, mmax)
-      if (r.pos + 32 <= sectionEndOffset) {
-        r.readF64(); r.readF64(); r.readF64(); r.readF64();
-      }
-      if (hasZ && r.pos + 16 <= sectionEndOffset) {
-        r.readF64(); r.readF64();
-      }
-      if (hasM && r.pos + 16 <= sectionEndOffset) {
-        r.readF64(); r.readF64();
-      }
+      // Some tables with Unknown CRS (geomFlags === 0) omit origin/tolerance/bbox doubles entirely
+      if (geomFlags === 0 && !isLastField && isValidFieldHeaderAt(tableBytes, r.pos, sectionEndOffset)) {
+        hasM = false;
+        hasZ = false;
+      } else {
+        xOrigin = r.pos + 8 <= sectionEndOffset ? r.readF64() : -400;
+        yOrigin = r.pos + 8 <= sectionEndOffset ? r.readF64() : -400;
+        xyScale = r.pos + 8 <= sectionEndOffset ? r.readF64() : 1000000000;
+        if (hasM && r.pos + 16 <= sectionEndOffset) {
+          mOrigin = r.readF64();
+          mScale = r.readF64();
+        }
+        if (hasZ && r.pos + 16 <= sectionEndOffset) {
+          zOrigin = r.readF64();
+          zScale = r.readF64();
+        }
+        // xyTolerance (+ optional m/z tolerances)
+        if (r.pos + 8 <= sectionEndOffset) r.readF64();
+        if (hasM && r.pos + 8 <= sectionEndOffset) r.readF64();
+        if (hasZ && r.pos + 8 <= sectionEndOffset) r.readF64();
 
-      // Spatial index grid sizes
-      if (r.pos + 4 <= sectionEndOffset) {
-        const numGrids = r.readU32();
-        if (numGrids < 16 && r.pos + numGrids * 8 <= sectionEndOffset) {
-          r.pos += numGrids * 8;
+        // Mandatory 2D Bounding box xmin, ymin, xmax, ymax
+        if (r.pos + 32 <= sectionEndOffset) {
+          r.pos += 32;
         } else {
           r.pos = sectionEndOffset;
         }
+
+        // Resolve Z/M bbox, optional 0x00 separator, and spatial index grids without losing alignment on subsequent fields
+        r.pos = resolveGeometrySectionEndOffset(
+          tableBytes,
+          r.pos,
+          hasZ,
+          hasM,
+          sectionEndOffset,
+          isLastField
+        );
       }
 
       fields.push({
@@ -668,13 +940,40 @@ function parseFieldDescriptions(tableBytes: Uint8Array, fieldDescOffset: number)
         zOrigin,
         zScale,
       });
+    } else if (fieldType === 9) {
+      // Raster field
+      if (r.pos + 2 > sectionEndOffset) break;
+      const width = r.readU8();
+      const flag = r.readU8();
+      if (r.pos < sectionEndOffset) {
+        const rasColLen = r.readU8();
+        r.pos = Math.min(sectionEndOffset, r.pos + rasColLen * 2);
+      }
+      if (r.pos + 2 <= sectionEndOffset) {
+        const rasWktLen = r.readU16();
+        r.pos = Math.min(sectionEndOffset, r.pos + rasWktLen);
+      }
+      if (!isLastField) {
+        const scanLimit = Math.min(sectionEndOffset, r.pos + 160);
+        for (let probe = r.pos; probe < scanLimit; probe++) {
+          if (isValidFieldHeaderAt(tableBytes, probe, sectionEndOffset)) {
+            r.pos = probe;
+            break;
+          }
+        }
+      } else {
+        r.pos = sectionEndOffset;
+      }
+      fields.push({ name, alias, fieldType, width, flag, nullable: (flag & 1) !== 0 });
     } else if (fieldType === 8 || fieldType === 12) {
       // Binary or XML
+      if (r.pos + 2 > sectionEndOffset) break;
       const width = r.readU8();
       const flag = r.readU8();
       fields.push({ name, alias, fieldType, width, flag, nullable: (flag & 1) !== 0 });
     } else {
-      // Fixed numeric / date / guid / globalid / int64
+      // Fixed numeric / date / guid / globalid / int64 / ArcGIS Pro dateOnly(14)/timeOnly(15)/timestampOffset(16)
+      if (r.pos + 2 > sectionEndOffset) break;
       const width = r.readU8();
       const flag = r.readU8();
       if ((flag & 4) !== 0 && r.pos < sectionEndOffset) {
@@ -701,49 +1000,52 @@ function decodeGdbGeometry(blob: Uint8Array, geomField: ParsedFieldDescriptor): 
   const yOrigin = geomField.yOrigin ?? -400;
   const xyScale = geomField.xyScale || 1000000000;
 
-  // Point types: 1=Point, 9=PointZM, 11=PointZ, 21=PointM
-  if (baseType === 1 || baseType === 9 || baseType === 11 || baseType === 21) {
+  // Point types: 1=Point, 9=PointZM, 11=PointZ, 21=PointM, 52=GeneralPoint
+  if (baseType === 1 || baseType === 9 || baseType === 11 || baseType === 21 || baseType === 52) {
+    if (r.remaining === 0) return null;
     const viX = r.readVarUInt();
+    if (r.remaining === 0) return null;
     const viY = r.readVarUInt();
     if (viX === 0 && viY === 0) return null;
     const x = (viX - 1) / xyScale + xOrigin;
     const y = (viY - 1) / xyScale + yOrigin;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
     return { type: 'Point', coordinates: [x, y] };
   }
 
-  // MultiPoint: 8, 18, 20, 28
-  if (baseType === 8 || baseType === 18 || baseType === 20 || baseType === 28) {
+  // MultiPoint: 8, 18, 20, 28, 53=GeneralMultiPoint
+  if (baseType === 8 || baseType === 18 || baseType === 20 || baseType === 28 || baseType === 53) {
     const nPts = r.readVarUInt();
-    if (nPts === 0) return null;
-    // BBox: xmin, ymin, xmax, ymax
+    if (nPts === 0 || nPts > 5000000) return null;
+    // BBox: xmin, ymin, dx, dy
     r.readVarUInt(); r.readVarUInt(); r.readVarUInt(); r.readVarUInt();
     const coords: [number, number][] = [];
     let accX = 0;
     let accY = 0;
-    for (let i = 0; i < nPts; i++) {
+    for (let i = 0; i < nPts && r.remaining > 0; i++) {
       accX += r.readVarInt();
       accY += r.readVarInt();
       coords.push([accX / xyScale + xOrigin, accY / xyScale + yOrigin]);
     }
+    if (coords.length === 0) return null;
     return coords.length === 1
       ? { type: 'Point', coordinates: coords[0] }
       : { type: 'MultiPoint', coordinates: coords };
   }
 
-  // Polyline (3, 10, 13, 23) & Polygon (5, 15, 19, 25)
-  const isPolygon = baseType === 5 || baseType === 15 || baseType === 19 || baseType === 25;
-  const isPolyline = baseType === 3 || baseType === 10 || baseType === 13 || baseType === 23;
+  // Polyline (3, 10, 13, 23, 50=GeneralPolyline) & Polygon (5, 15, 19, 25, 51=GeneralPolygon)
+  const isPolygon = baseType === 5 || baseType === 15 || baseType === 19 || baseType === 25 || baseType === 51;
+  const isPolyline = baseType === 3 || baseType === 10 || baseType === 13 || baseType === 23 || baseType === 50;
   if (!isPolygon && !isPolyline) return null;
 
   const nPts = r.readVarUInt();
-  if (nPts === 0) return null;
+  if (nPts === 0 || nPts > 5000000) return null;
   const nParts = r.readVarUInt();
-  if (nParts === 0) return null;
+  if (nParts === 0 || nParts > 1000000) return null;
 
   const hasCurves = (rawType & 0x20000000) !== 0;
-  let _nCurves = 0;
-  if (hasCurves) {
-    _nCurves = r.readVarUInt();
+  if (hasCurves && r.remaining > 0) {
+    r.readVarUInt();
   }
 
   // BBox: xmin, ymin, dx, dy
@@ -754,7 +1056,7 @@ function decodeGdbGeometry(blob: Uint8Array, geomField: ParsedFieldDescriptor): 
 
   const partCounts: number[] = [];
   let sumPrev = 0;
-  for (let p = 0; p < nParts - 1; p++) {
+  for (let p = 0; p < nParts - 1 && r.remaining > 0; p++) {
     const count = r.readVarUInt();
     partCounts.push(count);
     sumPrev += count;
@@ -764,7 +1066,7 @@ function decodeGdbGeometry(blob: Uint8Array, geomField: ParsedFieldDescriptor): 
   const ringsOrLines: [number, number][][] = [];
   let accX = 0;
   let accY = 0;
-  for (let p = 0; p < nParts; p++) {
+  for (let p = 0; p < partCounts.length; p++) {
     const cnt = partCounts[p];
     const pts: [number, number][] = [];
     for (let i = 0; i < cnt && r.remaining > 0; i++) {
@@ -812,6 +1114,25 @@ function decodeGdbGeometry(blob: Uint8Array, geomField: ParsedFieldDescriptor): 
     : { type: 'MultiPolygon', coordinates: polys };
 }
 
+function isPlausibleFieldDescOffset(tableBytes: Uint8Array, offset: number): boolean {
+  if (!Number.isFinite(offset) || offset < 40 || offset + 14 > tableBytes.length) return false;
+  const dv = new DataView(tableBytes.buffer, tableBytes.byteOffset, tableBytes.length);
+  const descSize = dv.getUint32(offset, true);
+  if (descSize < 10 || offset + 4 + descSize > tableBytes.length) return false;
+  const version = dv.getUint32(offset + 4, true);
+  return version === 3 || version === 4;
+}
+
+function resolveFieldDescOffsetFromHeader(tableBytes: Uint8Array, u64At24: number, u64At32: number): number {
+  // Standard Esri / GDAL OpenFileGDB v10+ places fileSize at bytes 24..31 and fieldDescOffset at bytes 32..39
+  if (isPlausibleFieldDescOffset(tableBytes, u64At32)) return u64At32;
+  // Fallback for legacy single-file writers storing fieldDescOffset at bytes 24..31
+  if (isPlausibleFieldDescOffset(tableBytes, u64At24)) return u64At24;
+  if (u64At32 >= 40 && u64At32 < tableBytes.length) return u64At32;
+  if (u64At24 >= 40 && u64At24 < tableBytes.length) return u64At24;
+  return 0;
+}
+
 function parseSingleGdbTable(
   fileName: string,
   tableBytes: Uint8Array,
@@ -825,58 +1146,71 @@ function parseSingleGdbTable(
   const nValidRows = headerReader.readU32();
   const _largestRecordSize = headerReader.readU32();
   const _flags = headerReader.readU32();
-  const _fileSize = headerReader.readU64();
-  const fieldDescOffset = headerReader.readU64();
+  const _reservedOrFileSize = headerReader.readU64(); // offset 16..23 (0 in Esri/GDAL)
+  const u64At24 = headerReader.readU64();              // offset 24..31 (fileSize in Esri/GDAL)
+  const u64At32 = headerReader.readU64();              // offset 32..39 (fieldDescOffset in Esri/GDAL)
 
+  const fieldDescOffset = resolveFieldDescOffsetFromHeader(tableBytes, u64At24, u64At32);
   if (fieldDescOffset < 40 || fieldDescOffset >= tableBytes.length) return null;
 
   const { geomTypeCode, fields, sectionEndOffset } = parseFieldDescriptions(tableBytes, fieldDescOffset);
+  if (fields.length === 0) return null;
+
   const nullableFields = fields.filter((f) => f.fieldType !== 6 && f.nullable);
   const nullBitmapBytes = Math.ceil(nullableFields.length / 8);
 
   const offsetsFromIndex = parseTablxOffsets(tablxBytes);
-  const candidateOffsets: number[] = [];
+  const candidateRows: TablxRowOffset[] = [];
 
   if (offsetsFromIndex && offsetsFromIndex.length > 0) {
-    for (const off of offsetsFromIndex) {
-      if (off >= 40 && off < fieldDescOffset) {
-        candidateOffsets.push(off);
+    for (const entry of offsetsFromIndex) {
+      // Allow rows before fieldDescOffset (when schema is at EOF) OR after sectionEndOffset (when schema is at byte 40)
+      if (
+        entry.offset >= 40 &&
+        entry.offset + 4 <= tableBytes.length &&
+        (entry.offset < fieldDescOffset || entry.offset >= sectionEndOffset)
+      ) {
+        candidateRows.push(entry);
       }
     }
   } else if (nValidRows > 0) {
-    // Sequential scan between byte 40 and fieldDescOffset (or after sectionEndOffset)
+    // Sequential scan between byte 40 and fieldDescOffset (or after sectionEndOffset when schema is at byte 40)
     const scanStart = fieldDescOffset > 40 ? 40 : sectionEndOffset;
     const scanEnd = fieldDescOffset > 40 ? fieldDescOffset : tableBytes.length;
     let cursor = scanStart;
+    let seqOid = 1;
     while (cursor + 4 <= scanEnd) {
       const dv = new DataView(tableBytes.buffer, tableBytes.byteOffset + cursor, 4);
       const recLen = dv.getInt32(0, true);
       if (recLen === 0) break;
       if (recLen < 0) {
         cursor += 4 + Math.abs(recLen);
+        seqOid++;
         continue;
       }
       if (cursor + 4 + recLen > scanEnd) break;
-      candidateOffsets.push(cursor);
+      candidateRows.push({ oid: seqOid, offset: cursor });
+      seqOid++;
       cursor += 4 + recLen;
     }
   }
 
   const rows: { oid: number; props: Record<string, any>; geometry: any }[] = [];
 
-  for (let rowIdx = 0; rowIdx < candidateOffsets.length; rowIdx++) {
-    const offset = candidateOffsets[rowIdx];
+  for (let rowIdx = 0; rowIdx < candidateRows.length; rowIdx++) {
+    const { oid, offset } = candidateRows[rowIdx];
     const r = new ByteReader(tableBytes, offset);
+    if (r.remaining < 4) continue;
     const recSize = r.readI32();
     if (recSize <= 0 || offset + 4 + recSize > tableBytes.length) continue;
 
     const recordEnd = offset + 4 + recSize;
+    if (r.pos + nullBitmapBytes > recordEnd) continue;
     const nullBytes = r.readBytes(nullBitmapBytes);
     let nullableIdx = 0;
 
     const props: Record<string, any> = {};
     let geometry: any = null;
-    const oid = rowIdx + 1;
 
     for (const field of fields) {
       let isNull = false;
@@ -901,16 +1235,16 @@ function parseSingleGdbTable(
 
       switch (field.fieldType) {
         case 0: // Int16
-          props[field.name] = r.readI16();
+          if (r.pos + 2 <= recordEnd) props[field.name] = r.readI16();
           break;
         case 1: // Int32
-          props[field.name] = r.readI32();
+          if (r.pos + 4 <= recordEnd) props[field.name] = r.readI32();
           break;
         case 2: // Float32
-          props[field.name] = Number(r.readF32().toFixed(6));
+          if (r.pos + 4 <= recordEnd) props[field.name] = Number(r.readF32().toFixed(6));
           break;
         case 3: // Float64
-          props[field.name] = r.readF64();
+          if (r.pos + 8 <= recordEnd) props[field.name] = r.readF64();
           break;
         case 4: { // String
           const strLen = r.readVarUInt();
@@ -918,14 +1252,20 @@ function parseSingleGdbTable(
           break;
         }
         case 5: { // DateTime
-          const days = r.readF64();
-          props[field.name] = daysToIsoDate(days);
+          if (r.pos + 8 <= recordEnd) {
+            const days = r.readF64();
+            props[field.name] = daysToIsoDate(days);
+          }
           break;
         }
         case 7: { // Geometry
           const geomLen = r.readVarUInt();
           const geomBlob = r.readBytes(Math.min(geomLen, recordEnd - r.pos));
-          geometry = decodeGdbGeometry(geomBlob, field);
+          try {
+            geometry = decodeGdbGeometry(geomBlob, field);
+          } catch {
+            geometry = null;
+          }
           break;
         }
         case 8: { // Blob
@@ -934,10 +1274,21 @@ function parseSingleGdbTable(
           props[field.name] = `[BLOB ${blobLen}B]`;
           break;
         }
+        case 9: { // Raster
+          const rasLen = r.readVarUInt();
+          r.readBytes(Math.min(rasLen, recordEnd - r.pos));
+          props[field.name] = `[RASTER ${rasLen}B]`;
+          break;
+        }
         case 10:
         case 11: { // GUID / GlobalID
-          const guidBytes = r.readBytes(16);
-          props[field.name] = formatGuid(guidBytes);
+          if (r.pos + 16 <= recordEnd) {
+            const guidBytes = r.readBytes(16);
+            props[field.name] = formatGuid(guidBytes);
+          } else {
+            r.pos = recordEnd;
+            props[field.name] = null;
+          }
           break;
         }
         case 12: { // XML
@@ -946,7 +1297,31 @@ function parseSingleGdbTable(
           break;
         }
         case 13: { // Int64
-          props[field.name] = r.readI64();
+          if (r.pos + 8 <= recordEnd) props[field.name] = r.readI64();
+          break;
+        }
+        case 14: { // DateOnly
+          if (field.width === 4 && r.pos + 4 <= recordEnd) {
+            props[field.name] = daysToIsoDate(r.readI32());
+          } else if (r.pos + 8 <= recordEnd) {
+            props[field.name] = daysToIsoDate(r.readF64());
+          }
+          break;
+        }
+        case 15: { // TimeOnly
+          if (r.pos + 8 <= recordEnd) {
+            const frac = r.readF64();
+            props[field.name] = Number.isFinite(frac) ? String(frac) : null;
+          }
+          break;
+        }
+        case 16: { // TimestampOffset
+          const span = Math.min(Math.max(field.width || 10, 8), recordEnd - r.pos);
+          if (span >= 8) {
+            const days = r.readF64();
+            if (span > 8) r.pos += span - 8;
+            props[field.name] = daysToIsoDate(days);
+          }
           break;
         }
         default:
@@ -985,7 +1360,12 @@ function decodeSystemCatalog(entries: Map<string, Uint8Array>): CatalogEntry[] {
   const sysTablx = entries.get('a00000001.gdbtablx');
   if (!sysBytes) return [];
 
-  const parsed = parseSingleGdbTable('a00000001.gdbtable', sysBytes, sysTablx, 'GDB_SystemCatalog');
+  let parsed: ParsedGdbTable | null = null;
+  try {
+    parsed = parseSingleGdbTable('a00000001.gdbtable', sysBytes, sysTablx, 'GDB_SystemCatalog');
+  } catch {
+    return [];
+  }
   if (!parsed) return [];
 
   const result: CatalogEntry[] = [];
@@ -1010,20 +1390,29 @@ function extractGdbItemsMetadata(entries: Map<string, Uint8Array>): GdbItemsMeta
   const itemsTablx = entries.get('a00000004.gdbtablx');
   if (!itemsBytes) return { commentsByTable, relationships };
 
-  const parsed = parseSingleGdbTable('a00000004.gdbtable', itemsBytes, itemsTablx, 'GDB_Items');
+  let parsed: ParsedGdbTable | null = null;
+  try {
+    parsed = parseSingleGdbTable('a00000004.gdbtable', itemsBytes, itemsTablx, 'GDB_Items');
+  } catch {
+    return { commentsByTable, relationships };
+  }
   if (!parsed) return { commentsByTable, relationships };
 
   for (const row of parsed.rows) {
     const itemName = String(row.props.Name ?? row.props.name ?? '').trim();
+    const physicalName = String(row.props.PhysicalName ?? row.props.physicalname ?? '').trim();
     const docXml = String(row.props.Documentation ?? row.props.documentation ?? '');
     const defXml = String(row.props.Definition ?? row.props.definition ?? '');
 
-    if (itemName) {
+    if (itemName || physicalName) {
       let commentText = '';
       if (docXml) {
-        const descMatch = docXml.match(/<Description>([\s\S]*?)<\/Description>/i) ||
-                          docXml.match(/<Abstract>([\s\S]*?)<\/Abstract>/i) ||
-                          docXml.match(/<Purpose>([\s\S]*?)<\/Purpose>/i);
+        const descMatch =
+          docXml.match(/<Description>([\s\S]*?)<\/Description>/i) ||
+          docXml.match(/<Abstract>([\s\S]*?)<\/Abstract>/i) ||
+          docXml.match(/<idAbs>([\s\S]*?)<\/idAbs>/i) ||
+          docXml.match(/<Purpose>([\s\S]*?)<\/Purpose>/i) ||
+          docXml.match(/<idPurp>([\s\S]*?)<\/idPurp>/i);
         if (descMatch && descMatch[1]) {
           commentText = descMatch[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, '').trim();
         }
@@ -1035,7 +1424,14 @@ function extractGdbItemsMetadata(entries: Map<string, Uint8Array>): GdbItemsMeta
         }
       }
       if (commentText) {
-        commentsByTable.set(itemName.toLowerCase(), commentText);
+        if (itemName) {
+          commentsByTable.set(itemName.toLowerCase(), commentText);
+          const shortName = itemName.split('.').pop();
+          if (shortName) commentsByTable.set(shortName.toLowerCase(), commentText);
+        }
+        if (physicalName) {
+          commentsByTable.set(physicalName.toLowerCase(), commentText);
+        }
       }
     }
 
@@ -1070,13 +1466,14 @@ function mapGdbGeomType(code: number): GeometryType {
     case 1: return 'Point';
     case 2: return 'MultiPoint';
     case 3: return 'MultiLineString';
-    case 4: return 'MultiPolygon';
+    case 4:
+    case 9: return 'MultiPolygon';
     default: return 'Unknown';
   }
 }
 
 export async function inspectFileGdb(input: File | File[]): Promise<GdbInspectionResult> {
-  const { gdbName, entries } = await collectGdbFileMap(input);
+  const { gdbName, entries, hasCdfFiles } = await collectGdbFileMap(input);
   const catalog = decodeSystemCatalog(entries);
   const { commentsByTable, relationships } = extractGdbItemsMetadata(entries);
 
@@ -1086,12 +1483,23 @@ export async function inspectFileGdb(input: File | File[]): Promise<GdbInspectio
   }
 
   const layers: GdbLayerSummary[] = [];
+  const diagnostics: string[] = [];
   const tableFiles = Array.from(entries.keys())
     .filter((k) => k.endsWith('.gdbtable'))
     .sort();
 
+  if (tableFiles.length === 0) {
+    if (hasCdfFiles) {
+      throw new Error(
+        `${gdbName} uses Esri compressed File Geodatabase (.cdf) format, which cannot be decoded natively in the browser. Uncompress it in ArcGIS Pro / QGIS or export to uncompressed .gdb / GeoPackage (.gpkg).`
+      );
+    }
+    throw new Error(
+      `No .gdbtable files were found in ${gdbName}. Please upload the complete .gdb folder (via "Select Folder" or Drag & Drop) or a compressed .gdb.zip archive.`
+    );
+  }
+
   for (const fileKey of tableFiles) {
-    // Skip internal GDB system tables a00000001..a00000008 unless no user tables exist
     if (/^a0000000[1-8]\.gdbtable$/i.test(fileKey)) continue;
 
     const mappedName = catalogMap.get(fileKey);
@@ -1102,12 +1510,30 @@ export async function inspectFileGdb(input: File | File[]): Promise<GdbInspectio
     const tablxKey = fileKey.replace(/\.gdbtable$/i, '.gdbtablx');
     const tablxBytes = entries.get(tablxKey);
 
-    const parsed = parseSingleGdbTable(fileKey, tableBytes, tablxBytes, mappedName);
-    if (!parsed) continue;
+    let parsed: ParsedGdbTable | null = null;
+    try {
+      parsed = parseSingleGdbTable(fileKey, tableBytes, tablxBytes, mappedName);
+    } catch (err) {
+      diagnostics.push(`${mappedName || fileKey}: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+    if (!parsed) {
+      if (tableBytes.length >= 40) {
+        const dv = new DataView(tableBytes.buffer, tableBytes.byteOffset, 40);
+        const sig = dv.getUint32(0, true);
+        if (sig !== 3) {
+          diagnostics.push(`${mappedName || fileKey}: unsupported table header signature (${sig}).`);
+        } else {
+          diagnostics.push(`${mappedName || fileKey}: could not decode field descriptor block (${tableBytes.length} bytes).`);
+        }
+      }
+      continue;
+    }
 
     const geomField = parsed.fields.find((f) => f.fieldType === 7);
     const crs = detectCrsFromWkt(geomField?.wkt);
-    const isNonSpatial = !geomField || parsed.geomTypeCode === 0;
+    const hasDecodedGeoms = parsed.rows.some((r) => r.geometry !== null);
+    const isNonSpatial = !geomField || (parsed.geomTypeCode === 0 && !hasDecodedGeoms);
 
     layers.push({
       internalFileName: fileKey,
@@ -1124,10 +1550,20 @@ export async function inspectFileGdb(input: File | File[]): Promise<GdbInspectio
     });
   }
 
+  if (layers.length === 0 && hasCdfFiles) {
+    throw new Error(
+      `${gdbName} contains compressed (.cdf) File Geodatabase vectors. Please uncompress it in ArcGIS Pro / QGIS before ingesting.`
+    );
+  }
+  if (layers.length === 0 && diagnostics.length > 0) {
+    throw new Error(`Could not decode tables in ${gdbName}: ${diagnostics.slice(0, 3).join('; ')}`);
+  }
+
   return {
     gdbName,
     layers,
     discoveredRelationships: relationships,
+    diagnostics: diagnostics.length > 0 ? diagnostics : undefined,
   };
 }
 
@@ -1139,7 +1575,7 @@ export async function parseFileGdbLayers(
   discoveredRelationships: DiscoveredGdbRelationship[];
   gdbName: string;
 }> {
-  const { gdbName, entries } = await collectGdbFileMap(input);
+  const { gdbName, entries, hasCdfFiles } = await collectGdbFileMap(input);
   const catalog = decodeSystemCatalog(entries);
   const { commentsByTable, relationships } = extractGdbItemsMetadata(entries);
 
@@ -1172,12 +1608,18 @@ export async function parseFileGdbLayers(
     const tablxKey = fileKey.replace(/\.gdbtable$/i, '.gdbtablx');
     const tablxBytes = entries.get(tablxKey);
 
-    const parsed = parseSingleGdbTable(fileKey, tableBytes, tablxBytes, mappedName);
+    let parsed: ParsedGdbTable | null = null;
+    try {
+      parsed = parseSingleGdbTable(fileKey, tableBytes, tablxBytes, mappedName);
+    } catch {
+      continue;
+    }
     if (!parsed) continue;
 
     const geomField = parsed.fields.find((f) => f.fieldType === 7);
     const oidField = parsed.fields.find((f) => f.fieldType === 6);
-    const isNonSpatial = !geomField || parsed.geomTypeCode === 0;
+    const hasDecodedGeoms = parsed.rows.some((r) => r.geometry !== null);
+    const isNonSpatial = !geomField || (parsed.geomTypeCode === 0 && !hasDecodedGeoms);
     const crs = detectCrsFromWkt(geomField?.wkt);
 
     const features = parsed.rows.map((row) => ({
@@ -1204,7 +1646,7 @@ export async function parseFileGdbLayers(
           name: f.name,
           type: (f.fieldType === 0 || f.fieldType === 1 || f.fieldType === 2 || f.fieldType === 3 || f.fieldType === 6 || f.fieldType === 13)
             ? 'number'
-            : f.fieldType === 5
+            : (f.fieldType === 5 || f.fieldType === 14 || f.fieldType === 16)
             ? 'date'
             : 'string',
           sampleValues: [],
@@ -1238,6 +1680,12 @@ export async function parseFileGdbLayers(
       isNonSpatial,
       gdbSourceName: gdbName,
     });
+  }
+
+  if (datasets.length === 0 && hasCdfFiles) {
+    throw new Error(
+      `${gdbName} uses Esri compressed (.cdf) format. Please uncompress it in ArcGIS Pro / QGIS before importing.`
+    );
   }
 
   return {
@@ -1553,13 +2001,14 @@ function buildBinaryGdbTableAndIndex(params: {
   w.writeBytes(fieldSectionBytes);
 
   const fileSize = w.length;
-  // Patch 40-byte header
+  // Patch 40-byte header per OpenFileGDB v10+ spec (fileSize at 24..31, fieldDescOffset at 32..39)
   w.patchU32(0, 3); // signature
   w.patchU32(4, rows.length);
   w.patchU32(8, maxRecordSize);
   w.patchU32(12, 5);
-  w.patchU64(16, fileSize);
-  w.patchU64(24, fieldDescOffset);
+  w.patchU64(16, 0);
+  w.patchU64(24, fileSize);
+  w.patchU64(32, fieldDescOffset);
 
   // Build .gdbtablx
   const n1024Blocks = Math.max(1, Math.ceil(Math.max(rows.length, 1) / 1024));

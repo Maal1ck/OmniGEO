@@ -145,31 +145,45 @@ export function findCSVCoordinateColumns(headers: string[], sampleRows?: Record<
   return null;
 }
 
+function parseCsvNumber(raw: any): number {
+  if (raw === null || raw === undefined) return NaN;
+  if (typeof raw === 'number') return raw;
+  const s = String(raw).trim();
+  if (!s) return NaN;
+  // Handle optional decimal comma in numeric strings (e.g. "31,625")
+  const normalized = /^-?\d+,\d+$/.test(s) ? s.replace(',', '.') : s;
+  return Number(normalized);
+}
+
 /**
- * Parses spatial CSV into GeoJSON FeatureCollection
+ * Parses spatial or non-spatial CSV into GeoJSON FeatureCollection
  */
 export function parseCSV(
   csvText: string,
   fileName: string,
   fileSize: number,
   customXCol?: string,
-  customYCol?: string
+  customYCol?: string,
+  forceNonSpatial: boolean = false
 ): SpatialDataset {
   const parsed = Papa.parse(csvText, { header: true, dynamicTyping: true, skipEmptyLines: true });
-  const headers = parsed.meta.fields || [];
-  const coordCols = (customXCol && customYCol) 
-    ? { xCol: customXCol, yCol: customYCol }
-    : findCSVCoordinateColumns(headers);
-
-  const features: any[] = [];
+  const headers = (parsed.meta.fields || []).filter((h) => h && h.trim() !== '');
   const data = parsed.data as Record<string, any>[];
+
+  const coordCols = forceNonSpatial
+    ? null
+    : (customXCol && customYCol)
+    ? { xCol: customXCol, yCol: customYCol }
+    : findCSVCoordinateColumns(headers, data.slice(0, 20));
+
+  const spatialFeatures: any[] = [];
 
   if (coordCols) {
     for (const row of data) {
-      const x = Number(row[coordCols.xCol]);
-      const y = Number(row[coordCols.yCol]);
+      const x = parseCsvNumber(row[coordCols.xCol]);
+      const y = parseCsvNumber(row[coordCols.yCol]);
       if (Number.isFinite(x) && Number.isFinite(y)) {
-        features.push({
+        spatialFeatures.push({
           type: 'Feature',
           geometry: {
             type: 'Point',
@@ -181,26 +195,56 @@ export function parseCSV(
     }
   }
 
+  // If no spatial coordinates were found (or non-spatial requested), ingest all rows as an attribute table
+  const isNonSpatial = forceNonSpatial || !coordCols || spatialFeatures.length === 0;
+  const features = isNonSpatial
+    ? data.map((row, idx) => ({
+        type: 'Feature',
+        id: idx + 1,
+        geometry: null,
+        properties: row,
+      }))
+    : spatialFeatures;
+
   const geojson = {
     type: 'FeatureCollection',
     features,
   };
 
+  let fields = extractSchemaFields(geojson);
+  if (fields.length === 0 && headers.length > 0) {
+    fields = headers.map((h) => ({ name: h, type: 'string' as const, sampleValues: [] }));
+  }
+
+  if (isNonSpatial) {
+    const defaultCrs = getCRSByCode('EPSG:4326')!;
+    return {
+      id: `ds-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: fileName.replace(/\.[^/.]+$/, ''),
+      originalFileName: fileName,
+      format: 'csv',
+      sizeBytes: fileSize,
+      featureCount: features.length,
+      geometryType: 'Unknown',
+      detectedCRS: defaultCrs,
+      crsStatus: 'verified',
+      bounds: [0, 0, 0, 0],
+      fields,
+      geojson,
+      validationIssues: [],
+      status: 'ready',
+      addedAt: Date.now(),
+      isNonSpatial: true,
+    };
+  }
+
   const bounds = computeGeoJSONBounds(geojson);
   const coordResult = detectCRSFromCoordinates(bounds);
   const detectedCRS = coordResult.detectedCRS;
-  const crsStatus = coordCols ? coordResult.crsStatus : 'missing';
-
-  const fields = extractSchemaFields(geojson);
+  const crsStatus = coordResult.crsStatus;
   const validationIssues = validateDatasetGeometries(geojson, detectedCRS?.code);
 
-  if (!coordCols) {
-    validationIssues.push({
-      severity: 'warning',
-      code: 'NO_COORDINATE_COLS',
-      message: 'Could not auto-detect Longitude/Latitude columns. Please configure CSV spatial columns in Conversion Lab.',
-    });
-  } else if (coordResult.crsStatus === 'missing') {
+  if (coordResult.crsStatus === 'missing') {
     validationIssues.push({
       severity: 'warning',
       code: 'PROJECTED_COORDINATES_DETECTED',
@@ -224,6 +268,7 @@ export function parseCSV(
     validationIssues,
     status: validationIssues.some(i => i.severity === 'error') ? 'invalid' : validationIssues.length > 0 ? 'warning' : 'ready',
     addedAt: Date.now(),
+    isNonSpatial: false,
   };
 }
 

@@ -97,18 +97,23 @@ export function generatePostgisSql(
   const createIndex = options.createSpatialIndex ?? true;
   const batchSize = Math.max(1, Math.min(500, options.batchSize || 100));
 
+  const isNonSpatial = Boolean(dataset.isNonSpatial);
   const features = dataset.geojson?.features || (dataset.geojson?.type === 'Feature' ? [dataset.geojson] : []);
   const geomType = dataset.geometryType === 'Unknown' ? 'Geometry' : dataset.geometryType;
 
   let sql = `-- ====================================================================\n`;
-  sql += `-- OmniGeo by Maodo: PostGIS Automated Ingestion Script\n`;
-  sql += `-- Dataset: ${dataset.name} (${dataset.originalFileName})\n`;
-  sql += `-- Target: "${schema}"."${table}" | SRID: ${srid} | Features: ${features.length}\n`;
+  sql += `-- OmniGeo by Maodo: PostgreSQL / PostGIS Automated Ingestion Script\n`;
+  sql += `-- Dataset: ${dataset.name} (${dataset.originalFileName})${isNonSpatial ? ' [Attribute Table]' : ''}\n`;
+  sql += `-- Target: "${schema}"."${table}" | ${isNonSpatial ? 'Non-Spatial' : `SRID: ${srid}`} | Records: ${features.length}\n`;
   sql += `-- Generated: ${new Date().toISOString()}\n`;
   sql += `-- ====================================================================\n\n`;
 
-  sql += `-- 1. Ensure PostGIS Spatial Extension & Schema exist\n`;
-  sql += `CREATE EXTENSION IF NOT EXISTS postgis;\n`;
+  if (!isNonSpatial) {
+    sql += `-- 1. Ensure PostGIS Spatial Extension & Schema exist\n`;
+    sql += `CREATE EXTENSION IF NOT EXISTS postgis;\n`;
+  } else {
+    sql += `-- 1. Ensure Target Schema exists\n`;
+  }
   if (schema !== 'public') {
     sql += `CREATE SCHEMA IF NOT EXISTS "${schema}";\n`;
   }
@@ -128,14 +133,15 @@ export function generatePostgisSql(
 
   for (const field of dataset.fields) {
     const sanitized = sanitizeSqlIdentifier(field.name);
-    if (sanitized === 'ogc_fid' || sanitized === geomCol) continue;
+    if (sanitized === 'ogc_fid' || (!isNonSpatial && sanitized === geomCol)) continue;
     const pgType = mapFieldToPostgresType(field);
     colDefinitions.push(`  "${sanitized}" ${pgType}`);
     fieldMapping.push({ sourceName: field.name, sanitizedName: sanitized, pgType });
   }
 
-  // Geometry column with typed PostGIS geometry
-  colDefinitions.push(`  "${geomCol}" geometry(${geomType}, ${srid})`);
+  if (!isNonSpatial) {
+    colDefinitions.push(`  "${geomCol}" geometry(${geomType}, ${srid})`);
+  }
 
   sql += colDefinitions.join(',\n');
   sql += `\n);\n\n`;
@@ -143,11 +149,11 @@ export function generatePostgisSql(
   sql += `COMMENT ON TABLE "${schema}"."${table}" IS 'Ingested from OmniGeo GIS Suite (${dataset.originalFileName})';\n\n`;
 
   if (features.length > 0) {
-    sql += `-- 4. Batched Spatial Features DML Inserts (${features.length} records)\n`;
+    sql += `-- 4. Batched ${isNonSpatial ? 'Tabular Records' : 'Spatial Features'} DML Inserts (${features.length} records)\n`;
 
     const insertColNames = [
       ...fieldMapping.map(f => `"${f.sanitizedName}"`),
-      `"${geomCol}"`,
+      ...(isNonSpatial ? [] : [`"${geomCol}"`]),
     ].join(', ');
 
     for (let i = 0; i < features.length; i += batchSize) {
@@ -164,12 +170,13 @@ export function generatePostgisSql(
           values.push(escapeSqlLiteral(val));
         }
 
-        // Geometry value via ST_SetSRID(ST_GeomFromGeoJSON(...), srid)
-        if (f.geometry) {
-          const geomJson = JSON.stringify(f.geometry).replace(/'/g, "''");
-          values.push(`ST_SetSRID(ST_GeomFromGeoJSON('${geomJson}'), ${srid})`);
-        } else {
-          values.push('NULL');
+        if (!isNonSpatial) {
+          if (f.geometry) {
+            const geomJson = JSON.stringify(f.geometry).replace(/'/g, "''");
+            values.push(`ST_SetSRID(ST_GeomFromGeoJSON('${geomJson}'), ${srid})`);
+          } else {
+            values.push('NULL');
+          }
         }
 
         rowValues.push(`  (${values.join(', ')})`);
@@ -180,12 +187,12 @@ export function generatePostgisSql(
     }
   }
 
-  if (createIndex) {
+  if (createIndex && !isNonSpatial) {
     sql += `-- 5. Spatial Index for ultra-fast bounding box & spatial queries\n`;
     sql += `CREATE INDEX "idx_${table}_${geomCol}" ON "${schema}"."${table}" USING GIST ("${geomCol}");\n\n`;
   }
 
-  sql += `-- 6. Vacuum Analyze to update PostGIS query optimizer statistics\n`;
+  sql += `-- Vacuum Analyze to update PostgreSQL query optimizer statistics\n`;
   sql += `VACUUM ANALYZE "${schema}"."${table}";\n`;
 
   return sql;

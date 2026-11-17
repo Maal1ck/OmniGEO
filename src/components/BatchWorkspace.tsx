@@ -42,11 +42,14 @@ import {
   DiscoveredGdbRelationship,
   GdbInspectionResult,
   exportDatasetsToFileGdbZip,
+  getUploadedFileRelativePath,
   groupFileGdbFolderUploads,
   inspectFileGdb,
   isFileGdbFolderFiles,
   isFileGdbZipArchive,
   parseFileGdbLayers,
+  registerUploadedFileRelativePath,
+  splitFileGdbZipBundles,
 } from '../core/fileGdbEngine';
 import { ExcelCoordinateModal, PendingExcelFile } from './ExcelCoordinateModal';
 import { GpkgLayerModal, PendingGpkgFile } from './GpkgLayerModal';
@@ -276,14 +279,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       if (entry.isFile) {
         const file: File = await new Promise((resolve, reject) => entry.file(resolve, reject));
         const relativePath = path ? `${path}/${file.name}` : file.name;
-        try {
-          Object.defineProperty(file, 'webkitRelativePath', {
-            value: relativePath,
-            writable: true,
-          });
-        } catch {
-          // ignore
-        }
+        registerUploadedFileRelativePath(file, relativePath);
         files.push(file);
       } else if (entry.isDirectory) {
         const reader = entry.createReader();
@@ -329,6 +325,19 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     const rawList = Array.from(files);
     if (rawList.length === 0) return;
 
+    // Detect unsupported geodatabase containers or empty .gdb directory stubs dropped without traversal
+    const unsupportedGdbErrors: string[] = [];
+    for (const f of rawList) {
+      const lower = f.name.toLowerCase();
+      if (lower.endsWith('.geodatabase')) {
+        unsupportedGdbErrors.push(`${f.name}: Mobile Geodatabase (.geodatabase SQLite) is not yet supported; export to .gpkg or uncompressed .gdb/.gdb.zip.`);
+      } else if (lower.endsWith('.mdb')) {
+        unsupportedGdbErrors.push(`${f.name}: Legacy Personal Geodatabase (.mdb Microsoft Access) is not supported in browser environments; convert to .gdb or .gpkg in QGIS/ArcGIS.`);
+      } else if (lower.endsWith('.gdb') && f.size === 0 && !getUploadedFileRelativePath(f).includes('/')) {
+        unsupportedGdbErrors.push(`${f.name}: Your browser passed the folder stub without its internal .gdbtable files. Click "Select Folder" to pick ${f.name} or compress it as .gdb.zip.`);
+      }
+    }
+
     // If folder ingestion and forced choice is not predetermined, check for subfolders
     if (isFolderSource && forcedRecursive === undefined) {
       let rootCount = 0;
@@ -336,7 +345,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       const subfolderDirs = new Set<string>();
 
       for (const file of rawList) {
-        const relPath = (file as any).webkitRelativePath || file.name;
+        const relPath = getUploadedFileRelativePath(file);
+        const lowerBase = relPath.split('/').pop()?.toLowerCase() || '';
+        if (relPath.toLowerCase().includes('__macosx/') || lowerBase.startsWith('._') || lowerBase === '.ds_store') {
+          continue;
+        }
         const slashCount = (relPath.match(/\//g) || []).length;
         if (slashCount > 1) {
           subfolderCount++;
@@ -350,11 +363,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       const hasOnlyGdbSubfolders =
         isFileGdbFolderFiles(rawList) &&
         subfolderDirs.size > 0 &&
-        Array.from(subfolderDirs).every((dir) => /(^|\/)[^/]+\.gdb$/i.test(dir));
+        Array.from(subfolderDirs).every((dir) => /(^|\/)[^/]+\.gdb($|\/)/i.test(dir));
 
       // If nested subfolders were found and prompting is enabled, open the choice modal
       if (subfolderCount > 0 && alwaysPromptSubfolders && !hasOnlyGdbSubfolders) {
-        const firstRel = (rawList[0] as any).webkitRelativePath || '';
+        const firstRel = getUploadedFileRelativePath(rawList[0]);
         const folderName = firstRel.includes('/') ? firstRel.split('/')[0] : 'Selected Directory';
 
         setPendingFolderImport({
@@ -375,15 +388,26 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     setScanSuccessMessage(null);
 
     const newDatasets: SpatialDataset[] = [];
-    const fileErrors: string[] = [];
+    const fileErrors: string[] = [...unsupportedGdbErrors];
     const subfolderSet = new Set<string>();
 
     // Filter files based on user-selected data types and subfolder depth
     const eligibleFiles: File[] = [];
 
     for (const file of rawList) {
-      const relPath = ((file as any).webkitRelativePath || file.name).replace(/\\/g, '/');
+      const relPath = getUploadedFileRelativePath(file);
       const isInsideGdbDir = /(^|\/)[^/]+\.gdb\//i.test(relPath);
+
+      // Skip macOS / OS metadata junk
+      const lowerBase = (relPath.split('/').pop() || '').toLowerCase();
+      if (
+        relPath.toLowerCase().includes('__macosx/') ||
+        lowerBase.startsWith('._') ||
+        lowerBase === '.ds_store' ||
+        lowerBase === 'thumbs.db'
+      ) {
+        continue;
+      }
 
       // Handle subfolder filtering (preserve .gdb bundle contents inside root/picked gdb directories)
       if (isFolderSource && !effectiveRecursive && relPath.includes('/') && !isInsideGdbDir) {
@@ -409,6 +433,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         isInsideGdbDir ||
         ext === '.gdbtable' ||
         ext === '.gdbtablx' ||
+        ext === '.cdf' ||
         lowerName === 'gdb' ||
         lowerName === 'timestamps' ||
         lowerName.endsWith('.gdb.zip');
@@ -451,7 +476,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     }
 
     if (eligibleFiles.length === 0) {
-      setFileProcessingError(t.workspace.noMatchingFilesInFolder);
+      setFileProcessingError(
+        unsupportedGdbErrors.length > 0
+          ? unsupportedGdbErrors.join('\n')
+          : t.workspace.noMatchingFilesInFolder
+      );
       setIsProcessingFiles(false);
       return;
     }
@@ -566,21 +595,24 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
             newDatasets.push(dataset);
           } else if (ext === '.zip' || lowerName.endsWith('.gdb.zip')) {
-            if (dataTypes.filegdb && (await isFileGdbZipArchive(file))) {
-              const info = await inspectFileGdb(file);
-              if (info.discoveredRelationships.length > 0 && onAddDiscoveredGdbRelationships) {
-                onAddDiscoveredGdbRelationships(info.discoveredRelationships);
-              }
-              if (info.layers.length > 1) {
-                setPendingGdbQueue(prev => [...prev, { info, sourceInput: file }]);
-              } else if (info.layers.length === 1) {
-                const parsed = await parseFileGdbLayers(file);
-                newDatasets.push(...parsed.datasets);
-                if (parsed.discoveredRelationships.length > 0 && onAddDiscoveredGdbRelationships) {
-                  onAddDiscoveredGdbRelationships(parsed.discoveredRelationships);
+            if (dataTypes.filegdb && (lowerName.endsWith('.gdb.zip') || (await isFileGdbZipArchive(file)))) {
+              const zipBundles = await splitFileGdbZipBundles(file);
+              for (const zb of zipBundles) {
+                const info = await inspectFileGdb(zb.sourceInput);
+                if (info.discoveredRelationships.length > 0 && onAddDiscoveredGdbRelationships) {
+                  onAddDiscoveredGdbRelationships(info.discoveredRelationships);
                 }
-              } else {
-                fileErrors.push(`${displayName}: No readable layers found in File Geodatabase archive.`);
+                if (info.layers.length > 1) {
+                  setPendingGdbQueue(prev => [...prev, { info, sourceInput: zb.sourceInput }]);
+                } else if (info.layers.length === 1) {
+                  const parsed = await parseFileGdbLayers(zb.sourceInput);
+                  newDatasets.push(...parsed.datasets);
+                  if (parsed.discoveredRelationships.length > 0 && onAddDiscoveredGdbRelationships) {
+                    onAddDiscoveredGdbRelationships(parsed.discoveredRelationships);
+                  }
+                } else {
+                  fileErrors.push(`${zb.name}: No readable layers found in File Geodatabase archive.`);
+                }
               }
             } else if (dataTypes.shapefile && ext === '.zip') {
               const buf = await file.arrayBuffer();
@@ -932,10 +964,10 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                     { key: 'shapefile' as const, label: 'ESRI Shapefile (.shp / .zip)', desc: 'Bundled .shp, .shx, .dbf, .prj' },
                     { key: 'cad' as const, label: 'AutoCAD CAD (.dwg / .dxf)', desc: 'Engineering & surveying drawings' },
                     { key: 'gpx' as const, label: 'GPS Exchange (.gpx)', desc: 'GPS waypoints, tracks, and routes' },
-                    { key: 'excel' as const, label: 'Excel Spreadsheet (.xlsx / .xls)', desc: 'Auto-detects Lon/Lat or manual mapping' },
+                    { key: 'excel' as const, label: 'Excel Spreadsheet (.xlsx / .xls)', desc: 'Spatial Lon/Lat or non-spatial attribute tables' },
                     { key: 'geojson' as const, label: 'GeoJSON (.geojson, .json)', desc: 'RFC 7946 Standard' },
                     { key: 'kml' as const, label: 'Google Earth KML / KMZ', desc: 'Placemarks & boundaries' },
-                    { key: 'csv' as const, label: 'Spatial CSV (.csv)', desc: 'Coordinate latitude/longitude tables' },
+                    { key: 'csv' as const, label: 'CSV Table (.csv)', desc: 'Spatial coordinates or non-spatial attribute tables' },
                   ].map(item => (
                     <label
                       key={item.key}

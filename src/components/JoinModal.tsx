@@ -101,23 +101,46 @@ export const JoinModal: React.FC<JoinModalProps> = ({
       // Select all non-geometry fields from source
       setSelectedSourceFields(new Set(sourceDataset.fields.map(f => f.name)));
 
-      // Auto-detect matching keys for attribute join
-      const targetFieldNames = targetDataset.fields.map(f => f.name.toLowerCase());
-      const sourceFieldNames = sourceDataset.fields.map(f => f.name.toLowerCase());
-
-      // Look for exact matches (e.g. "id" == "id", "code_insee" == "code_insee")
+      // Auto-detect matching keys for attribute join (1: exact case-insensitive, 2: normalized, 3: id/code heuristic)
+      const normCol = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
       let matchedTarget = targetDataset.fields[0]?.name || '';
       let matchedSource = sourceDataset.fields[0]?.name || '';
+      let foundMatch = false;
 
       for (const tf of targetDataset.fields) {
-        const found = sourceDataset.fields.find(sf => 
-          sf.name.toLowerCase() === tf.name.toLowerCase() ||
-          (tf.name.toLowerCase().includes('id') && sf.name.toLowerCase().includes('id'))
-        );
-        if (found) {
+        const exact = sourceDataset.fields.find(sf => sf.name.toLowerCase() === tf.name.toLowerCase());
+        if (exact) {
           matchedTarget = tf.name;
-          matchedSource = found.name;
+          matchedSource = exact.name;
+          foundMatch = true;
           break;
+        }
+      }
+
+      if (!foundMatch) {
+        for (const tf of targetDataset.fields) {
+          const tn = normCol(tf.name);
+          const normMatch = sourceDataset.fields.find(sf => normCol(sf.name) === tn);
+          if (normMatch) {
+            matchedTarget = tf.name;
+            matchedSource = normMatch.name;
+            foundMatch = true;
+            break;
+          }
+        }
+      }
+
+      if (!foundMatch) {
+        for (const tf of targetDataset.fields) {
+          const found = sourceDataset.fields.find(sf =>
+            (tf.name.toLowerCase().includes('id') && sf.name.toLowerCase().includes('id')) ||
+            (tf.name.toLowerCase().includes('code') && sf.name.toLowerCase().includes('code'))
+          );
+          if (found) {
+            matchedTarget = tf.name;
+            matchedSource = found.name;
+            break;
+          }
         }
       }
 
@@ -202,6 +225,15 @@ export const JoinModal: React.FC<JoinModalProps> = ({
 
     if (joinMode === 'attribute' && (!targetKeyField || !sourceKeyField)) {
       setErrorMsg(lang === 'fr' ? 'Veuillez sélectionner les colonnes clés d\'association.' : 'Please select the key fields for matching.');
+      return;
+    }
+
+    if (joinMode === 'spatial' && (targetDataset.isNonSpatial || sourceDataset.isNonSpatial)) {
+      setErrorMsg(
+        lang === 'fr'
+          ? 'La jointure spatiale nécessite deux couches géométriques. Utilisez l\'onglet Jointure Attributaire pour les tables CSV/Excel non spatiales.'
+          : 'Spatial Join requires two geometry layers. Switch to Attribute Join (Common Key) for non-spatial CSV/Excel tables.'
+      );
       return;
     }
 
@@ -350,14 +382,14 @@ export const JoinModal: React.FC<JoinModalProps> = ({
               >
                 {datasets.map(d => (
                   <option key={d.id} value={d.id}>
-                    {d.name} ({d.geometryType} · {d.featureCount} feats)
+                    {d.name} ({d.isNonSpatial ? 'Table' : d.geometryType} · {d.featureCount} rows)
                   </option>
                 ))}
               </select>
               <p className="text-[10px] text-stone-500">
                 {lang === 'fr' 
-                  ? 'La géométrie de cette couche sera conservée dans le résultat.' 
-                  : 'Geometries from this layer will be preserved in the output.'}
+                  ? 'La géométrie de cette couche (ou sa structure tabulaire) sera conservée dans le résultat.' 
+                  : 'Geometries (or tabular schema) from this dataset will be preserved in the output.'}
               </p>
             </div>
 
@@ -374,7 +406,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                 </div>
                 {sourceDataset && (
                   <span className="text-[10px] font-mono text-stone-400">
-                    {sourceDataset.featureCount} feats
+                    {sourceDataset.featureCount} rows
                   </span>
                 )}
               </div>
@@ -388,7 +420,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
               >
                 {datasets.map(d => (
                   <option key={d.id} value={d.id} disabled={d.id === targetDatasetId}>
-                    {d.name} ({d.geometryType} · {d.featureCount} feats)
+                    {d.name} ({d.isNonSpatial ? 'Table' : d.geometryType} · {d.featureCount} rows)
                   </option>
                 ))}
               </select>

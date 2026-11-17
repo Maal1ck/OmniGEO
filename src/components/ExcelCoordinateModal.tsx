@@ -23,7 +23,8 @@ import {
   ArrowRight,
   Sliders,
   HelpCircle,
-  CopyCheck
+  CopyCheck,
+  Table2
 } from 'lucide-react';
 import { COMMON_CRS_LIST, searchCRS, getCRSByCode } from '../core/crsDefinitions';
 import { CRSInfo } from '../types/gis';
@@ -48,6 +49,7 @@ export interface PendingExcelFile {
 export interface SheetConfig {
   sheetName: string;
   selected: boolean;
+  isNonSpatial: boolean;
   xCol: string;
   yCol: string;
   crsCode: string;
@@ -95,9 +97,11 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
       const initialConfigs: Record<string, SheetConfig> = {};
 
       for (const summary of summaries) {
+        const hasCoords = Boolean(summary.detectedXCol && summary.detectedYCol);
         initialConfigs[summary.sheetName] = {
           sheetName: summary.sheetName,
           selected: true,
+          isNonSpatial: !hasCoords,
           xCol: summary.detectedXCol || '',
           yCol: summary.detectedYCol || '',
           crsCode: 'EPSG:4326',
@@ -241,13 +245,13 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
       return;
     }
 
-    // Validate that every selected sheet has X and Y chosen
-    const invalidSheet = toImport.find(s => !s.xCol || !s.yCol);
+    // Validate only sheets marked as spatial Points
+    const invalidSheet = toImport.find(s => !s.isNonSpatial && (!s.xCol || !s.yCol));
     if (invalidSheet) {
       setActiveSheetName(invalidSheet.sheetName);
       setErrorMsg(lang === 'fr'
-        ? `La feuille "${invalidSheet.sheetName}" n'a pas de colonnes X et Y configurées. Veuillez les sélectionner.`
-        : `Worksheet "${invalidSheet.sheetName}" is missing coordinate columns. Please assign X and Y.`);
+        ? `La feuille spatiale "${invalidSheet.sheetName}" n'a pas de colonnes X et Y configurées. Sélectionnez X/Y ou passez en mode Table Attributaire.`
+        : `Spatial worksheet "${invalidSheet.sheetName}" is missing X and Y columns. Select X/Y or switch it to Attribute Table mode.`);
       return;
     }
 
@@ -259,9 +263,10 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
           pendingFile.buffer,
           pendingFile.file.name,
           cfg.sheetName,
-          cfg.xCol,
-          cfg.yCol,
-          cfg.crsCode
+          cfg.isNonSpatial ? undefined : cfg.xCol,
+          cfg.isNonSpatial ? undefined : cfg.yCol,
+          cfg.crsCode,
+          { asNonSpatial: cfg.isNonSpatial }
         );
 
         if (res.dataset) {
@@ -273,7 +278,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
       }
 
       if (createdDatasets.length === 0) {
-        setErrorMsg(lang === 'fr' ? 'Aucune entité valide n\'a pu être créée à partir des feuilles configurées.' : 'No valid spatial features could be generated.');
+        setErrorMsg(lang === 'fr' ? 'Aucune donnée valide n\'a pu être importée depuis les feuilles sélectionnées.' : 'No valid datasets could be imported from selected sheets.');
         return;
       }
 
@@ -286,8 +291,8 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
 
   // Import single active sheet only
   const handleImportSingle = () => {
-    if (!activeConfig || !activeConfig.xCol || !activeConfig.yCol) {
-      setErrorMsg(lang === 'fr' ? 'Veuillez sélectionner les colonnes X et Y pour cette feuille.' : 'Please select X and Y columns for this sheet.');
+    if (!activeConfig || (!activeConfig.isNonSpatial && (!activeConfig.xCol || !activeConfig.yCol))) {
+      setErrorMsg(lang === 'fr' ? 'Veuillez sélectionner les colonnes X et Y ou choisir le mode Table Attributaire.' : 'Please select X and Y columns or switch to Attribute Table mode.');
       return;
     }
 
@@ -296,13 +301,14 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
         pendingFile.buffer,
         pendingFile.file.name,
         activeConfig.sheetName,
-        activeConfig.xCol,
-        activeConfig.yCol,
-        activeConfig.crsCode
+        activeConfig.isNonSpatial ? undefined : activeConfig.xCol,
+        activeConfig.isNonSpatial ? undefined : activeConfig.yCol,
+        activeConfig.crsCode,
+        { asNonSpatial: activeConfig.isNonSpatial }
       );
 
       if (!res.dataset) {
-        setErrorMsg(lang === 'fr' ? 'Impossible de construire des entités valides pour cette feuille.' : 'Could not construct valid features.');
+        setErrorMsg(lang === 'fr' ? 'Impossible d\'importer les enregistrements pour cette feuille.' : 'Could not import records from this worksheet.');
         return;
       }
 
@@ -403,7 +409,8 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                 {Object.values(sheetConfigs).map((cfg) => {
                   const isCurrentActive = activeSheetName === cfg.sheetName;
-                  const isReady = cfg.xCol && cfg.yCol;
+                  const isSpatialReady = !cfg.isNonSpatial && Boolean(cfg.xCol && cfg.yCol);
+                  const isReady = cfg.isNonSpatial ? cfg.rowCount > 0 : isSpatialReady;
 
                   return (
                     <div
@@ -448,14 +455,19 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                             </span>
                             {isCurrentActive && (
                               <span className="px-1 py-0.2 rounded text-[9px] font-mono uppercase bg-amber-500 text-stone-950 font-bold">
-                                Édition
+                                {lang === 'fr' ? 'Actif' : 'Active'}
                               </span>
                             )}
                           </div>
                           <div className="text-[10px] font-mono text-stone-500 flex items-center space-x-1 mt-0.5 truncate">
                             <span>{cfg.rowCount.toLocaleString()} r</span>
                             <span>·</span>
-                            {isReady ? (
+                            {cfg.isNonSpatial ? (
+                              <span className="text-sky-600 dark:text-sky-400 font-semibold truncate flex items-center space-x-0.5">
+                                <Table2 className="w-2.5 h-2.5 shrink-0 mr-0.5" />
+                                <span>{lang === 'fr' ? 'Table (Non-spatial)' : 'Table (Non-spatial)'}</span>
+                              </span>
+                            ) : isSpatialReady ? (
                               <span className="text-emerald-600 dark:text-emerald-400 font-semibold truncate flex items-center space-x-0.5">
                                 <Check className="w-2.5 h-2.5 shrink-0 mr-0.5" />
                                 <span>{cfg.xCol}/{cfg.yCol}</span>
@@ -463,7 +475,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                             ) : (
                               <span className="text-amber-600 dark:text-amber-400 font-semibold truncate flex items-center space-x-0.5">
                                 <AlertCircle className="w-2.5 h-2.5 shrink-0 mr-0.5" />
-                                <span>X/Y requis</span>
+                                <span>{lang === 'fr' ? 'X/Y requis' : 'X/Y needed'}</span>
                               </span>
                             )}
                           </div>
@@ -473,7 +485,10 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                       {/* Ready Indicator badge */}
                       <div className="shrink-0">
                         {isReady ? (
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 block" title="Coordinates configured" />
+                          <span
+                            className={`w-2 h-2 rounded-full block ${cfg.isNonSpatial ? 'bg-sky-500' : 'bg-emerald-500'}`}
+                            title={cfg.isNonSpatial ? 'Ready as non-spatial attribute table' : 'Coordinates configured'}
+                          />
                         ) : (
                           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse block" title="Requires coordinate configuration" />
                         )}
@@ -529,22 +544,81 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                 )}
               </div>
 
-              {/* Layer Output Name */}
-              <div>
-                <label className="block text-[11px] font-mono text-stone-500 mb-1 font-semibold">
-                  {lang === 'fr' ? 'Nom de la couche résultante dans l\'espace de travail :' : 'Output Layer Name in Workspace :'}
-                </label>
-                <input
-                  type="text"
-                  value={activeConfig.outputName}
-                  onChange={(e) => updateActiveConfig({ outputName: e.target.value })}
-                  className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 ${
-                    theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
-                  }`}
-                />
+              {/* Layer Output Name + Ingestion Mode Selector */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-mono text-stone-500 mb-1 font-semibold">
+                    {lang === 'fr' ? 'Nom de la table / couche résultante :' : 'Output Table / Layer Name in Workspace :'}
+                  </label>
+                  <input
+                    type="text"
+                    value={activeConfig.outputName}
+                    onChange={(e) => updateActiveConfig({ outputName: e.target.value })}
+                    className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 ${
+                      theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono text-stone-500 mb-1 font-semibold">
+                    {lang === 'fr' ? 'Type d’ingestion pour cette feuille :' : 'Ingestion Mode for this Sheet :'}
+                  </label>
+                  <div className={`grid grid-cols-2 gap-1 p-1 rounded-xl border ${
+                    theme === 'light' ? 'bg-[#EFEAE2] border-[#DCD5C9]' : 'bg-[#120F0D] border-stone-800'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => updateActiveConfig({ isNonSpatial: false })}
+                      className={`flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded-lg text-[11px] font-mono transition-all cursor-pointer ${
+                        !activeConfig.isNonSpatial
+                          ? theme === 'light'
+                            ? 'bg-white text-emerald-800 font-bold shadow-xs'
+                            : 'bg-emerald-600 text-white font-bold shadow-xs'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>{lang === 'fr' ? 'Points (X/Y)' : 'Spatial Points (X/Y)'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateActiveConfig({ isNonSpatial: true })}
+                      className={`flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded-lg text-[11px] font-mono transition-all cursor-pointer ${
+                        activeConfig.isNonSpatial
+                          ? theme === 'light'
+                            ? 'bg-white text-sky-800 font-bold shadow-xs'
+                            : 'bg-sky-600 text-white font-bold shadow-xs'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      <Table2 className="w-3.5 h-3.5" />
+                      <span>{lang === 'fr' ? 'Table Attributaire' : 'Attribute Table'}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* Coordinate Columns Selection Grid */}
+              {activeConfig.isNonSpatial ? (
+                <div className={`p-4 rounded-xl border flex items-start space-x-3 ${
+                  theme === 'light' ? 'bg-sky-50 border-sky-200 text-sky-900' : 'bg-sky-950/30 border-sky-800/60 text-sky-200'
+                }`}>
+                  <Table2 className="w-5 h-5 text-sky-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="font-display font-bold text-xs">
+                      {lang === 'fr'
+                        ? 'Mode Table Attributaire Non-Spatiale activé'
+                        : 'Non-Spatial Attribute Table Mode Active'}
+                    </div>
+                    <p className="text-[11px] opacity-85 leading-relaxed">
+                      {lang === 'fr'
+                        ? 'Toutes les lignes et colonnes seront importées sans coordonnées X/Y. Idéal pour enrichir des couches spatiales par jointure attributaire, définir des relations PK/FK, auditer les données ou générer du SQL/MCD.'
+                        : 'All rows and columns will be imported without requiring X/Y geometry. Ideal for enriching spatial layers via attribute join, mapping PK/FK IDs, running data cleaning audits, and SQL/MCD reports.'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+              /* Coordinate Columns Selection Grid */
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Longitude (X) Column */}
                 <div className={`p-3 rounded-xl border space-y-1.5 ${
@@ -600,8 +674,10 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                   </span>
                 </div>
               </div>
+              )}
 
-              {/* Coordinate Reference System (CRS) Selection for this sheet */}
+              {/* Coordinate Reference System (CRS) Selection for this sheet (spatial mode only) */}
+              {!activeConfig.isNonSpatial && (
               <div className={`p-3.5 rounded-xl border space-y-2.5 ${
                 theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
               }`}>
@@ -841,6 +917,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                   </div>
                 )}
               </div>
+              )}
 
               {/* Live Data Sample Preview for Active Sheet */}
               <div className="space-y-2 pt-2 border-t border-stone-200 dark:border-stone-800">
@@ -852,6 +929,40 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                 <div className={`rounded-xl border overflow-x-auto ${
                   theme === 'light' ? 'border-[#E2DBD0]' : 'border-stone-800/80'
                 }`}>
+                  {activeConfig.isNonSpatial ? (
+                    <table className="w-full text-left text-[11px] font-mono border-collapse">
+                      <thead className={theme === 'light' ? 'bg-[#F2EFEA]' : 'bg-[#120F0D]'}>
+                        <tr>
+                          <th className="p-2 text-stone-400 font-medium border-b border-stone-200 dark:border-stone-800">#</th>
+                          {activeConfig.headers.slice(0, 6).map((h) => (
+                            <th key={h} className="p-2 text-sky-600 dark:text-sky-400 font-bold border-b border-stone-200 dark:border-stone-800 whitespace-nowrap">
+                              {h}
+                            </th>
+                          ))}
+                          {activeConfig.headers.length > 6 && (
+                            <th className="p-2 text-stone-400 font-medium border-b border-stone-200 dark:border-stone-800">
+                              +{activeConfig.headers.length - 6} cols
+                            </th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-200 dark:divide-stone-800/50">
+                        {activeConfig.previewRows.slice(0, 4).map((row, idx) => (
+                          <tr key={idx} className={theme === 'light' ? 'hover:bg-stone-50' : 'hover:bg-stone-900/50'}>
+                            <td className="p-2 text-stone-500">{idx + 1}</td>
+                            {activeConfig.headers.slice(0, 6).map((h) => (
+                              <td key={h} className="p-2 text-stone-700 dark:text-stone-300 max-w-[160px] truncate">
+                                {String(row[h] ?? '—')}
+                              </td>
+                            ))}
+                            {activeConfig.headers.length > 6 && (
+                              <td className="p-2 text-stone-400">...</td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
                   <table className="w-full text-left text-[11px] font-mono border-collapse">
                     <thead className={theme === 'light' ? 'bg-[#F2EFEA]' : 'bg-[#120F0D]'}>
                       <tr>
@@ -886,6 +997,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                       })}
                     </tbody>
                   </table>
+                  )}
                 </div>
               </div>
             </div>
@@ -928,8 +1040,8 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
               <button
                 type="button"
                 onClick={handleImportSingle}
-                disabled={!activeConfig?.xCol || !activeConfig?.yCol}
-                className={`px-3.5 py-2 rounded-xl text-xs font-mono font-semibold border transition-all ${
+                disabled={!activeConfig || (!activeConfig.isNonSpatial && (!activeConfig.xCol || !activeConfig.yCol))}
+                className={`px-3.5 py-2 rounded-xl text-xs font-mono font-semibold border transition-all disabled:opacity-40 ${
                   theme === 'light'
                     ? 'bg-white border-stone-300 hover:bg-stone-100 text-stone-800'
                     : 'bg-stone-850 border-stone-700 hover:bg-stone-800 text-stone-200'
@@ -950,11 +1062,15 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
               <span>
                 {Object.keys(sheetConfigs).length > 1
                   ? (lang === 'fr' 
-                      ? `Importer toutes les feuilles cochées (${selectedList.length} couches)` 
-                      : `Import All Selected Sheets (${selectedList.length} layers)`)
-                  : (lang === 'fr' 
-                      ? `Confirmer & Importer la couche` 
-                      : `Confirm & Ingest Spatial Layer`)}
+                      ? `Importer les feuilles cochées (${selectedList.length})` 
+                      : `Import Selected Sheets (${selectedList.length})`)
+                  : activeConfig?.isNonSpatial
+                    ? (lang === 'fr'
+                        ? `Importer en Table Attributaire`
+                        : `Import as Attribute Table`)
+                    : (lang === 'fr' 
+                        ? `Confirmer & Importer la couche` 
+                        : `Confirm & Ingest Spatial Layer`)}
               </span>
             </button>
           </div>
