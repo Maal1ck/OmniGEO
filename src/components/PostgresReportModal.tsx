@@ -26,7 +26,7 @@ import {
   Archive,
   RotateCcw
 } from 'lucide-react';
-import { SpatialDataset } from '../types/gis';
+import { SpatialDataset, DefinedRelationship } from '../types/gis';
 import { 
   PostgresDatabaseSchema, 
   PostgresTableSchema,
@@ -54,12 +54,16 @@ interface PostgresReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   datasets: SpatialDataset[];
+  definedRelationships?: DefinedRelationship[];
+  onOpenRelationshipMapper?: () => void;
 }
 
 export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
   isOpen,
   onClose,
   datasets,
+  definedRelationships = [],
+  onOpenRelationshipMapper,
 }) => {
   const { theme } = useTheme();
   const { lang: appLang } = useI18n();
@@ -73,10 +77,21 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
   // Active database schema being reported
   const [schema, setSchema] = useState<PostgresDatabaseSchema>(() => {
     if (datasets && datasets.length > 0) {
-      return buildSchemaFromDatasets(datasets, 'omnigeo_spatial_production_db');
+      return buildSchemaFromDatasets(datasets, 'omnigeo_spatial_production_db', definedRelationships);
     }
     return SAMPLE_POSTGRES_DATABASES.cadastre;
   });
+
+  // Sync workspace schema when datasets/relationships update while using workspace source
+  const [usingWorkspaceSource, setUsingWorkspaceSource] = useState<boolean>(
+    () => !!(datasets && datasets.length > 0)
+  );
+
+  React.useEffect(() => {
+    if (isOpen && datasets && datasets.length > 0 && usingWorkspaceSource) {
+      setSchema(buildSchemaFromDatasets(datasets, 'omnigeo_spatial_production_db', definedRelationships));
+    }
+  }, [isOpen, datasets, definedRelationships, usingWorkspaceSource]);
 
   // Source tab states
   const [sourceMode, setSourceMode] = useState<'sql_query' | 'ddl_paste' | 'samples' | 'workspace' | 'python'>('sql_query');
@@ -95,11 +110,14 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
   const [hideEmptyTables, setHideEmptyTables] = useState<boolean>(false);
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
 
-  // MPD interactive selected entity, business-only filter, & card width customizer
+  // MPD interactive selected entity, comment/schema/search filters, business-only filter, & card width customizer
   const [selectedMpdTable, setSelectedMpdTable] = useState<string | null>(null);
   const [mpdCardWidth, setMpdCardWidth] = useState<number>(360);
   const [tableWidthOverrides, setTableWidthOverrides] = useState<Record<string, number>>({});
   const [mpdBusinessOnly, setMpdBusinessOnly] = useState<boolean>(true);
+  const [mpdSearchQuery, setMpdSearchQuery] = useState<string>('');
+  const [selectedMpdFamilyFilter, setSelectedMpdFamilyFilter] = useState<string>('all');
+  const [selectedMpdSchemaFilter, setSelectedMpdSchemaFilter] = useState<string>('all');
   const [isGeneratingZip, setIsGeneratingZip] = useState<boolean>(false);
 
   // Copy status
@@ -224,7 +242,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
         throw new Error(reportLang === 'fr' ? "Le JSON doit comporter un tableau de 'tables'." : "JSON must contain an array of 'tables'.");
       }
 
-      // Compute relationships with unique IDs
+      // Compute relationships with unique IDs — preserve cardinalities only when available
       const rawRels = Array.isArray(parsed.relationships) ? parsed.relationships : [];
       const rels: PostgresRelationship[] = rawRels.map((r: any, idx: number) => ({
         id: r.id ? `${r.id}_${idx}` : `rel_${r.sourceTable || 'src'}_${r.sourceColumn || 'col'}_${idx}`,
@@ -233,9 +251,9 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
         sourceColumn: r.sourceColumn || '',
         targetTable: r.targetTable || '',
         targetColumn: r.targetColumn || '',
-        cardinality: r.cardinality || '1:N',
-        sourceCardinality: r.sourceCardinality || '0..n',
-        targetCardinality: r.targetCardinality || '1..1',
+        cardinality: r.cardinality || undefined,
+        sourceCardinality: r.sourceCardinality || undefined,
+        targetCardinality: r.targetCardinality || undefined,
         updateRule: r.updateRule,
         deleteRule: r.deleteRule,
       }));
@@ -314,6 +332,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
         },
       };
 
+      setUsingWorkspaceSource(false);
       setSchema(formattedSchema);
       setParseSuccess(reportLang === 'fr' 
         ? `Base "${formattedSchema.databaseName}" chargée avec succès (${formattedSchema.tables.length} tables, ${totalCols} colonnes).`
@@ -339,6 +358,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
       if (!parsed.tables || parsed.tables.length === 0) {
         throw new Error(reportLang === 'fr' ? "Aucune table 'CREATE TABLE' détectée dans le script collé." : "No 'CREATE TABLE' statements detected.");
       }
+      setUsingWorkspaceSource(false);
       setSchema(parsed);
       setParseSuccess(reportLang === 'fr' 
         ? `Schéma DDL analysé : ${parsed.tables.length} tables détectées avec succès.`
@@ -439,11 +459,32 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     setHideEmptyTables(false);
   };
 
-  // Business-filtered tables & relationships for MCD/MPD tab
+  const resetMpdFilters = () => {
+    setMpdSearchQuery('');
+    setSelectedMpdFamilyFilter('all');
+    setSelectedMpdSchemaFilter('all');
+  };
+
+  // Business-filtered & comment-filtered tables + relationships for MCD/MPD tab
   const mpdTables = useMemo(() => {
     const all = schema.tables || [];
-    return mpdBusinessOnly ? all.filter(isBusinessTable) : all;
-  }, [schema, mpdBusinessOnly]);
+    const base = mpdBusinessOnly ? all.filter(isBusinessTable) : all;
+    const q = mpdSearchQuery.toLowerCase().trim();
+
+    return base.filter(t => {
+      if (selectedMpdSchemaFilter !== 'all' && t.schema !== selectedMpdSchemaFilter) return false;
+      const family = classifyTableFamily(t, all, reportLang);
+      if (selectedMpdFamilyFilter !== 'all' && family !== selectedMpdFamilyFilter) return false;
+
+      if (!q) return true;
+      const hitName = (t.name || '').toLowerCase().includes(q);
+      const hitComment = (t.comment || '').toLowerCase().includes(q) || family.toLowerCase().includes(q);
+      const hitCol = (t.columns || []).some(
+        c => (c.name || '').toLowerCase().includes(q) || (c.dataType || '').toLowerCase().includes(q)
+      );
+      return hitName || hitComment || hitCol;
+    });
+  }, [schema, mpdBusinessOnly, mpdSearchQuery, selectedMpdFamilyFilter, selectedMpdSchemaFilter, reportLang]);
 
   const mpdTableNamesSet = useMemo(() => {
     return new Set(mpdTables.map(t => t.name));
@@ -802,9 +843,17 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                               {rel.sourceTable}.<span className="underline">{rel.sourceColumn}</span>
                             </td>
                             <td className="py-2 px-4 text-center">
-                              <span className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/30 text-[10px] font-bold">
-                                {rel.sourceCardinality || '0..n'} &rarr; {rel.cardinality || '1:N'} &rarr; {rel.targetCardinality || '1..1'}
-                              </span>
+                              {(rel.cardinality || rel.sourceCardinality || rel.targetCardinality) ? (
+                                <span className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/30 text-[10px] font-bold">
+                                  {rel.sourceCardinality ? `${rel.sourceCardinality} ` : ''}
+                                  {rel.sourceCardinality && rel.cardinality ? '→ ' : ''}
+                                  {rel.cardinality || ''}
+                                  {rel.cardinality && rel.targetCardinality ? ' → ' : ''}
+                                  {rel.targetCardinality || ''}
+                                </span>
+                              ) : (
+                                <span className="text-stone-500 text-[10px]">—</span>
+                              )}
                             </td>
                             <td className="py-2 px-4 font-bold text-emerald-400">
                               {rel.targetTable}.<span className="underline">{rel.targetColumn}</span>
@@ -1325,6 +1374,20 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                     </div>
                   </div>
 
+                  {onOpenRelationshipMapper && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenRelationshipMapper();
+                      }}
+                      className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 text-[11px] font-semibold cursor-pointer"
+                    >
+                      <Key className="w-3.5 h-3.5" />
+                      <span>{isFr ? 'Gérer IDs & Relations' : 'IDs & Relationships'}</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={handleDownloadMpdHtml}
                     className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
@@ -1343,6 +1406,83 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </div>
               </div>
 
+              {/* MCD / MPD Filter Bar by Comment (Service / Group), Schema & Search */}
+              <div className={`p-3.5 rounded-xl border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 items-end ${
+                theme === 'light'
+                  ? 'bg-white border-slate-200 text-slate-900'
+                  : 'bg-slate-900/60 border-slate-800 text-slate-200'
+              }`}>
+                <div className="lg:col-span-2">
+                  <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+                    {isFr ? 'Recherche MCD / MPD' : 'Search MCD / ERD'}
+                  </label>
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={mpdSearchQuery}
+                      onChange={(e) => setMpdSearchQuery(e.target.value)}
+                      placeholder={isFr ? 'Table, champ ou commentaire...' : 'Table, column or comment...'}
+                      className={`w-full rounded-lg pl-8 pr-3 py-1.5 text-xs border focus:outline-none ${
+                        theme === 'light'
+                          ? 'bg-slate-50 border-slate-300 text-slate-900'
+                          : 'bg-slate-950 border-slate-700 text-slate-100'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+                    {isFr ? 'Service / Groupe (Commentaire)' : 'Service / Group (Comment)'}
+                  </label>
+                  <select
+                    value={selectedMpdFamilyFilter}
+                    onChange={(e) => setSelectedMpdFamilyFilter(e.target.value)}
+                    className={`w-full rounded-lg px-2.5 py-1.5 text-xs border focus:outline-none cursor-pointer ${
+                      theme === 'light'
+                        ? 'bg-slate-50 border-slate-300 text-slate-900'
+                        : 'bg-slate-950 border-slate-700 text-slate-100'
+                    }`}
+                  >
+                    <option value="all">{isFr ? `Tous (${uniqueFamilies.length})` : `All (${uniqueFamilies.length})`}</option>
+                    {uniqueFamilies.map((fam, idx) => (
+                      <option key={`mpd-fam-${fam}-${idx}`} value={fam}>{fam}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-end space-x-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+                      {isFr ? 'Schéma' : 'Schema'}
+                    </label>
+                    <select
+                      value={selectedMpdSchemaFilter}
+                      onChange={(e) => setSelectedMpdSchemaFilter(e.target.value)}
+                      className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none cursor-pointer ${
+                        theme === 'light'
+                          ? 'bg-slate-50 border-slate-300 text-slate-900'
+                          : 'bg-slate-950 border-slate-700 text-slate-100'
+                      }`}
+                    >
+                      <option value="all">{isFr ? `Tous (${uniqueSchemas.length})` : `All (${uniqueSchemas.length})`}</option>
+                      {uniqueSchemas.map((s, idx) => (
+                        <option key={`mpd-sch-${s}-${idx}`} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetMpdFilters}
+                    title={isFr ? 'Réinitialiser filtres' : 'Reset filters'}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-300 hover:bg-slate-800 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
               {/* In-app flexible non-overlapping container of Entity Cards */}
               <div className="flex flex-wrap gap-4 items-start justify-start">
                 {mpdTables.map((table, tIdx) => {
@@ -1352,9 +1492,9 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                          (r.targetTable === table.name && r.sourceTable === selectedMpdTable)
                   );
 
-                  const safeForeignKeys = (Array.isArray(table.foreignKeys) ? table.foreignKeys : []).filter(
-                    fk => mpdTableNamesSet.has(fk.targetTable)
-                  );
+                  const safeForeignKeys = mpdRelationships.filter(r => r.sourceTable === table.name);
+                  const safeIncomingRels = mpdRelationships.filter(r => r.targetTable === table.name && r.sourceTable !== table.name);
+                  const tableService = classifyTableFamily(table, schema.tables || [], reportLang);
                   const currentWidth = mpdCardWidth >= 900 
                     ? '100%' 
                     : `${tableWidthOverrides[table.name] || mpdCardWidth}px`;
@@ -1437,6 +1577,20 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         </div>
                       </div>
 
+                      {/* Comment / Service strip */}
+                      {(table.comment || tableService) && (
+                        <div
+                          className={`px-3 py-1 text-[10px] border-b truncate ${
+                            theme === 'light'
+                              ? 'bg-slate-50/70 border-slate-200 text-slate-600'
+                              : 'bg-black/20 border-slate-800 text-slate-400'
+                          }`}
+                          title={table.comment || tableService}
+                        >
+                          {table.comment || tableService}
+                        </div>
+                      )}
+
                       {/* Columns List strictly contained */}
                       <div className="p-2 space-y-1 max-h-64 overflow-y-auto font-mono text-[11px] w-full box-sizing: border-box;">
                         {(table.columns || []).map((col, colIdx) => {
@@ -1478,18 +1632,45 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         })}
                       </div>
 
-                      {/* Outgoing relationships summary strictly contained */}
-                      {safeForeignKeys.length > 0 && (
-                        <div className="px-3 py-2 border-t border-slate-800 bg-black/30 text-[10px] font-mono text-slate-400 space-y-0.5 overflow-hidden">
-                          {safeForeignKeys.map((fk, fkIdx) => (
-                            <div key={`mpd-fk-${fk.id || 'fk'}-${fk.sourceColumn}-${fk.targetTable}-${fkIdx}`} className="flex items-center space-x-1 text-purple-300 truncate">
-                              <span>&bull;</span>
-                              <span className="font-bold truncate max-w-[100px]" title={fk.sourceColumn}>{fk.sourceColumn}</span>
-                              <span>&rarr;</span>
-                              <span className="text-amber-400 underline truncate max-w-[120px]" title={`${fk.targetTable}.${fk.targetColumn}`}>{fk.targetTable}.{fk.targetColumn}</span>
-                              <span className="text-slate-400 font-bold shrink-0">({fk.cardinality || '1:N'})</span>
-                            </div>
-                          ))}
+                      {/* Outgoing & Incoming relationships summary with cardinalities if available */}
+                      {(safeForeignKeys.length > 0 || safeIncomingRels.length > 0) && (
+                        <div className="px-3 py-2 border-t border-slate-800 bg-black/30 text-[10px] font-mono text-slate-400 space-y-1 overflow-hidden">
+                          {safeForeignKeys.map((fk, fkIdx) => {
+                            const hasCard = !!(fk.cardinality || fk.sourceCardinality || fk.targetCardinality);
+                            return (
+                              <div key={`mpd-fk-${fk.id || 'fk'}-${fk.sourceColumn}-${fk.targetTable}-${fkIdx}`} className="flex items-center justify-between gap-1.5 text-purple-300">
+                                <div className="flex items-center space-x-1 min-w-0 truncate">
+                                  <span className="shrink-0">FK</span>
+                                  <span className="font-bold truncate" title={fk.sourceColumn}>{fk.sourceColumn}</span>
+                                  <span>&rarr;</span>
+                                  <span className="text-amber-400 underline truncate" title={`${fk.targetTable}.${fk.targetColumn}`}>{fk.targetTable}.{fk.targetColumn}</span>
+                                </div>
+                                {hasCard && (
+                                  <span className="px-1.5 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-purple-200 font-bold shrink-0 text-[9px]">
+                                    {[fk.sourceCardinality, fk.cardinality, fk.targetCardinality].filter(Boolean).join(' | ')}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {safeIncomingRels.map((inc, incIdx) => {
+                            const hasCard = !!(inc.cardinality || inc.sourceCardinality || inc.targetCardinality);
+                            return (
+                              <div key={`mpd-inc-${inc.id || 'inc'}-${inc.sourceTable}-${incIdx}`} className="flex items-center justify-between gap-1.5 text-emerald-300/90">
+                                <div className="flex items-center space-x-1 min-w-0 truncate">
+                                  <span className="shrink-0">PK</span>
+                                  <span className="truncate">{inc.targetColumn}</span>
+                                  <span>&larr;</span>
+                                  <span className="truncate" title={`${inc.sourceTable}.${inc.sourceColumn}`}>{inc.sourceTable}.{inc.sourceColumn}</span>
+                                </div>
+                                {hasCard && (
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 font-bold shrink-0 text-[9px]">
+                                    {inc.cardinality || [inc.sourceCardinality, inc.targetCardinality].filter(Boolean).join(' / ')}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1518,18 +1699,23 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
                   {mpdHighlightedRelations.length > 0 ? (
                     <div className="space-y-1.5">
-                      {mpdHighlightedRelations.map((rel, rIdx) => (
-                        <div key={`drawer-rel-${rel.id || ''}-${rel.sourceTable}-${rel.sourceColumn}-${rIdx}`} className="text-xs font-mono p-2 rounded bg-black/30 border border-purple-500/20 flex items-center justify-between">
-                          <div>
-                            <span className="text-amber-400 font-bold">{rel.sourceTable}.{rel.sourceColumn}</span>
-                            <span className="mx-2 text-stone-500">&mdash;[{rel.sourceCardinality || '0..n'} &rarr; {rel.cardinality || '1:N'} &rarr; {rel.targetCardinality || '1..1'}]&rarr;</span>
-                            <span className="text-emerald-400 font-bold">{rel.targetTable}.{rel.targetColumn}</span>
+                      {mpdHighlightedRelations.map((rel, rIdx) => {
+                        const cardParts = [rel.sourceCardinality, rel.cardinality, rel.targetCardinality].filter(Boolean);
+                        return (
+                          <div key={`drawer-rel-${rel.id || ''}-${rel.sourceTable}-${rel.sourceColumn}-${rIdx}`} className="text-xs font-mono p-2 rounded bg-black/30 border border-purple-500/20 flex items-center justify-between">
+                            <div>
+                              <span className="text-amber-400 font-bold">{rel.sourceTable}.{rel.sourceColumn}</span>
+                              <span className="mx-2 text-stone-500">
+                                {cardParts.length > 0 ? `—[${cardParts.join(' → ')}]→` : '—→'}
+                              </span>
+                              <span className="text-emerald-400 font-bold">{rel.targetTable}.{rel.targetColumn}</span>
+                            </div>
+                            <span className="text-[11px] text-stone-500">
+                              {rel.deleteRule ? `ON DELETE ${rel.deleteRule}` : ''}
+                            </span>
                           </div>
-                          <span className="text-[11px] text-stone-500">
-                            {rel.deleteRule ? `ON DELETE ${rel.deleteRule}` : 'CASCADE'}
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-xs text-stone-400">
@@ -1739,7 +1925,8 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       </div>
                       <button
                         onClick={() => {
-                          const generated = buildSchemaFromDatasets(datasets);
+                          setUsingWorkspaceSource(true);
+                          const generated = buildSchemaFromDatasets(datasets, 'omnigeo_spatial_production_db', definedRelationships);
                           setSchema(generated);
                           setParseSuccess(isFr 
                             ? `Modèle généré depuis ${datasets.length} couches de l'atelier.` 

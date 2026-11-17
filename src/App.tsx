@@ -7,7 +7,9 @@ import {
   PresetProfile, 
   QAQCReportData, 
   SchemaHarmonizerConfig, 
-  SpatialDataset 
+  SpatialDataset,
+  DatasetIdConfig,
+  DefinedRelationship,
 } from './types/gis';
 import { executeConversionJob, generateBatchManifest, resolveOutputFileName } from './core/conversionEngine';
 import { PRESET_PROFILES } from './core/presets';
@@ -29,6 +31,10 @@ import { ConcatenationModal } from './components/ConcatenationModal';
 import { PostgisModal } from './components/PostgisModal';
 import { JoinModal } from './components/JoinModal';
 import { PostgresReportModal } from './components/PostgresReportModal';
+import { RelationshipMapperModal } from './components/RelationshipMapperModal';
+import { GdbEditorModal } from './components/GdbEditorModal';
+import { DataCleaningAuditModal } from './components/DataCleaningAuditModal';
+import { DiscoveredGdbRelationship } from './core/fileGdbEngine';
 import { generateAutoHarmonizerRules, applySchemaHarmonization } from './core/schemaHarmonizer';
 import { createMultiLayerGeoPackage, generateQgisProjectXml, bundleConsolidatedHandoff } from './core/multiLayerGpkg';
 import { generateQAQCReportData } from './core/auditCertificate';
@@ -90,12 +96,54 @@ export default function App() {
   const [isPostgisModalOpen, setIsPostgisModalOpen] = useState(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isPostgresReportOpen, setIsPostgresReportOpen] = useState(false);
+  const [isRelationshipMapperOpen, setIsRelationshipMapperOpen] = useState(false);
+  const [isGdbEditorOpen, setIsGdbEditorOpen] = useState(false);
+  const [gdbEditorDatasetId, setGdbEditorDatasetId] = useState<string | null>(null);
+  const [isDataCleaningOpen, setIsDataCleaningOpen] = useState(false);
+  const [dataCleaningDatasetId, setDataCleaningDatasetId] = useState<string | null>(null);
+  const [idConfigs, setIdConfigs] = useState<Record<string, DatasetIdConfig>>({});
+  const [definedRelationships, setDefinedRelationships] = useState<DefinedRelationship[]>([]);
+  const [discoveredGdbRelationships, setDiscoveredGdbRelationships] = useState<DiscoveredGdbRelationship[]>([]);
   const [concatenationInitialIds, setConcatenationInitialIds] = useState<string[]>([]);
   const [postgisTargetDatasetId, setPostgisTargetDatasetId] = useState<string | null>(null);
   const [joinTargetDatasetId, setJoinTargetDatasetId] = useState<string | null>(null);
 
   const handleOpenPostgresReport = () => {
     setIsPostgresReportOpen(true);
+  };
+
+  const handleOpenGdbEditor = (datasetId: string) => {
+    setGdbEditorDatasetId(datasetId);
+    setIsGdbEditorOpen(true);
+  };
+
+  const handleOpenDataCleaning = (datasetId?: string) => {
+    setDataCleaningDatasetId(datasetId || selectedDatasetId || null);
+    setIsDataCleaningOpen(true);
+  };
+
+  const handleAddDiscoveredGdbRelationships = (rels: DiscoveredGdbRelationship[]) => {
+    setDiscoveredGdbRelationships((prev) => {
+      const merged = [...prev];
+      for (const r of rels) {
+        const exists = merged.some(
+          (m) =>
+            m.originTable.toLowerCase() === r.originTable.toLowerCase() &&
+            m.destinationTable.toLowerCase() === r.destinationTable.toLowerCase() &&
+            (m.originForeignKey || '') === (r.originForeignKey || '')
+        );
+        if (!exists) merged.push(r);
+      }
+      return merged;
+    });
+  };
+
+  const handleApplyRelationshipMapper = (
+    updatedDatasets: SpatialDataset[],
+    updatedRelationships: DefinedRelationship[]
+  ) => {
+    setDatasets(updatedDatasets);
+    setDefinedRelationships(updatedRelationships);
   };
 
   const handleAddConcatenatedDataset = (newDataset: SpatialDataset) => {
@@ -442,6 +490,8 @@ export default function App() {
         onOpenPostgisModal={() => handleOpenPostgisModal()}
         onOpenJoinModal={() => handleOpenJoinModal()}
         onOpenPostgresReport={() => handleOpenPostgresReport()}
+        onOpenRelationshipMapper={() => setIsRelationshipMapperOpen(true)}
+        onOpenDataCleaning={() => handleOpenDataCleaning()}
       />
 
       {/* Main Work Area Views */}
@@ -486,6 +536,11 @@ export default function App() {
             onOpenPostgisModal={handleOpenPostgisModal}
             onOpenJoinModal={handleOpenJoinModal}
             onOpenPostgresReport={handleOpenPostgresReport}
+            definedRelationships={definedRelationships}
+            onOpenRelationshipMapper={() => setIsRelationshipMapperOpen(true)}
+            onOpenGdbEditor={handleOpenGdbEditor}
+            onAddDiscoveredGdbRelationships={handleAddDiscoveredGdbRelationships}
+            onOpenDataCleaning={handleOpenDataCleaning}
           />
         )}
 
@@ -514,7 +569,7 @@ export default function App() {
             processedJob={processedJobForPreview}
             onCalculateSurfaces={handleCalculateSurfaces}
             onOpenAggregationModal={() => setIsAggregationModalOpen(true)}
-            isOverlayOpen={isCRSModalOpen || isCommandPaletteOpen || isPythonModalOpen || isDoctorOpen || isHarmonizerOpen || isCertificateOpen || isAggregationModalOpen}
+            isOverlayOpen={isCRSModalOpen || isCommandPaletteOpen || isPythonModalOpen || isDoctorOpen || isHarmonizerOpen || isCertificateOpen || isAggregationModalOpen || isRelationshipMapperOpen || isGdbEditorOpen || isDataCleaningOpen}
           />
         )}
 
@@ -587,6 +642,7 @@ export default function App() {
         onClose={() => setIsDoctorOpen(false)}
         datasets={datasets}
         onUpdateDataset={handleUpdateDataset}
+        onOpenDataCleaning={handleOpenDataCleaning}
       />
 
       {/* Feature 4: Visual Batch Schema Harmonizer Modal */}
@@ -645,6 +701,47 @@ export default function App() {
         isOpen={isPostgresReportOpen}
         onClose={() => setIsPostgresReportOpen(false)}
         datasets={datasets}
+        definedRelationships={definedRelationships}
+        onOpenRelationshipMapper={() => {
+          setIsPostgresReportOpen(false);
+          setIsRelationshipMapperOpen(true);
+        }}
+      />
+
+      {/* ID Generation & Foreign Key Relationship Mapper Modal */}
+      <RelationshipMapperModal
+        isOpen={isRelationshipMapperOpen}
+        onClose={() => setIsRelationshipMapperOpen(false)}
+        datasets={datasets}
+        idConfigs={idConfigs}
+        setIdConfigs={setIdConfigs}
+        relationships={definedRelationships}
+        setRelationships={setDefinedRelationships}
+        discoveredGdbRelationships={discoveredGdbRelationships}
+        onApplyToWorkspace={handleApplyRelationshipMapper}
+        onOpenPostgresReport={() => {
+          setIsRelationshipMapperOpen(false);
+          setIsPostgresReportOpen(true);
+        }}
+      />
+
+      {/* File Geodatabase (.gdb) & Attribute Table Editor Modal */}
+      <GdbEditorModal
+        isOpen={isGdbEditorOpen}
+        onClose={() => setIsGdbEditorOpen(false)}
+        dataset={datasets.find((d) => d.id === gdbEditorDatasetId) || datasets[0] || null}
+        allDatasets={datasets}
+        relationships={definedRelationships}
+        onSaveDataset={handleUpdateDataset}
+      />
+
+      {/* Attribute Data Cleaning & Numeric Audit Modal */}
+      <DataCleaningAuditModal
+        isOpen={isDataCleaningOpen}
+        onClose={() => setIsDataCleaningOpen(false)}
+        datasets={datasets}
+        initialDatasetId={dataCleaningDatasetId}
+        onUpdateDataset={handleUpdateDataset}
       />
     </div>
   );

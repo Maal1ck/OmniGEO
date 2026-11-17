@@ -142,22 +142,25 @@ export async function createMultiLayerGeoPackage(
     if (first === 'Polygon' || first === 'MultiPolygon') geomType = 'POLYGON';
     else if (first === 'LineString' || first === 'MultiLineString') geomType = 'LINESTRING';
 
-    const colMap = new Map<string, 'TEXT' | 'REAL' | 'INTEGER'>();
+    const colTypeState = new Map<string, 'TEXT' | 'REAL' | 'INTEGER' | null>();
     for (const f of features) {
       const props = f?.properties || {};
       for (const [k, v] of Object.entries(props)) {
         const colName = k.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
-        if (!colMap.has(colName)) {
-          let colType: 'TEXT' | 'REAL' | 'INTEGER' = 'TEXT';
-          if (typeof v === 'number') {
-            colType = Number.isInteger(v) ? 'INTEGER' : 'REAL';
-          }
-          colMap.set(colName, colType);
+        if (!colTypeState.has(colName)) colTypeState.set(colName, null);
+        if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) continue;
+        const cur = colTypeState.get(colName);
+        if (cur === 'TEXT') continue;
+        if (typeof v === 'number' && Number.isFinite(v)) {
+          const kind = Number.isInteger(v) ? 'INTEGER' : 'REAL';
+          colTypeState.set(colName, cur === 'REAL' || kind === 'REAL' ? 'REAL' : 'INTEGER');
+        } else {
+          colTypeState.set(colName, 'TEXT');
         }
       }
     }
 
-    const colDefs = Array.from(colMap.entries()).map(([name, type]) => `"${name}" ${type}`);
+    const colDefs = Array.from(colTypeState.entries()).map(([name, type]) => `"${name}" ${type || 'TEXT'}`);
     const createSql = `
       CREATE TABLE "${sanitizedLayer}" (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -177,7 +180,7 @@ export async function createMultiLayerGeoPackage(
       VALUES (?, 'geom', ?, ?, 0, 0);
     `, [sanitizedLayer, geomType, srsId]);
 
-    const colNames = Array.from(colMap.keys());
+    const colNames = Array.from(colTypeState.keys());
     const insertCols = ['geom', ...colNames.map(c => `"${c}"`)].join(', ');
     const placeholders = ['?', ...colNames.map(() => '?')].join(', ');
     const insertSql = `INSERT INTO "${sanitizedLayer}" (${insertCols}) VALUES (${placeholders});`;

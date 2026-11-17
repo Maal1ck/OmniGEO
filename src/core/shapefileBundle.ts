@@ -272,19 +272,26 @@ function writeShpAndShx(
 }
 
 function writeDbf(features: any[]): ArrayBuffer {
-  // Collect attributes
-  const fieldMap = new Map<string, 'C' | 'N'>();
+  // Collect attributes across all rows so mixed strings safely stay Character ('C') until cleaned
+  const fieldState = new Map<string, 'C' | 'N' | null>();
   for (const f of features) {
     const props = f?.properties || {};
     for (const key of Object.keys(props)) {
       const sanitizedKey = key.slice(0, 10).replace(/[^a-zA-Z0-9_]/g, '_');
-      if (!fieldMap.has(sanitizedKey)) {
-        const val = props[key];
-        const isNum = typeof val === 'number';
-        fieldMap.set(sanitizedKey, isNum ? 'N' : 'C');
+      if (!fieldState.has(sanitizedKey)) fieldState.set(sanitizedKey, null);
+      const val = props[key];
+      if (val === null || val === undefined || (typeof val === 'string' && val.trim() === '')) continue;
+      const cur = fieldState.get(sanitizedKey);
+      if (cur === 'C') continue;
+      if (typeof val === 'number' && Number.isFinite(val)) {
+        fieldState.set(sanitizedKey, 'N');
+      } else {
+        fieldState.set(sanitizedKey, 'C');
       }
     }
   }
+  const fieldMap = new Map<string, 'C' | 'N'>();
+  fieldState.forEach((v, k) => fieldMap.set(k, v || 'C'));
 
   // Always ensure at least one field (e.g. ID)
   if (fieldMap.size === 0) {

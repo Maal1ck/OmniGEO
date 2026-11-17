@@ -1,4 +1,4 @@
-export type SupportedFormat = 'geojson' | 'shapefile' | 'geopackage' | 'kml' | 'csv' | 'cad' | 'gpx' | 'excel' | 'flatgeobuf';
+export type SupportedFormat = 'geojson' | 'shapefile' | 'geopackage' | 'filegdb' | 'kml' | 'csv' | 'cad' | 'gpx' | 'excel' | 'flatgeobuf';
 
 export type GeometryType = 
   | 'Point' 
@@ -60,6 +60,58 @@ export interface SpatialDataset {
   status: 'ready' | 'warning' | 'invalid';
   addedAt: number;
   rawFiles?: { [filename: string]: ArrayBuffer | string };
+  tableComment?: string;
+  schemaName?: string;
+  primaryKeyColumn?: string;
+  isNonSpatial?: boolean;
+  gdbSourceName?: string;
+}
+
+export type IdGenerationStrategy =
+  | 'keep_existing'
+  | 'auto_increment'
+  | 'prefixed_sequence'
+  | 'uuid'
+  | 'composite_hash';
+
+export interface DatasetIdConfig {
+  datasetId: string;
+  pkColumn: string;
+  strategy: IdGenerationStrategy;
+  prefix?: string;
+  startAt?: number;
+  padLength?: number;
+  sourceField?: string;
+}
+
+export type RelationshipCardinality = '1:1' | '1:N' | 'N:1' | 'N:M' | '0:1' | '0:N';
+
+export type RelationshipMatchMode =
+  | 'spatial_within'
+  | 'spatial_intersects'
+  | 'spatial_nearest'
+  | 'attribute';
+
+export interface DefinedRelationship {
+  id: string;
+  constraintName: string;
+  parentDatasetId: string;
+  parentPkColumn: string;
+  childDatasetId: string;
+  fkColumnName: string;
+  cardinality?: RelationshipCardinality;
+  sourceCardinality?: string;
+  targetCardinality?: string;
+  matchMode: RelationshipMatchMode;
+  parentMatchField?: string;
+  childMatchField?: string;
+  enabled: boolean;
+  lastStats?: {
+    totalChild: number;
+    matched: number;
+    unmatched: number;
+    matchPercentage: number;
+  };
 }
 
 export type JobStatus = 

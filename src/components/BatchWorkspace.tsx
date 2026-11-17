@@ -29,14 +29,28 @@ import {
   Globe,
   Edit3,
   GitMerge,
-  TableProperties
+  TableProperties,
+  KeyRound,
+  Download,
+  SlidersHorizontal
 } from 'lucide-react';
-import { SpatialDataset, CRSInfo } from '../types/gis';
+import { SpatialDataset, CRSInfo, DefinedRelationship } from '../types/gis';
 import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers, parseCadFile, parseGpxFile } from '../core/formatParsers';
 import { parseGeoPackage, inspectGeoPackageLayers } from '../core/geoPackageParser';
 import { inspectExcelWorkbook } from '../core/excelParser';
+import {
+  DiscoveredGdbRelationship,
+  GdbInspectionResult,
+  exportDatasetsToFileGdbZip,
+  groupFileGdbFolderUploads,
+  inspectFileGdb,
+  isFileGdbFolderFiles,
+  isFileGdbZipArchive,
+  parseFileGdbLayers,
+} from '../core/fileGdbEngine';
 import { ExcelCoordinateModal, PendingExcelFile } from './ExcelCoordinateModal';
 import { GpkgLayerModal, PendingGpkgFile } from './GpkgLayerModal';
+import { GdbLayerModal } from './GdbLayerModal';
 import { CRSModal } from './CRSModal';
 import { useI18n } from '../core/i18n';
 import { useTheme } from '../core/theme';
@@ -44,6 +58,7 @@ import { useTheme } from '../core/theme';
 export interface DataTypeFilter {
   shapefile: boolean;
   geopackage: boolean;
+  filegdb: boolean;
   geojson: boolean;
   kml: boolean;
   csv: boolean;
@@ -66,6 +81,11 @@ interface BatchWorkspaceProps {
   onOpenPostgisModal?: (datasetId?: string) => void;
   onOpenJoinModal?: (datasetId?: string) => void;
   onOpenPostgresReport?: () => void;
+  definedRelationships?: DefinedRelationship[];
+  onOpenRelationshipMapper?: () => void;
+  onOpenGdbEditor?: (datasetId: string) => void;
+  onAddDiscoveredGdbRelationships?: (rels: DiscoveredGdbRelationship[]) => void;
+  onOpenDataCleaning?: (datasetId?: string) => void;
 }
 
 export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
@@ -81,6 +101,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   onOpenPostgisModal,
   onOpenJoinModal,
   onOpenPostgresReport,
+  definedRelationships = [],
+  onOpenRelationshipMapper,
+  onOpenGdbEditor,
+  onAddDiscoveredGdbRelationships,
+  onOpenDataCleaning,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -90,6 +115,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessingFiles, setIsProcessingFiles] = useState(false);
+  const [isExportingGdbZip, setIsExportingGdbZip] = useState(false);
   const [fileProcessingError, setFileProcessingError] = useState<string | null>(null);
   const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(null);
 
@@ -100,6 +126,12 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   // GeoPackage layer isolation modal state
   const [isGpkgModalOpen, setIsGpkgModalOpen] = useState(false);
   const [pendingGpkgFile, setPendingGpkgFile] = useState<PendingGpkgFile | null>(null);
+
+  // File Geodatabase (.gdb / .gdb.zip) layer isolation queue state
+  const [pendingGdbQueue, setPendingGdbQueue] = useState<{
+    info: GdbInspectionResult;
+    sourceInput: File | File[];
+  }[]>([]);
 
   // CRS calibration modal states
   const [crsModalTarget, setCrsModalTarget] = useState<SpatialDataset | null>(null);
@@ -170,6 +202,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   const [dataTypes, setDataTypes] = useState<DataTypeFilter>({
     shapefile: true,
     geopackage: true,
+    filegdb: true,
     geojson: true,
     kml: true,
     csv: true,
@@ -198,7 +231,8 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   // Filter datasets for display table
   const filteredDatasets = datasets.filter((d) => {
     const matchesSearch = d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.detectedCRS?.code.toLowerCase().includes(searchQuery.toLowerCase());
+      (d.detectedCRS?.code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (d.tableComment || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFormat = filterFormat === 'all' || d.format === filterFormat;
     const matchesStatus = filterStatus === 'all' || d.status === filterStatus;
     return matchesSearch && matchesFormat && matchesStatus;
@@ -220,6 +254,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     setDataTypes({
       shapefile: enable,
       geopackage: enable,
+      filegdb: enable,
       geojson: enable,
       kml: enable,
       csv: enable,
@@ -312,8 +347,13 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         }
       }
 
-      // If nested subfolders were found and prompting is enabled, open the choice modal!
-      if (subfolderCount > 0 && alwaysPromptSubfolders) {
+      const hasOnlyGdbSubfolders =
+        isFileGdbFolderFiles(rawList) &&
+        subfolderDirs.size > 0 &&
+        Array.from(subfolderDirs).every((dir) => /(^|\/)[^/]+\.gdb$/i.test(dir));
+
+      // If nested subfolders were found and prompting is enabled, open the choice modal
+      if (subfolderCount > 0 && alwaysPromptSubfolders && !hasOnlyGdbSubfolders) {
         const firstRel = (rawList[0] as any).webkitRelativePath || '';
         const folderName = firstRel.includes('/') ? firstRel.split('/')[0] : 'Selected Directory';
 
@@ -342,13 +382,13 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     const eligibleFiles: File[] = [];
 
     for (const file of rawList) {
-      const relPath = (file as any).webkitRelativePath || file.name;
+      const relPath = ((file as any).webkitRelativePath || file.name).replace(/\\/g, '/');
+      const isInsideGdbDir = /(^|\/)[^/]+\.gdb\//i.test(relPath);
 
-      // Handle subfolder filtering
-      if (isFolderSource && !effectiveRecursive && relPath.includes('/')) {
+      // Handle subfolder filtering (preserve .gdb bundle contents inside root/picked gdb directories)
+      if (isFolderSource && !effectiveRecursive && relPath.includes('/') && !isInsideGdbDir) {
         const slashCount = (relPath.match(/\//g) || []).length;
         if (slashCount > 1) {
-          // Exclude files in nested subfolders
           continue;
         }
       }
@@ -359,11 +399,20 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       }
 
       const fileName = lastSlash >= 0 ? relPath.slice(lastSlash + 1) : relPath;
+      const lowerName = fileName.toLowerCase();
       const lastDot = fileName.lastIndexOf('.');
       const ext = lastDot >= 0 ? fileName.slice(lastDot).toLowerCase() : '';
 
       // Check against selected data types
-      const isShape = ['.shp', '.shx', '.dbf', '.prj', '.cpg', '.sbn', '.sbx', '.zip'].includes(ext);
+      const isZipArchive = ext === '.zip' || lowerName.endsWith('.gdb.zip');
+      const isGdbPart =
+        isInsideGdbDir ||
+        ext === '.gdbtable' ||
+        ext === '.gdbtablx' ||
+        lowerName === 'gdb' ||
+        lowerName === 'timestamps' ||
+        lowerName.endsWith('.gdb.zip');
+      const isShapePart = ['.shp', '.shx', '.dbf', '.prj', '.cpg', '.sbn', '.sbx'].includes(ext);
       const isGpkg = ext === '.gpkg';
       const isGeoJson = ['.geojson', '.json'].includes(ext);
       const isKml = ['.kml', '.kmz'].includes(ext);
@@ -372,7 +421,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       const isGpx = ext === '.gpx';
       const isExcel = ['.xlsx', '.xls'].includes(ext);
 
-      if (isShape && !dataTypes.shapefile) continue;
+      if (isZipArchive && !dataTypes.shapefile && !dataTypes.filegdb) continue;
+      if (!isZipArchive && isGdbPart && !dataTypes.filegdb) continue;
+      if (isShapePart && !dataTypes.shapefile) continue;
       if (isGpkg && !dataTypes.geopackage) continue;
       if (isGeoJson && !dataTypes.geojson) continue;
       if (isKml && !dataTypes.kml) continue;
@@ -381,8 +432,18 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       if (isGpx && !dataTypes.gpx) continue;
       if (isExcel && !dataTypes.excel) continue;
 
-      // Ignore non-geospatial files silently (e.g. .txt, .pdf, .xml, .DS_Store, .png)
-      if (!isShape && !isGpkg && !isGeoJson && !isKml && !isCsv && !isCad && !isGpx && !isExcel) {
+      if (
+        !isZipArchive &&
+        !isGdbPart &&
+        !isShapePart &&
+        !isGpkg &&
+        !isGeoJson &&
+        !isKml &&
+        !isCsv &&
+        !isCad &&
+        !isGpx &&
+        !isExcel
+      ) {
         continue;
       }
 
@@ -395,10 +456,15 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
       return;
     }
 
-    // Group files by directory path + base name to match Shapefile sidecars (.shp, .shx, .dbf, .prj) across subfolders
+    // Separate File Geodatabase folder bundles from individual / shapefile-sidecar files
+    const { gdbBundles, remainingFiles } = dataTypes.filegdb
+      ? groupFileGdbFolderUploads(eligibleFiles)
+      : { gdbBundles: [], remainingFiles: eligibleFiles };
+
+    // Group remaining files by directory path + base name to match Shapefile sidecars
     const sidecarGroups: Record<string, { [ext: string]: File }> = {};
 
-    for (const file of eligibleFiles) {
+    for (const file of remainingFiles) {
       const relPath = (file as any).webkitRelativePath || file.name;
       const lastSlash = relPath.lastIndexOf('/');
       const dirPrefix = lastSlash >= 0 ? relPath.slice(0, lastSlash) : '';
@@ -415,12 +481,38 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
     }
 
     try {
-      for (let i = 0; i < eligibleFiles.length; i++) {
-        const file = eligibleFiles[i];
+      // 1. Ingest grouped .gdb folders / loose .gdbtable sets
+      for (const bundle of gdbBundles) {
+        try {
+          const info = await inspectFileGdb(bundle.files);
+          if (info.discoveredRelationships.length > 0 && onAddDiscoveredGdbRelationships) {
+            onAddDiscoveredGdbRelationships(info.discoveredRelationships);
+          }
+          if (info.layers.length > 1) {
+            setPendingGdbQueue(prev => [...prev, { info, sourceInput: bundle.files }]);
+          } else if (info.layers.length === 1) {
+            const parsed = await parseFileGdbLayers(bundle.files);
+            newDatasets.push(...parsed.datasets);
+            if (parsed.discoveredRelationships.length > 0 && onAddDiscoveredGdbRelationships) {
+              onAddDiscoveredGdbRelationships(parsed.discoveredRelationships);
+            }
+          } else {
+            fileErrors.push(`${bundle.name}: No readable layers or attribute tables found inside File Geodatabase.`);
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          fileErrors.push(`${bundle.name}: ${message}`);
+        }
+      }
+
+      // 2. Ingest individual files & .zip archives
+      for (let i = 0; i < remainingFiles.length; i++) {
+        const file = remainingFiles[i];
         const relPath = (file as any).webkitRelativePath || file.name;
         const lastSlash = relPath.lastIndexOf('/');
         const dirPrefix = lastSlash >= 0 ? relPath.slice(0, lastSlash) : '';
         const fileName = lastSlash >= 0 ? relPath.slice(lastSlash + 1) : relPath;
+        const lowerName = fileName.toLowerCase();
         const lastDot = fileName.lastIndexOf('.');
         const ext = lastDot >= 0 ? fileName.slice(lastDot).toLowerCase() : '';
         const baseName = lastDot >= 0 ? fileName.slice(0, lastDot) : fileName;
@@ -473,10 +565,28 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             }
 
             newDatasets.push(dataset);
-          } else if (ext === '.zip') {
-            const buf = await file.arrayBuffer();
-            const dataset = await parseShapefileZipOrBuffers(buf, displayName, file.size);
-            newDatasets.push(dataset);
+          } else if (ext === '.zip' || lowerName.endsWith('.gdb.zip')) {
+            if (dataTypes.filegdb && (await isFileGdbZipArchive(file))) {
+              const info = await inspectFileGdb(file);
+              if (info.discoveredRelationships.length > 0 && onAddDiscoveredGdbRelationships) {
+                onAddDiscoveredGdbRelationships(info.discoveredRelationships);
+              }
+              if (info.layers.length > 1) {
+                setPendingGdbQueue(prev => [...prev, { info, sourceInput: file }]);
+              } else if (info.layers.length === 1) {
+                const parsed = await parseFileGdbLayers(file);
+                newDatasets.push(...parsed.datasets);
+                if (parsed.discoveredRelationships.length > 0 && onAddDiscoveredGdbRelationships) {
+                  onAddDiscoveredGdbRelationships(parsed.discoveredRelationships);
+                }
+              } else {
+                fileErrors.push(`${displayName}: No readable layers found in File Geodatabase archive.`);
+              }
+            } else if (dataTypes.shapefile && ext === '.zip') {
+              const buf = await file.arrayBuffer();
+              const dataset = await parseShapefileZipOrBuffers(buf, displayName, file.size);
+              newDatasets.push(dataset);
+            }
           } else if (ext === '.geojson' || ext === '.json') {
             const text = await file.text();
             const dataset = parseGeoJSON(text, displayName, file.size);
@@ -658,7 +768,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".shp,.shx,.dbf,.prj,.cpg,.geojson,.json,.kml,.kmz,.csv,.gpkg,.zip,.dwg,.dxf,.gpx,.xlsx,.xls"
+        accept=".shp,.shx,.dbf,.prj,.cpg,.geojson,.json,.kml,.kmz,.csv,.gpkg,.zip,.gdb,.gdbtable,.gdbtablx,.gdb.zip,.dwg,.dxf,.gpx,.xlsx,.xls"
         className="hidden"
         onChange={(e) => {
           const files = Array.from(e.currentTarget.files ?? []);
@@ -766,7 +876,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
               title="Configure data types and subfolder scanning"
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
-                isFilterMenuOpen || activeTypesCount < 8 || !includeSubfolders
+                isFilterMenuOpen || activeTypesCount < 9 || !includeSubfolders
                   ? theme === 'light'
                     ? 'bg-[#FEF3C7] border-[#FCD34D] text-[#92400E] font-bold shadow-xs'
                     : 'bg-amber-950/50 border-amber-600/60 text-amber-300 font-semibold'
@@ -780,7 +890,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
                 theme === 'light' ? 'bg-[#EDE7DC] text-stone-800 font-bold' : 'bg-stone-800/90 text-stone-300'
               }`}>
-                {activeTypesCount}/8
+                {activeTypesCount}/9
               </span>
             </button>
 
@@ -817,6 +927,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 {/* Data Types Checkboxes */}
                 <div className="py-2.5 space-y-1.5 max-h-60 overflow-y-auto">
                   {[
+                    { key: 'filegdb' as const, label: 'File Geodatabase (.gdb / .gdb.zip)', desc: 'Esri OpenFileGDB folders, tables & relations' },
                     { key: 'geopackage' as const, label: 'GeoPackage (.gpkg)', desc: 'OGC Vector SQLite Database' },
                     { key: 'shapefile' as const, label: 'ESRI Shapefile (.shp / .zip)', desc: 'Bundled .shp, .shx, .dbf, .prj' },
                     { key: 'cad' as const, label: 'AutoCAD CAD (.dwg / .dxf)', desc: 'Engineering & surveying drawings' },
@@ -926,6 +1037,83 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 </button>
               )}
 
+              {onOpenDataCleaning && (
+                <button
+                  type="button"
+                  onClick={() => onOpenDataCleaning(selectedIds.size === 1 ? Array.from(selectedIds)[0] : undefined)}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    theme === 'light'
+                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border-amber-700/50'
+                  }`}
+                  title={lang === 'fr' ? 'Auditer les nombres malformees (19,.7), la casse et les separateurs' : 'Audit malformed numbers (19,.7 -> Double/Float), text casing, and separators'}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{lang === 'fr' ? 'Audit & Nettoyage' : 'Clean & Audit'}</span>
+                </button>
+              )}
+
+              {onOpenRelationshipMapper && (
+                <button
+                  type="button"
+                  onClick={() => onOpenRelationshipMapper()}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    theme === 'light'
+                      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
+                      : 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border-emerald-700/50'
+                  }`}
+                  title={lang === 'fr' ? 'Definir les relations, generer les IDs (PK) et mapper les cles etrangeres (FK)' : 'Define relationships, generate PK IDs, and auto-map Foreign Keys'}
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>{lang === 'fr' ? 'IDs & Relations' : 'IDs & Relations'}</span>
+                  {definedRelationships.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded bg-emerald-600 text-white text-[10px] font-mono font-bold">
+                      {definedRelationships.length}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              <button
+                type="button"
+                disabled={isExportingGdbZip}
+                onClick={async () => {
+                  const targetList = selectedIds.size > 0
+                    ? datasets.filter(d => selectedIds.has(d.id))
+                    : datasets;
+                  if (targetList.length === 0) return;
+                  setIsExportingGdbZip(true);
+                  try {
+                    const blob = await exportDatasetsToFileGdbZip(
+                      targetList,
+                      'omnigeo_geodatabase',
+                      definedRelationships
+                    );
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'omnigeo_geodatabase.gdb.zip';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } finally {
+                    setIsExportingGdbZip(false);
+                  }
+                }}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer disabled:opacity-50 ${
+                  theme === 'light'
+                    ? 'bg-sky-50 hover:bg-sky-100 text-sky-900 border-sky-300'
+                    : 'bg-sky-950/40 hover:bg-sky-900/50 text-sky-300 border-sky-700/50'
+                }`}
+                title={lang === 'fr' ? 'Exporter la selection ou le workspace en archive File Geodatabase (.gdb.zip)' : 'Export selected or all layers as an Esri File Geodatabase (.gdb.zip)'}
+              >
+                {isExportingGdbZip ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-500" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 text-sky-500" />
+                )}
+                <span>Export .gdb{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}</span>
+              </button>
+
               {onOpenPostgresReport && (
                 <button
                   type="button"
@@ -938,7 +1126,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                   title="Generate global PostgreSQL database architecture & schema report (HTML)"
                 >
                   <TableProperties className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{lang === 'fr' ? 'Rapport Base de Données' : 'DB Report'}</span>
+                  <span>{lang === 'fr' ? 'Rapport Base de Donnees' : 'DB Report'}</span>
                 </button>
               )}
 
@@ -1157,6 +1345,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             {/* Right: Interactive Format Toggle Pills (Click to enable/disable data types) */}
             <div className="flex items-center flex-wrap gap-1.5 text-[11px] font-mono">
               {[
+                { key: 'filegdb' as const, label: 'FGDB', color: 'border-sky-600/40 text-sky-300' },
                 { key: 'shapefile' as const, label: 'SHP', color: 'border-amber-600/40 text-amber-300' },
                 { key: 'geopackage' as const, label: 'GPKG', color: 'border-amber-700/40 text-amber-200' },
                 { key: 'cad' as const, label: 'DWG/DXF', color: 'border-blue-600/40 text-blue-300' },
@@ -1235,9 +1424,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             <div className={`flex items-center space-x-3 text-xs ${
               theme === 'light' ? 'text-stone-600' : 'text-stone-400'
             }`}>
-              <div className="flex items-center space-x-1.5">
+              <div className="flex items-center space-x-1.5 flex-wrap">
                 <span className="text-[11px] font-mono text-stone-500 uppercase">Format:</span>
-                {(['all', 'shapefile', 'geopackage', 'cad', 'gpx', 'excel', 'geojson', 'kml', 'csv'] as const).map((fmt) => (
+                {(['all', 'filegdb', 'shapefile', 'geopackage', 'cad', 'gpx', 'excel', 'geojson', 'kml', 'csv'] as const).map((fmt) => (
                   <button
                     key={fmt}
                     onClick={() => setFilterFormat(fmt)}
@@ -1249,7 +1438,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                         : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
                     }`}
                   >
-                    {fmt === 'all' ? t.workspace.allFormats : fmt.toUpperCase()}
+                    {fmt === 'all' ? t.workspace.allFormats : fmt === 'filegdb' ? 'FGDB' : fmt.toUpperCase()}
                   </button>
                 ))}
               </div>
@@ -1349,11 +1538,20 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       }`}>
                         <div className="flex items-center space-x-2">
                           <Package className="w-4 h-4 text-amber-500 shrink-0" />
-                          <span className={`truncate max-w-[280px] font-medium ${
-                            theme === 'light' ? 'text-stone-900' : 'text-[#FAF6F0]'
-                          }`} title={d.name}>
-                            {d.name}
-                          </span>
+                          <div className="min-w-0">
+                            <span className={`block truncate max-w-[280px] font-medium ${
+                              theme === 'light' ? 'text-stone-900' : 'text-[#FAF6F0]'
+                            }`} title={d.name}>
+                              {d.name}
+                            </span>
+                            {d.tableComment && (
+                              <span className={`block truncate max-w-[280px] text-[10px] font-mono ${
+                                theme === 'light' ? 'text-stone-500' : 'text-stone-400'
+                              }`} title={d.tableComment}>
+                                {d.tableComment}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
 
@@ -1361,12 +1559,25 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       <td className="py-2.5 px-3.5 font-sans">
                         <div className="flex items-center space-x-1.5 flex-wrap">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold uppercase border ${
-                            theme === 'light'
+                            d.format === 'filegdb'
+                              ? theme === 'light'
+                                ? 'bg-sky-50 text-sky-900 border-sky-300'
+                                : 'bg-sky-950/60 text-sky-300 border-sky-700/60'
+                              : theme === 'light'
                               ? 'bg-[#EFE8DC] text-stone-800 border-[#DDD3C2]'
                               : 'bg-stone-800 text-stone-200 border-stone-700'
                           }`}>
-                            {d.format}
+                            {d.format === 'filegdb' ? 'FGDB' : d.format}
                           </span>
+                          {d.isNonSpatial && (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${
+                              theme === 'light'
+                                ? 'bg-stone-100 text-stone-700 border-stone-300'
+                                : 'bg-stone-800 text-stone-400 border-stone-700'
+                            }`}>
+                              TABLE
+                            </span>
+                          )}
                           {/* Sidecar indicators for shapefiles */}
                           {d.sidecars && d.sidecars.map((sc) => (
                             <span
@@ -1497,6 +1708,18 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       {/* Quick Analytical & Map Actions */}
                       <td className="py-2.5 px-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end space-x-1.5">
+                          {onOpenGdbEditor && (
+                            <button
+                              onClick={() => {
+                                setSelectedDatasetId(d.id);
+                                onOpenGdbEditor(d.id);
+                              }}
+                              title={lang === 'fr' ? 'Editer table / attributs / commentaire (.gdb)' : 'Edit table attributes, schema, & .gdb metadata'}
+                              className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-sky-400 transition-colors cursor-pointer"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                          )}
                           {onOpenAggregationModal && (
                             <button
                               onClick={() => {
@@ -1507,6 +1730,18 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                               className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-orange-400 transition-colors"
                             >
                               <PieChart className="w-4 h-4" />
+                            </button>
+                          )}
+                          {onOpenDataCleaning && (
+                            <button
+                              onClick={() => {
+                                setSelectedDatasetId(d.id);
+                                onOpenDataCleaning(d.id);
+                              }}
+                              title={lang === 'fr' ? 'Auditer & nettoyer nombres, casse et separateurs' : 'Audit & clean malformed numbers, case, and separators'}
+                              className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                            >
+                              <SlidersHorizontal className="w-4 h-4" />
                             </button>
                           )}
                           {onOpenSpatialDoctor && (
@@ -1626,6 +1861,34 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
           } finally {
             setIsGpkgModalOpen(false);
             setPendingGpkgFile(null);
+          }
+        }}
+      />
+
+      {/* File Geodatabase (.gdb / .gdb.zip) Multi-Layer Inspector Modal */}
+      <GdbLayerModal
+        isOpen={pendingGdbQueue.length > 0}
+        onClose={() => setPendingGdbQueue(prev => prev.slice(1))}
+        gdbInfo={pendingGdbQueue[0]?.info || null}
+        onConfirmSelection={async (selectedTableNames) => {
+          const activeItem = pendingGdbQueue[0];
+          if (!activeItem) return;
+          try {
+            const parsed = await parseFileGdbLayers(activeItem.sourceInput, selectedTableNames);
+            if (parsed.datasets.length > 0) {
+              setDatasets(prev => [...prev, ...parsed.datasets]);
+              if (!selectedDatasetId && parsed.datasets[0]) {
+                setSelectedDatasetId(parsed.datasets[0].id);
+              }
+            }
+            if (parsed.discoveredRelationships.length > 0 && onAddDiscoveredGdbRelationships) {
+              onAddDiscoveredGdbRelationships(parsed.discoveredRelationships);
+            }
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            setFileProcessingError(`${activeItem.info.gdbName}: ${message}`);
+          } finally {
+            setPendingGdbQueue(prev => prev.slice(1));
           }
         }}
       />

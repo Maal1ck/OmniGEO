@@ -6,6 +6,7 @@ import { geojsonToCSV, geojsonToKML } from './formatParsers';
 import { geojsonToDXF, geojsonToGPX } from './cadParser';
 import { geojsonToExcelBuffer } from './excelParser';
 import { getCRSByCode } from './crsDefinitions';
+import { exportDatasetsToFileGdbZip } from './fileGdbEngine';
 
 export function resolveOutputFileName(
   inputName: string,
@@ -28,6 +29,7 @@ export function resolveOutputFileName(
     geojson: '.geojson',
     shapefile: '.zip',
     geopackage: '.gpkg',
+    filegdb: '.gdb.zip',
     kml: '.kml',
     csv: '.csv',
     cad: '.dxf',
@@ -168,6 +170,17 @@ export async function executeConversionJob(
       case 'excel': {
         const excelBuf = geojsonToExcelBuffer(workingGeoJSON);
         outputBlob = new Blob([excelBuf.buffer as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        break;
+      }
+      case 'filegdb': {
+        const targetCrsObj = getCRSByCode(job.targetCRS) || dataset.detectedCRS;
+        const convertedDataset: SpatialDataset = {
+          ...dataset,
+          name: job.layerName || dataset.name,
+          geojson: workingGeoJSON,
+          detectedCRS: targetCrsObj,
+        };
+        outputBlob = await exportDatasetsToFileGdbZip([convertedDataset], job.layerName || dataset.name);
         break;
       }
       case 'geojson':

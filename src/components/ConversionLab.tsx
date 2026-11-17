@@ -71,6 +71,14 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
       tag: 'Recommended',
     },
     {
+      id: 'filegdb',
+      name: 'Esri File Geodatabase (.gdb)',
+      ext: '.gdb.zip',
+      desc: 'Portable Esri File Geodatabase v10 (.gdbtable/.gdbtablx) bundle ready for ArcGIS Pro, QGIS OpenFileGDB, & CAD.',
+      accentColor: 'amber',
+      borderColor: 'border-amber-500',
+    },
+    {
       id: 'shapefile',
       name: 'ESRI Shapefile Suite',
       ext: '.zip',

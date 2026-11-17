@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SpatialDataset } from '../types/gis';
+import { SpatialDataset, DefinedRelationship } from '../types/gis';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
@@ -212,7 +212,19 @@ fk_constraints AS (
     ccu.table_name AS target_table,
     ccu.column_name AS target_column,
     rc.update_rule,
-    rc.delete_rule
+    rc.delete_rule,
+    (col.is_nullable = 'YES') AS source_nullable,
+    EXISTS (
+      SELECT 1
+      FROM information_schema.table_constraints utc
+      JOIN information_schema.key_column_usage ukcu
+        ON utc.constraint_name = ukcu.constraint_name
+        AND utc.table_schema = ukcu.table_schema
+      WHERE utc.constraint_type IN ('UNIQUE', 'PRIMARY KEY')
+        AND utc.table_schema = tc.table_schema
+        AND utc.table_name = tc.table_name
+        AND ukcu.column_name = kcu.column_name
+    ) AS source_is_unique
   FROM information_schema.table_constraints tc
   JOIN information_schema.key_column_usage kcu
     ON tc.constraint_name = kcu.constraint_name
@@ -222,6 +234,10 @@ fk_constraints AS (
     AND ccu.table_schema = tc.table_schema
   JOIN information_schema.referential_constraints rc
     ON tc.constraint_name = rc.constraint_name
+  JOIN information_schema.columns col
+    ON col.table_schema = tc.table_schema
+    AND col.table_name = tc.table_name
+    AND col.column_name = kcu.column_name
   WHERE tc.constraint_type = 'FOREIGN KEY'
 ),
 columns_metadata AS (
@@ -315,7 +331,14 @@ SELECT json_build_object(
         'targetColumn', fk.target_column,
         'updateRule', fk.update_rule,
         'deleteRule', fk.delete_rule,
-        'cardinality', '1:N'
+        'cardinality', CASE WHEN fk.source_is_unique THEN '1:1' ELSE '1:N' END,
+        'sourceCardinality', CASE
+          WHEN fk.source_is_unique AND fk.source_nullable THEN '0..1'
+          WHEN fk.source_is_unique THEN '1..1'
+          WHEN fk.source_nullable THEN '0..n'
+          ELSE '1..n'
+        END,
+        'targetCardinality', CASE WHEN fk.source_nullable THEN '0..1' ELSE '1..1' END
       )
     )
     FROM fk_constraints fk
@@ -629,99 +652,189 @@ function splitSqlColumns(body: string): string[] {
  * Builds a PostgresDatabaseSchema from active workspace datasets.
  * Automatically enforces canonical PostgreSQL types.
  */
-export function buildSchemaFromDatasets(datasets: SpatialDataset[], dbName = 'omnigeo_spatial_db'): PostgresDatabaseSchema {
+export function buildSchemaFromDatasets(
+  datasets: SpatialDataset[],
+  dbName = 'omnigeo_spatial_db',
+  definedRelationships: DefinedRelationship[] = []
+): PostgresDatabaseSchema {
   const tables: PostgresTableSchema[] = [];
   const relationships: PostgresRelationship[] = [];
+  const datasetToTableName = new Map<string, string>();
 
   for (const ds of datasets) {
     const tableName = ds.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    datasetToTableName.set(ds.id, tableName);
     const columns: PostgresColumnSchema[] = [];
+    const declaredPk = ds.primaryKeyColumn
+      ? ds.primaryKeyColumn.toLowerCase().replace(/[^a-z0-9_]/g, '_')
+      : null;
 
-    // Primary key
-    columns.push({
-      name: 'id',
-      dataType: 'bigserial',
-      isNullable: false,
-      defaultValue: "nextval('id_seq')",
-      isPrimaryKey: true,
-      isForeignKey: false,
-      isGeometry: false,
-    });
+    const hasExplicitPkInFields =
+      !!declaredPk &&
+      ds.fields.some((f) => f.name.toLowerCase().replace(/[^a-z0-9_]/g, '_') === declaredPk);
 
-    // Geometry column
-    const srid = ds.detectedCRS?.code.replace(/^EPSG:/i, '') || '4326';
-    const geomType = ds.geometryType === 'Polygon' ? 'MultiPolygon' : ds.geometryType || 'Geometry';
-    columns.push({
-      name: 'geom',
-      dataType: `geometry(${geomType}, ${srid})`,
-      isNullable: true,
-      defaultValue: null,
-      isPrimaryKey: false,
-      isForeignKey: false,
-      isGeometry: true,
-      geometryType: geomType,
-      srid: parseInt(srid, 10),
-    });
+    // Primary key column (either declared existing field or synthetic bigserial id)
+    if (!hasExplicitPkInFields) {
+      columns.push({
+        name: declaredPk || 'id',
+        dataType: 'bigserial',
+        isNullable: false,
+        defaultValue: "nextval('id_seq')",
+        isPrimaryKey: true,
+        isForeignKey: false,
+        isGeometry: false,
+      });
+    }
+
+    // Geometry column (omit for non-spatial attribute tables)
+    const isSpatial = !ds.isNonSpatial && ds.geometryType !== 'Unknown';
+    if (isSpatial) {
+      const srid = ds.detectedCRS?.code.replace(/^EPSG:/i, '') || '4326';
+      const geomType = ds.geometryType === 'Polygon' ? 'MultiPolygon' : ds.geometryType || 'Geometry';
+      columns.push({
+        name: 'geom',
+        dataType: `geometry(${geomType}, ${srid})`,
+        isNullable: true,
+        defaultValue: null,
+        isPrimaryKey: false,
+        isForeignKey: false,
+        isGeometry: true,
+        geometryType: geomType,
+        srid: parseInt(srid, 10),
+      });
+    }
 
     // Attribute columns with strict canonical types
     for (const f of ds.fields) {
+      const colSlug = f.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
       let pgType = 'character varying(255)';
       if (f.type === 'number') {
-        pgType = f.name.toLowerCase().includes('id') ? 'integer' : 'double precision';
+        pgType = colSlug === 'id' || colSlug.endsWith('_id') || colSlug.startsWith('id_') || colSlug === 'objectid'
+          ? 'integer'
+          : 'double precision';
       } else if (f.type === 'boolean') {
         pgType = 'boolean';
       } else if (f.type === 'date') {
         pgType = 'timestamp with time zone';
       }
 
-      const isFkCandidate = f.name.toLowerCase().endsWith('_id') && datasets.some(other => {
+      const isPk = !!declaredPk && colSlug === declaredPk;
+      const isFkCandidate = !isPk && colSlug.endsWith('_id') && datasets.some((other) => {
         const otherName = other.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        return f.name.toLowerCase().startsWith(otherName) || otherName.includes(f.name.toLowerCase().replace(/_id$/, ''));
+        return colSlug.startsWith(otherName) || otherName.includes(colSlug.replace(/_id$/, ''));
       });
 
       columns.push({
-        name: f.name.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+        name: colSlug,
         dataType: pgType,
-        isNullable: true,
+        isNullable: !isPk,
         defaultValue: null,
-        isPrimaryKey: false,
+        isPrimaryKey: isPk,
         isForeignKey: !!isFkCandidate,
         isGeometry: false,
       });
     }
 
+    const pks = columns.filter((c) => c.isPrimaryKey).map((c) => c.name);
+    if (pks.length === 0 && columns.length > 0) {
+      columns[0].isPrimaryKey = true;
+      columns[0].isNullable = false;
+      pks.push(columns[0].name);
+    }
+
     tables.push({
       name: tableName,
-      schema: 'public',
+      schema: ds.schemaName || 'public',
       estimatedRows: ds.featureCount,
       sizeFormatted: `${(ds.sizeBytes / 1024).toFixed(1)} kB`,
       columns,
-      primaryKeys: ['id'],
+      primaryKeys: pks,
       foreignKeys: [],
-      isSpatial: true,
-      comment: `Couche géospatiale importée: ${ds.originalFileName} (${ds.format.toUpperCase()})`,
+      isSpatial,
+      comment:
+        ds.tableComment ||
+        `Couche géospatiale importée: ${ds.originalFileName} (${ds.format.toUpperCase()})`,
     });
   }
 
-  // Cross-table foreign key relationships
+  const seenRelKeys = new Set<string>();
+
+  // 1. Apply explicit relationships defined via Relationship & ID Mapper or .gdb metadata
+  for (const relDef of definedRelationships) {
+    if (!relDef.enabled) continue;
+    const targetTableName = datasetToTableName.get(relDef.parentDatasetId);
+    const sourceTableName = datasetToTableName.get(relDef.childDatasetId);
+    if (!targetTableName || !sourceTableName) continue;
+
+    const sourceTable = tables.find((t) => t.name === sourceTableName);
+    const targetTable = tables.find((t) => t.name === targetTableName);
+    if (!sourceTable || !targetTable) continue;
+
+    const fkColSlug = relDef.fkColumnName.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const pkColSlug = (relDef.parentPkColumn || targetTable.primaryKeys[0] || 'id')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '_');
+
+    let col = sourceTable.columns.find((c) => c.name === fkColSlug);
+    if (!col) {
+      col = {
+        name: fkColSlug,
+        dataType: 'integer',
+        isNullable: true,
+        defaultValue: null,
+        isPrimaryKey: false,
+        isForeignKey: true,
+        foreignKeyTarget: { table: targetTable.name, column: pkColSlug },
+        isGeometry: false,
+      };
+      sourceTable.columns.push(col);
+    } else {
+      col.isForeignKey = true;
+      col.foreignKeyTarget = { table: targetTable.name, column: pkColSlug };
+    }
+
+    const relKey = `${sourceTable.name}.${fkColSlug}->${targetTable.name}.${pkColSlug}`;
+    seenRelKeys.add(relKey);
+
+    const pgRel: PostgresRelationship = {
+      id: relDef.id || `rel_${sourceTable.name}_${fkColSlug}`,
+      constraintName: relDef.constraintName || `fk_${sourceTable.name}_${fkColSlug}`,
+      sourceTable: sourceTable.name,
+      sourceColumn: fkColSlug,
+      targetTable: targetTable.name,
+      targetColumn: pkColSlug,
+      cardinality: relDef.cardinality,
+      sourceCardinality: relDef.sourceCardinality,
+      targetCardinality: relDef.targetCardinality,
+    };
+    relationships.push(pgRel);
+    sourceTable.foreignKeys.push(pgRel);
+  }
+
+  // 2. Fallback cross-table foreign key inference from column names
   for (const t of tables) {
     for (const c of t.columns) {
-      if (c.name.endsWith('_id') && c.name !== 'id') {
-        const potentialTargetTable = c.name.replace(/_id$/, '');
-        const target = tables.find(other => other.name === potentialTargetTable || other.name.startsWith(potentialTargetTable));
-        if (target && target.name !== t.name) {
+      if ((c.name.endsWith('_id') || c.name.startsWith('id_') || c.name.endsWith('_fk')) && !c.isPrimaryKey) {
+        const stem = c.name.replace(/^id_/, '').replace(/_id$/, '').replace(/_fk$/, '');
+        const target = tables.find(
+          (other) =>
+            other.name !== t.name &&
+            (other.name === stem || other.name.startsWith(stem) || stem.includes(other.name.replace(/s$/, '')))
+        );
+        if (target) {
+          const targetPk = target.primaryKeys[0] || 'id';
+          const relKey = `${t.name}.${c.name}->${target.name}.${targetPk}`;
+          if (seenRelKeys.has(relKey)) continue;
+          seenRelKeys.add(relKey);
           c.isForeignKey = true;
-          c.foreignKeyTarget = { table: target.name, column: 'id' };
+          c.foreignKeyTarget = { table: target.name, column: targetPk };
           const rel: PostgresRelationship = {
             id: `rel_${t.name}_${c.name}`,
             constraintName: `fk_${t.name}_${c.name}`,
             sourceTable: t.name,
             sourceColumn: c.name,
             targetTable: target.name,
-            targetColumn: 'id',
-            cardinality: '1:N',
-            sourceCardinality: '0..n',
-            targetCardinality: '1..1',
+            targetColumn: targetPk,
           };
           relationships.push(rel);
           t.foreignKeys.push(rel);
@@ -2809,6 +2922,11 @@ export function generatePhysicalDataModelHtml(
   );
   const hiddenTechnicalCount = allTables.length - rawTables.length;
 
+  const uniqueSchemas = Array.from(new Set(rawTables.map(t => t.schema || 'public'))).sort();
+  const uniqueServices = Array.from(
+    new Set(rawTables.map(t => classifyTableFamily(t, allTables, lang)))
+  ).sort();
+
   const defaultCardWidth = 340;
   const colGap = 130;
   const rowGap = 50;
@@ -2821,14 +2939,17 @@ export function generatePhysicalDataModelHtml(
       if (colHeights[c] < colHeights[minCol]) minCol = c;
     }
     const cols = t.columns || [];
-    const estHeight = 46 + (cols.length * 28) + 20;
+    const estHeight = 58 + (cols.length * 28) + 24;
     const x = 50 + minCol * (defaultCardWidth + colGap);
     const y = colHeights[minCol];
     colHeights[minCol] += estHeight + rowGap;
+    const serviceGroup = classifyTableFamily(t, allTables, lang);
 
     return {
       name: t.name || `table_${idx}`,
       schema: t.schema || 'public',
+      comment: t.comment || '',
+      serviceGroup,
       isSpatial: !!t.isSpatial,
       estimatedRows: t.estimatedRows || 0,
       width: defaultCardWidth,
@@ -2854,9 +2975,9 @@ export function generatePhysicalDataModelHtml(
     sourceColumn: r.sourceColumn || '',
     targetTable: r.targetTable || '',
     targetColumn: r.targetColumn || '',
-    cardinality: r.cardinality || '1:N',
-    sourceCardinality: r.sourceCardinality || '0..n',
-    targetCardinality: r.targetCardinality || '1..1',
+    cardinality: r.cardinality || '',
+    sourceCardinality: r.sourceCardinality || '',
+    targetCardinality: r.targetCardinality || '',
   })));
 
   return `<!DOCTYPE html>
@@ -3035,10 +3156,67 @@ export function generatePhysicalDataModelHtml(
       border-color: var(--accent);
     }
 
+    /* Filter Sub-Bar */
+    .mpd-filterbar {
+      height: 44px;
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 18px;
+      z-index: 45;
+      position: relative;
+      font-size: 11px;
+    }
+    .mpd-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .filter-input, .filter-select {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-family: var(--font-sans);
+      outline: none;
+    }
+    .filter-input {
+      min-width: 210px;
+      flex: 1;
+      max-width: 320px;
+    }
+    .filter-select {
+      max-width: 260px;
+      cursor: pointer;
+    }
+    .filter-input:focus, .filter-select:focus {
+      border-color: var(--accent);
+    }
+    .table-entity.filtered-hidden {
+      display: none !important;
+    }
+    .entity-service-strip {
+      padding: 4px 12px;
+      font-size: 10px;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(120, 113, 108, 0.14);
+      background: rgba(59, 130, 246, 0.04);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* Diagram board viewport */
     #board-viewport {
       width: 100%;
-      height: calc(100% - 56px);
+      height: calc(100% - 100px);
       position: relative;
       overflow: hidden;
       background-color: var(--board-bg);
@@ -3383,7 +3561,7 @@ export function generatePhysicalDataModelHtml(
     <div class="brand-title-group">
       <span class="badge-mpd">${isFr ? 'MCD / MPD (Tables Métiers)' : 'MCD / ERD (Business Tables)'}</span>
       <h1 class="db-title">${escapeHtml(schema.databaseName)}</h1>
-      <span class="db-meta">(${rawTables.length} ${isFr ? 'tables métiers' : 'business tables'}${hiddenTechnicalCount > 0 ? (isFr ? ` • ${hiddenTechnicalCount} tech. masquées` : ` • ${hiddenTechnicalCount} tech. hidden`) : ''} &bull; ${filteredRelationships.length} ${isFr ? 'relations' : 'relationships'})</span>
+      <span id="mpd-meta-counter" class="db-meta">(${rawTables.length} ${isFr ? 'tables métiers' : 'business tables'}${hiddenTechnicalCount > 0 ? (isFr ? ` • ${hiddenTechnicalCount} tech. masquées` : ` • ${hiddenTechnicalCount} tech. hidden`) : ''} &bull; ${filteredRelationships.length} ${isFr ? 'relations' : 'relationships'})</span>
     </div>
 
     <div class="nav-actions">
@@ -3432,6 +3610,29 @@ export function generatePhysicalDataModelHtml(
       </button>
     </div>
   </header>
+
+  <!-- Filter Sub-Bar by Comment (Service / Group), Schema & Search -->
+  <div class="mpd-filterbar">
+    <div class="mpd-filter-group">
+      <input
+        type="text"
+        id="mpd-search-input"
+        class="filter-input"
+        placeholder="${isFr ? 'Rechercher table, champ ou commentaire...' : 'Search table, field or comment...'}"
+        oninput="applyMpdFilters()"
+      />
+      <select id="mpd-comment-filter" class="filter-select" onchange="applyMpdFilters()">
+        <option value="all">${isFr ? `Tous les Services / Commentaires (${uniqueServices.length})` : `All Services / Comments (${uniqueServices.length})`}</option>
+        ${uniqueServices.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('')}
+      </select>
+      <select id="mpd-schema-filter" class="filter-select" onchange="applyMpdFilters()">
+        <option value="all">${isFr ? `Tous les schémas (${uniqueSchemas.length})` : `All schemas (${uniqueSchemas.length})`}</option>
+        ${uniqueSchemas.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('')}
+      </select>
+      <button class="btn-ctrl" onclick="resetMpdFilters()">${isFr ? 'Réinitialiser' : 'Reset'}</button>
+    </div>
+    <div id="mpd-visible-summary" class="font-mono text-muted" style="color: var(--text-muted); white-space: nowrap;"></div>
+  </div>
 
   <!-- Interactive Board Viewport -->
   <div id="board-viewport">
@@ -3525,6 +3726,10 @@ export function generatePhysicalDataModelHtml(
           \`;
         }).join('');
 
+        const serviceStripHtml = (table.comment || table.serviceGroup)
+          ? \`<div class="entity-service-strip" title="\${escapeHtmlJs(table.comment || table.serviceGroup)}">\${escapeHtmlJs(table.comment || table.serviceGroup)}</div>\`
+          : '';
+
         card.innerHTML = \`
           <div class="entity-header">
             <div class="entity-header-left">
@@ -3536,6 +3741,7 @@ export function generatePhysicalDataModelHtml(
               <span class="badge-rows">\${(table.estimatedRows || 0).toLocaleString()} r.</span>
             </div>
           </div>
+          \${serviceStripHtml}
           <div class="entity-columns">
             \${colsHtml}
           </div>
@@ -3557,7 +3763,61 @@ export function generatePhysicalDataModelHtml(
         tablesLayer.appendChild(card);
       });
 
+      applyMpdFilters();
+    }
+
+    function escapeHtmlJs(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    let visibleTableNames = new Set(tablesData.map(t => t.name));
+
+    function applyMpdFilters() {
+      const q = (document.getElementById('mpd-search-input')?.value || '').trim().toLowerCase();
+      const serviceFilter = document.getElementById('mpd-comment-filter')?.value || 'all';
+      const schemaFilter = document.getElementById('mpd-schema-filter')?.value || 'all';
+
+      visibleTableNames = new Set();
+      tablesData.forEach(t => {
+        let match = true;
+        if (serviceFilter !== 'all' && t.serviceGroup !== serviceFilter) match = false;
+        if (match && schemaFilter !== 'all' && t.schema !== schemaFilter) match = false;
+        if (match && q) {
+          const hitTable = t.name.toLowerCase().includes(q) ||
+                           (t.comment || '').toLowerCase().includes(q) ||
+                           (t.serviceGroup || '').toLowerCase().includes(q) ||
+                           (t.columns || []).some(c => c.name.toLowerCase().includes(q) || c.dataType.toLowerCase().includes(q));
+          if (!hitTable) match = false;
+        }
+        const card = document.getElementById('entity-' + t.name);
+        if (card) {
+          card.classList.toggle('filtered-hidden', !match);
+        }
+        if (match) visibleTableNames.add(t.name);
+      });
+
+      const activeRelsCount = relsData.filter(
+        r => visibleTableNames.has(r.sourceTable) && visibleTableNames.has(r.targetTable)
+      ).length;
+      const summaryEl = document.getElementById('mpd-visible-summary');
+      if (summaryEl) {
+        summaryEl.textContent = \`\${visibleTableNames.size} / \${tablesData.length} ${isFr ? 'tables' : 'tables'} • \${activeRelsCount} ${isFr ? 'relations' : 'relations'}\`;
+      }
       renderConnections();
+    }
+
+    function resetMpdFilters() {
+      const s = document.getElementById('mpd-search-input');
+      const c = document.getElementById('mpd-comment-filter');
+      const sc = document.getElementById('mpd-schema-filter');
+      if (s) s.value = '';
+      if (c) c.value = 'all';
+      if (sc) sc.value = 'all';
+      applyMpdFilters();
     }
 
     // Render SVG connector lines
@@ -3565,6 +3825,7 @@ export function generatePhysicalDataModelHtml(
       linesGroup.innerHTML = '';
 
       relsData.forEach(rel => {
+        if (!visibleTableNames.has(rel.sourceTable) || !visibleTableNames.has(rel.targetTable)) return;
         const sourceCard = document.getElementById('entity-' + rel.sourceTable);
         const targetCard = document.getElementById('entity-' + rel.targetTable);
         if (!sourceCard || !targetCard) return;
@@ -3624,47 +3885,51 @@ export function generatePhysicalDataModelHtml(
         path.setAttribute('marker-end', 'url(#arrow-target)');
         linesGroup.appendChild(path);
 
-        // Cardinality badges
+        // Render cardinality badge & endpoints only if available
         const midX = (sX + tX) / 2;
         const midY = (sY + tY) / 2;
 
-        const badgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        badgeGroup.setAttribute('class', 'card-badge-group');
+        if (rel.cardinality) {
+          const badgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          badgeGroup.setAttribute('class', 'card-badge-group');
 
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', midX - 22);
-        rect.setAttribute('y', midY - 11);
-        rect.setAttribute('width', 44);
-        rect.setAttribute('height', 22);
-        rect.setAttribute('class', 'cardinality-badge');
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('x', midX - 22);
+          rect.setAttribute('y', midY - 11);
+          rect.setAttribute('width', 44);
+          rect.setAttribute('height', 22);
+          rect.setAttribute('class', 'cardinality-badge');
 
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', midX);
-        text.setAttribute('y', midY);
-        text.setAttribute('class', 'cardinality-text');
-        text.textContent = rel.cardinality;
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', midX);
+          text.setAttribute('y', midY);
+          text.setAttribute('class', 'cardinality-text');
+          text.textContent = rel.cardinality;
 
-        badgeGroup.appendChild(rect);
-        badgeGroup.appendChild(text);
-        linesGroup.appendChild(badgeGroup);
+          badgeGroup.appendChild(rect);
+          badgeGroup.appendChild(text);
+          linesGroup.appendChild(badgeGroup);
+        }
 
-        // Source cardinality text (e.g. 0..n)
-        const sText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        sText.setAttribute('x', sAnchorSide === 'right' ? sX + 16 : sX - 16);
-        sText.setAttribute('y', sY - 8);
-        sText.setAttribute('class', 'cardinality-text font-mono');
-        sText.style.fill = 'var(--accent)';
-        sText.textContent = rel.sourceCardinality;
-        linesGroup.appendChild(sText);
+        if (rel.sourceCardinality) {
+          const sText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          sText.setAttribute('x', sAnchorSide === 'right' ? sX + 16 : sX - 16);
+          sText.setAttribute('y', sY - 8);
+          sText.setAttribute('class', 'cardinality-text font-mono');
+          sText.style.fill = 'var(--accent)';
+          sText.textContent = rel.sourceCardinality;
+          linesGroup.appendChild(sText);
+        }
 
-        // Target cardinality text (e.g. 1..1)
-        const tText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        tText.setAttribute('x', tAnchorSide === 'left' ? tX - 18 : tX + 18);
-        tText.setAttribute('y', tY - 8);
-        tText.setAttribute('class', 'cardinality-text font-mono');
-        tText.style.fill = 'var(--pk-color)';
-        tText.textContent = rel.targetCardinality;
-        linesGroup.appendChild(tText);
+        if (rel.targetCardinality) {
+          const tText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          tText.setAttribute('x', tAnchorSide === 'left' ? tX - 18 : tX + 18);
+          tText.setAttribute('y', tY - 8);
+          tText.setAttribute('class', 'cardinality-text font-mono');
+          tText.style.fill = 'var(--pk-color)';
+          tText.textContent = rel.targetCardinality;
+          linesGroup.appendChild(tText);
+        }
       });
     }
 

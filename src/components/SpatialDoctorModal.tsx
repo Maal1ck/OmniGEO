@@ -20,6 +20,7 @@ interface SpatialDoctorModalProps {
   onClose: () => void;
   datasets: SpatialDataset[];
   onUpdateDataset: (updated: SpatialDataset) => void;
+  onOpenDataCleaning?: (datasetId?: string) => void;
 }
 
 export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
@@ -27,6 +28,7 @@ export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
   onClose,
   datasets,
   onUpdateDataset,
+  onOpenDataCleaning,
 }) => {
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>(() => datasets[0]?.id || '');
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -280,7 +282,21 @@ export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-stone-800 bg-[#110E0C] flex justify-end">
+        <div className="px-6 py-3 border-t border-stone-800 bg-[#110E0C] flex items-center justify-between gap-3">
+          {onOpenDataCleaning ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenDataCleaning(currentDataset.id);
+              }}
+              className="px-3.5 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/60 border border-amber-700/50 text-xs font-semibold text-amber-300 transition-colors cursor-pointer"
+            >
+              Open Attribute & Numeric Data Cleaner
+            </button>
+          ) : (
+            <div />
+          )}
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-stone-850 hover:bg-stone-800 text-xs font-semibold text-stone-200 transition-colors"

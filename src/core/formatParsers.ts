@@ -14,31 +14,71 @@ export function extractSchemaFields(geojson: any): AttributeField[] {
   const features = geojson?.features || (geojson?.type === 'Feature' ? [geojson] : []);
   if (!features || !features.length) return [];
 
-  const fieldTypes: Record<string, { type: AttributeField['type']; samples: any[] }> = {};
+  const fieldStats: Record<
+    string,
+    {
+      sawNumber: boolean;
+      sawString: boolean;
+      sawBoolean: boolean;
+      sawDate: boolean;
+      sawObject: boolean;
+      samples: any[];
+    }
+  > = {};
 
-  for (const f of features.slice(0, 200)) {
+  for (const f of features) {
     const props = f?.properties || {};
     for (const [k, v] of Object.entries(props)) {
-      if (!fieldTypes[k]) {
-        let t: AttributeField['type'] = 'string';
-        if (typeof v === 'number') t = 'number';
-        else if (typeof v === 'boolean') t = 'boolean';
-        else if (v instanceof Date) t = 'date';
-        else if (typeof v === 'object' && v !== null) t = 'object';
-
-        fieldTypes[k] = { type: t, samples: [] };
+      if (!fieldStats[k]) {
+        fieldStats[k] = {
+          sawNumber: false,
+          sawString: false,
+          sawBoolean: false,
+          sawDate: false,
+          sawObject: false,
+          samples: [],
+        };
       }
-      if (v !== undefined && v !== null && fieldTypes[k].samples.length < 5) {
-        fieldTypes[k].samples.push(v as any);
+      const stat = fieldStats[k];
+      if (v !== undefined && v !== null) {
+        if (stat.samples.length < 5) {
+          stat.samples.push(v as any);
+        }
+        if (typeof v === 'number' && Number.isFinite(v)) {
+          stat.sawNumber = true;
+        } else if (typeof v === 'boolean') {
+          stat.sawBoolean = true;
+        } else if (v instanceof Date) {
+          stat.sawDate = true;
+        } else if (typeof v === 'object') {
+          stat.sawObject = true;
+        } else if (typeof v === 'string') {
+          if (v.trim() !== '') stat.sawString = true;
+        }
       }
     }
   }
 
-  return Object.keys(fieldTypes).map(name => ({
-    name,
-    type: fieldTypes[name].type,
-    sampleValues: fieldTypes[name].samples,
-  }));
+  return Object.keys(fieldStats).map((name) => {
+    const s = fieldStats[name];
+    let type: AttributeField['type'] = 'string';
+    if (s.sawString) {
+      type = 'string';
+    } else if (s.sawObject) {
+      type = 'object';
+    } else if (s.sawNumber && !s.sawBoolean && !s.sawDate) {
+      type = 'number';
+    } else if (s.sawBoolean && !s.sawNumber && !s.sawDate) {
+      type = 'boolean';
+    } else if (s.sawDate && !s.sawNumber && !s.sawBoolean) {
+      type = 'date';
+    }
+    return {
+      name,
+      type,
+      sampleValues: s.samples,
+    };
+  });
 }
 
 /**

@@ -161,24 +161,29 @@ export async function createGeoPackageFile(
     );
   `);
 
-  // Discover property columns
-  const columnDefs: { name: string; type: 'TEXT' | 'REAL' | 'INTEGER' }[] = [];
-  const colSet = new Set<string>();
+  // Discover property columns across all rows so floats widen INTEGER->REAL and dirty strings stay TEXT
+  const colTypeMap = new Map<string, 'TEXT' | 'REAL' | 'INTEGER' | null>();
 
   for (const f of features) {
     const props = f?.properties || {};
     for (const [k, v] of Object.entries(props)) {
       const colName = k.replace(/[^a-zA-Z0-9_]/g, '_');
-      if (!colSet.has(colName)) {
-        colSet.add(colName);
-        let colType: 'TEXT' | 'REAL' | 'INTEGER' = 'TEXT';
-        if (typeof v === 'number') {
-          colType = Number.isInteger(v) ? 'INTEGER' : 'REAL';
-        }
-        columnDefs.push({ name: colName, type: colType });
+      if (!colTypeMap.has(colName)) colTypeMap.set(colName, null);
+      if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) continue;
+      const current = colTypeMap.get(colName);
+      if (current === 'TEXT') continue;
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        const numKind = Number.isInteger(v) ? 'INTEGER' : 'REAL';
+        colTypeMap.set(colName, current === 'REAL' || numKind === 'REAL' ? 'REAL' : 'INTEGER');
+      } else {
+        colTypeMap.set(colName, 'TEXT');
       }
     }
   }
+
+  const columnDefs: { name: string; type: 'TEXT' | 'REAL' | 'INTEGER' }[] = Array.from(colTypeMap.entries()).map(
+    ([name, inferred]) => ({ name, type: inferred || 'TEXT' })
+  );
 
   // 5. Create vector feature table
   const colSql = columnDefs.map(c => `"${c.name}" ${c.type}`).join(', ');

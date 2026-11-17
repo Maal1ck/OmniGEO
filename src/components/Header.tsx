@@ -26,7 +26,9 @@ import {
   Check,
   Database,
   BookOpen,
-  GitMerge
+  GitMerge,
+  KeyRound,
+  SlidersHorizontal
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { BatchSettings, PresetProfile } from '../types/gis';
@@ -57,6 +59,8 @@ interface HeaderProps {
   onOpenPostgisModal?: () => void;
   onOpenJoinModal?: () => void;
   onOpenPostgresReport?: () => void;
+  onOpenRelationshipMapper?: () => void;
+  onOpenDataCleaning?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -80,6 +84,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPostgisModal,
   onOpenJoinModal,
   onOpenPostgresReport,
+  onOpenRelationshipMapper,
+  onOpenDataCleaning,
 }) => {
   const { lang, setLang, t } = useI18n();
   const { theme, toggleTheme } = useTheme();
@@ -456,6 +462,32 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 </button>
 
+                {onOpenDataCleaning && (
+                  <button
+                    onClick={() => {
+                      setIsToolsOpen(false);
+                      onOpenDataCleaning();
+                    }}
+                    className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                      theme === 'light'
+                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        : 'hover:bg-[#28211C] text-stone-200 hover:text-amber-300'
+                    }`}
+                  >
+                    <SlidersHorizontal className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                    <div>
+                      <div className="font-semibold text-xs">
+                        {lang === 'fr' ? 'Audit & Nettoyage Attributaire' : 'Data Cleaning & Numeric Audit'}
+                      </div>
+                      <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>
+                        {lang === 'fr'
+                          ? 'Reparer nombres (19,.7 -> Double), casse & separateurs'
+                          : 'Fix malformed numbers (-> Double/Float), case & separators'}
+                      </div>
+                    </div>
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
                     setIsToolsOpen(false);
@@ -554,6 +586,32 @@ export const Header: React.FC<HeaderProps> = ({
                     <div>
                       <div className="font-semibold text-xs">PostgreSQL / PostGIS Exporter</div>
                       <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>Generate SQL dump, ogr2ogr, and psql scripts</div>
+                    </div>
+                  </button>
+                )}
+
+                {onOpenRelationshipMapper && (
+                  <button
+                    onClick={() => {
+                      setIsToolsOpen(false);
+                      onOpenRelationshipMapper();
+                    }}
+                    className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
+                      theme === 'light'
+                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-emerald-800'
+                        : 'hover:bg-[#28211C] text-stone-200 hover:text-emerald-300'
+                    }`}
+                  >
+                    <KeyRound className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    <div>
+                      <div className="font-semibold text-xs">
+                        {lang === 'fr' ? 'IDs, Relations & Mapping FK' : 'ID Generation & FK Relations'}
+                      </div>
+                      <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>
+                        {lang === 'fr'
+                          ? 'Definir les relations, generer les PK et mapper les FK'
+                          : 'Define table relationships, PK generators & auto-map FKs'}
+                      </div>
                     </div>
                   </button>
                 )}
