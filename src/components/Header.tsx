@@ -28,7 +28,8 @@ import {
   BookOpen,
   GitMerge,
   KeyRound,
-  SlidersHorizontal
+  SlidersHorizontal,
+  FileCode2
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { BatchSettings, PresetProfile } from '../types/gis';
@@ -36,7 +37,7 @@ import { PRESET_PROFILES } from '../core/presets';
 import { useI18n } from '../core/i18n';
 import { useTheme } from '../core/theme';
 
-export type NavTab = 'craft' | 'workspace' | 'lab' | 'map' | 'monitor' | 'showcase';
+export type NavTab = 'craft' | 'workspace' | 'lab' | 'map' | 'monitor' | 'scripts' | 'showcase';
 
 interface HeaderProps {
   activeTab: NavTab;
@@ -247,6 +248,24 @@ export const Header: React.FC<HeaderProps> = ({
             {runningJobCount > 0 && (
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
             )}
+          </button>
+
+          {/* Schema Enrichment Scripts Tab */}
+          <button
+            onClick={() => setActiveTab('scripts')}
+            title={t.header.scriptsTab}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+              activeTab === 'scripts'
+                ? theme === 'light'
+                  ? 'bg-[#EAE4DA] text-stone-900 font-bold shadow-xs'
+                  : 'bg-white/[0.08] text-stone-100 font-semibold shadow-xs'
+                : theme === 'light'
+                  ? 'text-stone-600 hover:text-stone-950 hover:bg-[#F2ECE3]'
+                  : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
+            }`}
+          >
+            <FileCode2 className={`w-3.5 h-3.5 ${activeTab === 'scripts' ? (theme === 'light' ? 'text-amber-700' : 'text-amber-300') : ''}`} />
+            <span className="hidden xl:inline">{t.header.scriptsTab}</span>
           </button>
 
           {/* Showcase & Website Tab */}
@@ -589,6 +608,30 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </button>
                 )}
+
+                <button
+                  onClick={() => {
+                    setIsToolsOpen(false);
+                    setActiveTab('scripts');
+                  }}
+                  className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                    theme === 'light'
+                      ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                      : 'hover:bg-[#28211C] text-stone-200 hover:text-amber-300'
+                  }`}
+                >
+                  <FileCode2 className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  <div>
+                    <div className="font-semibold text-xs">
+                      {lang === 'fr' ? 'Scripts d\'Enrichissement (ArcPy / SQL)' : 'Schema Enrichment Scripts (ArcPy / SQL)'}
+                    </div>
+                    <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>
+                      {lang === 'fr'
+                        ? 'Ajouter les colonnes manquantes et alimenter une table cible'
+                        : 'Add missing columns & populate target table via ArcPy or SQL'}
+                    </div>
+                  </div>
+                </button>
 
                 {onOpenRelationshipMapper && (
                   <button

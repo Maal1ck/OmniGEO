@@ -19,6 +19,7 @@ import { BatchWorkspace } from './components/BatchWorkspace';
 import { ConversionLab } from './components/ConversionLab';
 import { MapPreview } from './components/MapPreview';
 import { JobMonitor } from './components/JobMonitor';
+import { SchemaEnrichmentStudio } from './components/SchemaEnrichmentStudio';
 import { ShowcaseWebsite } from './components/ShowcaseWebsite';
 import { CommandPalette } from './components/CommandPalette';
 import { PythonCoreModal } from './components/PythonCoreModal';
@@ -107,6 +108,12 @@ export default function App() {
   const [concatenationInitialIds, setConcatenationInitialIds] = useState<string[]>([]);
   const [postgisTargetDatasetId, setPostgisTargetDatasetId] = useState<string | null>(null);
   const [joinTargetDatasetId, setJoinTargetDatasetId] = useState<string | null>(null);
+  const [scriptStudioSourceId, setScriptStudioSourceId] = useState<string | null>(null);
+
+  const handleOpenScriptStudio = (datasetId?: string) => {
+    setScriptStudioSourceId(datasetId || selectedDatasetId || null);
+    setActiveTab('scripts');
+  };
 
   const handleOpenPostgresReport = () => {
     setIsPostgresReportOpen(true);
@@ -541,6 +548,7 @@ export default function App() {
             onOpenGdbEditor={handleOpenGdbEditor}
             onAddDiscoveredGdbRelationships={handleAddDiscoveredGdbRelationships}
             onOpenDataCleaning={handleOpenDataCleaning}
+            onOpenScriptStudio={handleOpenScriptStudio}
           />
         )}
 
@@ -586,6 +594,14 @@ export default function App() {
             hasCertificate={!!qaqcReport}
             onDownloadConsolidated={handleDownloadConsolidatedHandoff}
             hasConsolidated={!!consolidatedHandoffBlob}
+          />
+        )}
+
+        {activeTab === 'scripts' && (
+          <SchemaEnrichmentStudio
+            datasets={datasets}
+            initialSourceDatasetId={scriptStudioSourceId}
+            onGoToWorkspace={() => setActiveTab('workspace')}
           />
         )}
 

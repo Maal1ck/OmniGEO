@@ -32,7 +32,8 @@ import {
   TableProperties,
   KeyRound,
   Download,
-  SlidersHorizontal
+  SlidersHorizontal,
+  FileCode2
 } from 'lucide-react';
 import { SpatialDataset, CRSInfo, DefinedRelationship } from '../types/gis';
 import { parseCSV, parseGeoJSON, parseKML, parseShapefileZipOrBuffers, parseCadFile, parseGpxFile } from '../core/formatParsers';
@@ -89,6 +90,7 @@ interface BatchWorkspaceProps {
   onOpenGdbEditor?: (datasetId: string) => void;
   onAddDiscoveredGdbRelationships?: (rels: DiscoveredGdbRelationship[]) => void;
   onOpenDataCleaning?: (datasetId?: string) => void;
+  onOpenScriptStudio?: (datasetId?: string) => void;
 }
 
 export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
@@ -109,6 +111,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   onOpenGdbEditor,
   onAddDiscoveredGdbRelationships,
   onOpenDataCleaning,
+  onOpenScriptStudio,
 }) => {
   const { t, lang } = useI18n();
   const { theme } = useTheme();
@@ -1085,6 +1088,26 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 </button>
               )}
 
+              {onOpenScriptStudio && (
+                <button
+                  type="button"
+                  onClick={() => onOpenScriptStudio(selectedIds.size === 1 ? Array.from(selectedIds)[0] : selectedDatasetId || undefined)}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    theme === 'light'
+                      ? 'bg-[#FAF6EE] hover:bg-[#F3EBD8] text-amber-950 border-[#D6CEBE]'
+                      : 'bg-amber-950/35 hover:bg-amber-900/45 text-amber-200 border-amber-700/45'
+                  }`}
+                  title={
+                    lang === 'fr'
+                      ? 'Générer un script ArcPy ou SQL pour créer les colonnes manquantes dans une table cible'
+                      : 'Generate ArcPy or SQL script to add missing columns and populate a target table'
+                  }
+                >
+                  <FileCode2 className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{lang === 'fr' ? 'Scripts ArcPy / SQL' : 'ArcPy / SQL Script'}</span>
+                </button>
+              )}
+
               {onOpenRelationshipMapper && (
                 <button
                   type="button"
@@ -1786,6 +1809,22 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                               className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-colors"
                             >
                               <Stethoscope className="w-4 h-4" />
+                            </button>
+                          )}
+                          {onOpenScriptStudio && (
+                            <button
+                              onClick={() => {
+                                setSelectedDatasetId(d.id);
+                                onOpenScriptStudio(d.id);
+                              }}
+                              title={
+                                lang === 'fr'
+                                  ? 'Générer un script ArcPy / SQL d\'enrichissement à partir de cette table'
+                                  : 'Generate ArcPy / SQL schema enrichment script from this dataset'
+                              }
+                              className="p-1.5 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-300 transition-colors cursor-pointer"
+                            >
+                              <FileCode2 className="w-4 h-4" />
                             </button>
                           )}
                           {onOpenPostgisModal && (

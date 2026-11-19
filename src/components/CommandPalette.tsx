@@ -127,6 +127,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       run: () => { setActiveTab('monitor'); onClose(); },
     },
     {
+      id: 'nav-scripts',
+      title: 'Go to ArcPy / SQL Schema Enrichment Script Studio',
+      category: 'Navigation',
+      icon: <FileCode className="w-4 h-4 text-amber-400" />,
+      run: () => { setActiveTab('scripts'); onClose(); },
+    },
+    {
       id: 'nav-showcase',
       title: 'Go to Product Website & Presentation Showcase',
       category: 'Navigation',

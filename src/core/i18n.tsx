@@ -41,6 +41,7 @@ export interface Translations {
     labTab: string;
     mapTab: string;
     monitorTab: string;
+    scriptsTab: string;
     showcaseTab: string;
     commands: string;
     commandsKbd: string;
@@ -353,6 +354,7 @@ export const translations: Record<Language, Translations> = {
       labTab: 'Conversion Lab',
       mapTab: 'Map Studio',
       monitorTab: 'Monitor',
+      scriptsTab: 'ArcPy / SQL',
       showcaseTab: 'Tutorial & Guide',
       commands: 'Commands',
       commandsKbd: '⌘K',
@@ -663,6 +665,7 @@ export const translations: Record<Language, Translations> = {
       labTab: 'Labo de conversion',
       mapTab: 'Studio carto',
       monitorTab: 'Supervision',
+      scriptsTab: 'Scripts ArcPy / SQL',
       showcaseTab: 'Guide & Tutoriel',
       commands: 'Commandes',
       commandsKbd: '⌘K',
@@ -973,6 +976,7 @@ export const translations: Record<Language, Translations> = {
       labTab: 'مختبر التحويل',
       mapTab: 'استوديو الخرائط',
       monitorTab: 'المراقبة',
+      scriptsTab: 'سكربتات ArcPy / SQL',
       showcaseTab: 'دليل الأدوات والشرح',
       commands: 'الأوامر',
       commandsKbd: 'K⌘',
