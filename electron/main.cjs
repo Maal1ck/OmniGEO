@@ -1,8 +1,11 @@
+const fs = require('node:fs');
 const path = require('node:path');
 const {fileURLToPath} = require('node:url');
-const {app, BrowserWindow, dialog, shell} = require('electron');
+const {app, BrowserWindow, dialog, ipcMain, safeStorage, shell} = require('electron');
+const {createLicenseManager} = require('./licenseManager.cjs');
 
 const appName = 'OmniGeo by Maodo — Geospatial Batch Processing Workbench';
+let licenseManager = null;
 
 function openExternalUrl(value) {
   const url = new URL(value);
@@ -13,8 +16,60 @@ function openExternalUrl(value) {
   }
 }
 
+function registerLicenseIpcHandlers() {
+  licenseManager = createLicenseManager({
+    userDataPath: app.getPath('userData'),
+    safeStorage,
+  });
+
+  ipcMain.handle('license:get-status', () => {
+    return licenseManager.getStatus();
+  });
+
+  ipcMain.handle('license:activate', (_event, rawKey) => {
+    return licenseManager.activateLicense(rawKey);
+  });
+
+  ipcMain.handle('license:start-trial', () => {
+    return licenseManager.startLocalTrial();
+  });
+
+  ipcMain.handle('license:deactivate', () => {
+    return licenseManager.deactivateLicense();
+  });
+
+  ipcMain.handle('license:import-file', async (event) => {
+    const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(ownerWindow || undefined, {
+      title: 'Import OmniGeo License File',
+      properties: ['openFile'],
+      filters: [
+        {name: 'OmniGeo License Files', extensions: ['omnigeo-lic', 'lic', 'txt', 'json']},
+        {name: 'All Files', extensions: ['*']},
+      ],
+    });
+
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return {ok: false, canceled: true, error: null, status: licenseManager.getStatus()};
+    }
+
+    try {
+      const content = fs.readFileSync(result.filePaths[0], 'utf8');
+      return licenseManager.activateLicense(content);
+    } catch (err) {
+      return {
+        ok: false,
+        canceled: false,
+        error: `Could not read license file: ${err.message}`,
+        status: licenseManager.getStatus(),
+      };
+    }
+  });
+}
+
 async function createWindow() {
   const indexPath = path.join(app.getAppPath(), 'dist', 'index.html');
+  const preloadPath = path.join(__dirname, 'preload.cjs');
   const window = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -24,6 +79,7 @@ async function createWindow() {
     backgroundColor: '#13110E',
     autoHideMenuBar: true,
     webPreferences: {
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -69,6 +125,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  registerLicenseIpcHandlers();
   void createWindow();
 
   app.on('activate', () => {

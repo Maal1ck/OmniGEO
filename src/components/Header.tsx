@@ -29,10 +29,12 @@ import {
   GitMerge,
   KeyRound,
   SlidersHorizontal,
-  FileCode2
+  FileCode2,
+  ShieldCheck
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { BatchSettings, PresetProfile } from '../types/gis';
+import { LicenseStatus } from '../core/licenseClient';
 import { PRESET_PROFILES } from '../core/presets';
 import { useI18n } from '../core/i18n';
 import { useTheme } from '../core/theme';
@@ -62,6 +64,8 @@ interface HeaderProps {
   onOpenPostgresReport?: () => void;
   onOpenRelationshipMapper?: () => void;
   onOpenDataCleaning?: () => void;
+  onOpenLicenseModal?: () => void;
+  licenseStatus?: LicenseStatus | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -87,6 +91,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPostgresReport,
   onOpenRelationshipMapper,
   onOpenDataCleaning,
+  onOpenLicenseModal,
+  licenseStatus,
 }) => {
   const { lang, setLang, t } = useI18n();
   const { theme, toggleTheme } = useTheme();
@@ -700,6 +706,38 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>{t.header.desktopAppDesc}</div>
                   </div>
                 </button>
+
+                {onOpenLicenseModal && (
+                  <button
+                    onClick={() => {
+                      setIsToolsOpen(false);
+                      onOpenLicenseModal();
+                    }}
+                    className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                      theme === 'light'
+                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-emerald-800'
+                        : 'hover:bg-[#28211C] text-stone-200 hover:text-emerald-300'
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-xs">
+                        {lang === 'fr' ? 'Licence Desktop (Hors Ligne)' : 'Desktop License (Offline)'}
+                      </div>
+                      <div className={`text-[10px] font-mono truncate ${theme === 'light' ? 'text-stone-500' : 'text-stone-400'}`}>
+                        {licenseStatus?.isDesktopElectron
+                          ? licenseStatus.isLifetime
+                            ? (lang === 'fr' ? 'Perpétuelle · Active' : 'Lifetime · Active')
+                            : licenseStatus.tier === 'annual'
+                              ? `${lang === 'fr' ? '1 An' : 'Annual'} · ${licenseStatus.daysRemaining ?? 0}d`
+                              : licenseStatus.tier === 'trial'
+                                ? `${lang === 'fr' ? 'Essai' : 'Trial'} · ${licenseStatus.daysRemaining ?? 0}d`
+                                : (lang === 'fr' ? 'Activation requise' : 'Activation required')
+                          : (lang === 'fr' ? 'Clé Ed25519 · Essai / 1 An / Illimitée' : 'Ed25519 · Trial / Annual / Lifetime')}
+                      </div>
+                    </div>
+                  </button>
+                )}
               </div>
 
               {/* Dry-Run Toggle */}

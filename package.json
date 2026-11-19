@@ -13,7 +13,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "license:init-keys": "node scripts/license-cli.mjs init-keys",
+    "license:issue": "node scripts/license-cli.mjs issue",
+    "license:verify": "node scripts/license-cli.mjs verify"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

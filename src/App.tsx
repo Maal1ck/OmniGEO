@@ -35,11 +35,13 @@ import { PostgresReportModal } from './components/PostgresReportModal';
 import { RelationshipMapperModal } from './components/RelationshipMapperModal';
 import { GdbEditorModal } from './components/GdbEditorModal';
 import { DataCleaningAuditModal } from './components/DataCleaningAuditModal';
+import { LicenseGateModal } from './components/LicenseGateModal';
 import { DiscoveredGdbRelationship } from './core/fileGdbEngine';
 import { generateAutoHarmonizerRules, applySchemaHarmonization } from './core/schemaHarmonizer';
 import { createMultiLayerGeoPackage, generateQgisProjectXml, bundleConsolidatedHandoff } from './core/multiLayerGpkg';
 import { generateQAQCReportData } from './core/auditCertificate';
 import { appendSurfaceColumnToDataset, SurfaceUnit } from './core/spatialAnalytics';
+import { LicenseStatus, fetchLicenseStatus, isElectronDesktopRuntime } from './core/licenseClient';
 import { useTheme } from './core/theme';
 
 export default function App() {
@@ -109,6 +111,30 @@ export default function App() {
   const [postgisTargetDatasetId, setPostgisTargetDatasetId] = useState<string | null>(null);
   const [joinTargetDatasetId, setJoinTargetDatasetId] = useState<string | null>(null);
   const [scriptStudioSourceId, setScriptStudioSourceId] = useState<string | null>(null);
+
+  // Offline-first Electron desktop license state
+  const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [isLicenseGatePreview, setIsLicenseGatePreview] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetchLicenseStatus()
+      .then((st) => {
+        if (active) setLicenseStatus(st);
+      })
+      .catch(() => {
+        // Fallback handled inside fetchLicenseStatus
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const isElectronRuntime = isElectronDesktopRuntime();
+  const isLicenseBlockingGate =
+    isLicenseGatePreview ||
+    (isElectronRuntime && (!licenseStatus || licenseStatus.state !== 'active'));
 
   const handleOpenScriptStudio = (datasetId?: string) => {
     setScriptStudioSourceId(datasetId || selectedDatasetId || null);
@@ -499,6 +525,8 @@ export default function App() {
         onOpenPostgresReport={() => handleOpenPostgresReport()}
         onOpenRelationshipMapper={() => setIsRelationshipMapperOpen(true)}
         onOpenDataCleaning={() => handleOpenDataCleaning()}
+        onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
+        licenseStatus={licenseStatus}
       />
 
       {/* Main Work Area Views */}
@@ -759,6 +787,19 @@ export default function App() {
         initialDatasetId={dataCleaningDatasetId}
         onUpdateDataset={handleUpdateDataset}
       />
+
+      {/* Offline-First Desktop License Gate & Manager */}
+      {licenseStatus && (
+        <LicenseGateModal
+          status={licenseStatus}
+          isBlockingGate={isLicenseBlockingGate}
+          isOpen={isLicenseModalOpen}
+          onClose={() => setIsLicenseModalOpen(false)}
+          onStatusChange={setLicenseStatus}
+          isGatePreviewActive={isLicenseGatePreview}
+          onToggleGatePreview={() => setIsLicenseGatePreview((v) => !v)}
+        />
+      )}
     </div>
   );
 }
