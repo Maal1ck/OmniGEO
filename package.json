@@ -16,7 +16,10 @@
     "lint": "tsc --noEmit",
     "license:init-keys": "node scripts/license-cli.mjs init-keys",
     "license:issue": "node scripts/license-cli.mjs issue",
-    "license:verify": "node scripts/license-cli.mjs verify"
+    "license:verify": "node scripts/license-cli.mjs verify",
+    "electron:start": "npm run generate:crs && npx vite build --base=./ && npx electron .",
+    "dist:win": "npm run generate:crs && npx vite build --base=./ && npx electron-builder --win",
+    "dist:mac": "npm run generate:crs && npx vite build --base=./ && npx electron-builder --mac"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -45,5 +48,36 @@
     "epsg-index": "^2.0.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
+  },
+  "build": {
+    "appId": "com.omnigeo.desktop",
+    "productName": "OmniGeo",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!.license-secrets",
+      "!scripts",
+      "!*.omnigeo-lic"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "target": ["dmg"]
+    }
   }
 }
