@@ -15,6 +15,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "license:init-keys": "node scripts/license-cli.mjs init-keys",
+    "license:set-trial": "node scripts/license-cli.mjs set-trial",
     "license:issue": "node scripts/license-cli.mjs issue",
     "license:verify": "node scripts/license-cli.mjs verify",
     "electron:start": "npm run generate:crs && npx vite build --base=./ && npx electron .",

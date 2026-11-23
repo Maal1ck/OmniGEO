@@ -14,12 +14,16 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {execSync} = require('node:child_process');
-const {LICENSE_PUBLIC_KEY_PEM, IS_PRODUCTION_KEY_CONFIGURED} = require('./licensePublicKey.cjs');
+const {
+  LICENSE_PUBLIC_KEY_PEM,
+  IS_PRODUCTION_KEY_CONFIGURED,
+  DEFAULT_TRIAL_DAYS,
+} = require('./licensePublicKey.cjs');
 
 const LICENSE_PREFIX = 'OMNIGEO-LIC-V1';
 const HARDWARE_SALT = 'OMNIGEO::DESKTOP::HWID::V1::2026';
 const STATE_HMAC_SALT = 'OMNIGEO::STATE::INTEGRITY::V1';
-const DEFAULT_LOCAL_TRIAL_DAYS = 14;
+const DEFAULT_LOCAL_TRIAL_DAYS = Number.isFinite(Number(DEFAULT_TRIAL_DAYS)) ? Math.max(0, Math.floor(Number(DEFAULT_TRIAL_DAYS))) : 14;
 const CLOCK_ROLLBACK_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutes tolerance for NTP drift
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -394,7 +398,7 @@ function createLicenseManager({userDataPath, safeStorage, publicKeyPem = LICENSE
       persistState({...stored, lastSeenUtcMs: nowMs});
     }
 
-    const trialEligible = !stored.trialStartedAt;
+    const trialEligible = DEFAULT_LOCAL_TRIAL_DAYS > 0 && !stored.trialStartedAt;
 
     if (clockRolledBack) {
       return {
@@ -410,6 +414,7 @@ function createLicenseManager({userDataPath, safeStorage, publicKeyPem = LICENSE
         isMasterKey: false,
         clockTampered: true,
         trialEligible,
+        localTrialDays: DEFAULT_LOCAL_TRIAL_DAYS,
         isDesktopElectron: true,
         isProductionKeyConfigured: IS_PRODUCTION_KEY_CONFIGURED,
         error: 'System clock rollback detected. Restore your system date and time to continue using OmniGeo.',
@@ -433,6 +438,7 @@ function createLicenseManager({userDataPath, safeStorage, publicKeyPem = LICENSE
           isMasterKey: check.payload.isMasterKey,
           clockTampered: false,
           trialEligible,
+          localTrialDays: DEFAULT_LOCAL_TRIAL_DAYS,
           isDesktopElectron: true,
           isProductionKeyConfigured: IS_PRODUCTION_KEY_CONFIGURED,
           error: null,
@@ -453,6 +459,7 @@ function createLicenseManager({userDataPath, safeStorage, publicKeyPem = LICENSE
           isMasterKey: check.payload.isMasterKey,
           clockTampered: false,
           trialEligible,
+          localTrialDays: DEFAULT_LOCAL_TRIAL_DAYS,
           isDesktopElectron: true,
           isProductionKeyConfigured: IS_PRODUCTION_KEY_CONFIGURED,
           error: check.error,
@@ -472,6 +479,7 @@ function createLicenseManager({userDataPath, safeStorage, publicKeyPem = LICENSE
         isMasterKey: false,
         clockTampered: false,
         trialEligible,
+        localTrialDays: DEFAULT_LOCAL_TRIAL_DAYS,
         isDesktopElectron: true,
         isProductionKeyConfigured: IS_PRODUCTION_KEY_CONFIGURED,
         error: check.error || 'Stored license is no longer valid.',
@@ -496,6 +504,7 @@ function createLicenseManager({userDataPath, safeStorage, publicKeyPem = LICENSE
           isMasterKey: false,
           clockTampered: false,
           trialEligible: false,
+          localTrialDays: DEFAULT_LOCAL_TRIAL_DAYS,
           isDesktopElectron: true,
           isProductionKeyConfigured: IS_PRODUCTION_KEY_CONFIGURED,
           error: null,
@@ -515,9 +524,10 @@ function createLicenseManager({userDataPath, safeStorage, publicKeyPem = LICENSE
         isMasterKey: false,
         clockTampered: false,
         trialEligible: false,
+        localTrialDays: DEFAULT_LOCAL_TRIAL_DAYS,
         isDesktopElectron: true,
         isProductionKeyConfigured: IS_PRODUCTION_KEY_CONFIGURED,
-        error: `Your ${DEFAULT_LOCAL_TRIAL_DAYS}-day free trial expired on ${stored.trialExpiresAt.slice(0, 10)}. Activate a 1-year or lifetime license to continue.`,
+        error: `Your free trial expired on ${stored.trialExpiresAt.slice(0, 10)}. Activate a 1-year or lifetime license to continue.`,
       };
     }
 
@@ -534,7 +544,8 @@ function createLicenseManager({userDataPath, safeStorage, publicKeyPem = LICENSE
       isLifetime: false,
       isMasterKey: false,
       clockTampered: false,
-      trialEligible: true,
+      trialEligible,
+      localTrialDays: DEFAULT_LOCAL_TRIAL_DAYS,
       isDesktopElectron: true,
       isProductionKeyConfigured: IS_PRODUCTION_KEY_CONFIGURED,
       error: null,
@@ -568,6 +579,13 @@ function createLicenseManager({userDataPath, safeStorage, publicKeyPem = LICENSE
   }
 
   function startLocalTrial(trialDays = DEFAULT_LOCAL_TRIAL_DAYS, nowMs = Date.now()) {
+    if (!trialDays || trialDays <= 0) {
+      return {
+        ok: false,
+        error: 'Self-service offline trials are disabled for this build. Request a signed trial key from your administrator.',
+        status: getStatus(nowMs),
+      };
+    }
     const stored = loadMergedState();
     if (stored.trialStartedAt) {
       return {

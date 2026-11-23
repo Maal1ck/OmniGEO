@@ -65,10 +65,14 @@ function printHelp() {
 OmniGeo Offline Ed25519 License CLI
 
 Commands:
-  init-keys [--force] [--private-key <path>] [--public-module <path>]
+  init-keys [--force] [--trial-days <N>] [--private-key <path>] [--public-module <path>]
       Generates a new Ed25519 private/public keypair.
       Stores private key in .license-secrets/omnigeo-private.pem (gitignored)
       and embeds the public key in electron/licensePublicKey.cjs.
+
+  set-trial --days <N> [--public-module <path>]
+      Updates the built-in offline free trial duration (in days) in electron/licensePublicKey.cjs.
+      Use --days 0 to disable the self-service trial completely (signed trial keys will still work).
 
   issue --tier <trial|annual|lifetime> --machine <OMNI-XXXX-XXXX-XXXX | *> --customer "<Name>"
         [--days <N>] [--email "<email>"] [--out <file.omnigeo-lic>] [--private-key <path>]
@@ -97,6 +101,9 @@ function initKeys(flags) {
   fs.mkdirSync(path.dirname(privateKeyPath), {recursive: true});
   fs.writeFileSync(privateKeyPath, privateKey, {mode: 0o600});
 
+  const parsedTrialDays = flags['trial-days'] !== undefined ? Number(flags['trial-days']) : 14;
+  const trialDays = Number.isFinite(parsedTrialDays) && parsedTrialDays >= 0 ? Math.floor(parsedTrialDays) : 14;
+
   const moduleSource = `/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -109,9 +116,14 @@ const LICENSE_PUBLIC_KEY_PEM = \`${publicKey.trim()}\`;
 
 const IS_PRODUCTION_KEY_CONFIGURED = true;
 
+// Built-in offline free trial duration in days (set to 0 to disable self-service trial)
+// Change easily with: npm run license:set-trial -- --days 30
+const DEFAULT_TRIAL_DAYS = ${trialDays};
+
 module.exports = {
   LICENSE_PUBLIC_KEY_PEM,
   IS_PRODUCTION_KEY_CONFIGURED,
+  DEFAULT_TRIAL_DAYS,
 };
 `;
 
@@ -121,6 +133,40 @@ module.exports = {
   console.log('Ed25519 keypair generated successfully.');
   console.log(`  Private key (KEEP SECRET & BACK UP SAFELY): ${privateKeyPath}`);
   console.log(`  Embedded public key module updated:         ${publicModulePath}`);
+  console.log(`  Built-in offline free trial duration:       ${trialDays === 0 ? 'Disabled (0 days)' : `${trialDays} days`}`);
+}
+
+function setTrialDays(flags) {
+  if (flags.days === undefined) {
+    console.error('Missing --days <N>. Example: npm run license:set-trial -- --days 30 (or --days 0 to disable)');
+    process.exit(1);
+  }
+  const days = Number(flags.days);
+  if (!Number.isFinite(days) || days < 0 || !Number.isInteger(days)) {
+    console.error('Invalid --days value. Must be a whole number >= 0.');
+    process.exit(1);
+  }
+
+  const publicModulePath = flags['public-module'] ? path.resolve(flags['public-module']) : DEFAULT_PUBLIC_KEY_MODULE_PATH;
+  if (!fs.existsSync(publicModulePath)) {
+    console.error(`Public key module not found at ${publicModulePath}.`);
+    process.exit(1);
+  }
+
+  const source = fs.readFileSync(publicModulePath, 'utf8');
+  let updated;
+  if (/const DEFAULT_TRIAL_DAYS\s*=\s*\d+;/.test(source)) {
+    updated = source.replace(/const DEFAULT_TRIAL_DAYS\s*=\s*\d+;/, `const DEFAULT_TRIAL_DAYS = ${days};`);
+  } else {
+    updated = source.replace(
+      /module\.exports\s*=\s*\{/,
+      `const DEFAULT_TRIAL_DAYS = ${days};\n\nmodule.exports = {\n  DEFAULT_TRIAL_DAYS,`
+    );
+  }
+
+  fs.writeFileSync(publicModulePath, updated, 'utf8');
+  console.log(`Updated built-in offline free trial duration in ${publicModulePath}: ${days === 0 ? 'Disabled (0 days)' : `${days} days`}`);
+  console.log('Rebuild your Electron installer (npm run dist:win or npm run dist:mac) to apply.');
 }
 
 function issueLicense(flags) {
@@ -264,6 +310,8 @@ function verifyLicense(flags) {
 const {command, flags} = parseArgs(process.argv.slice(2));
 if (command === 'init-keys') {
   initKeys(flags);
+} else if (command === 'set-trial') {
+  setTrialDays(flags);
 } else if (command === 'issue') {
   issueLicense(flags);
 } else if (command === 'verify') {

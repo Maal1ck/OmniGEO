@@ -27,6 +27,7 @@ export interface LicenseStatus {
   isMasterKey: boolean;
   clockTampered: boolean;
   trialEligible: boolean;
+  localTrialDays: number;
   isDesktopElectron: boolean;
   isProductionKeyConfigured: boolean;
   error: string | null;
@@ -70,6 +71,7 @@ const WEB_PREVIEW_STATUS: LicenseStatus = {
   isMasterKey: false,
   clockTampered: false,
   trialEligible: true,
+  localTrialDays: 14,
   isDesktopElectron: false,
   isProductionKeyConfigured: false,
   error: null,

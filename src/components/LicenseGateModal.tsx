@@ -146,8 +146,8 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
       if (res.ok) {
         setFeedbackSuccess(
           isFr
-            ? 'Essai gratuit de 14 jours activé pour ce poste.'
-            : '14-day free trial activated for this desktop.'
+            ? `Essai gratuit de ${status.localTrialDays} jours activé pour ce poste.`
+            : `${status.localTrialDays}-day free trial activated for this desktop.`
         );
       } else if (res.error) {
         setFeedbackError(res.error);
@@ -449,17 +449,21 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
           </form>
 
           {/* Local Free Trial Option (shown if eligible and not already on annual/lifetime) */}
-          {status.trialEligible && status.tier !== 'annual' && status.tier !== 'lifetime' && !status.clockTampered && (
+          {status.trialEligible && status.localTrialDays > 0 && status.tier !== 'annual' && status.tier !== 'lifetime' && !status.clockTampered && (
             <div className={`pt-4 border-t flex flex-wrap items-center justify-between gap-3 ${isLight ? 'border-[#EBE5DC]' : 'border-white/[0.07]'}`}>
               <div>
                 <div className="text-xs font-semibold flex items-center gap-1.5">
                   <FileKey2 className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{isFr ? 'Démarrer un essai gratuit de 14 jours' : 'Start a 14-Day Free Trial'}</span>
+                  <span>
+                    {isFr
+                      ? `Démarrer un essai gratuit de ${status.localTrialDays} jours`
+                      : `Start a ${status.localTrialDays}-Day Free Trial`}
+                  </span>
                 </div>
                 <p className={`text-[11px] mt-0.5 ${mutedText}`}>
                   {isFr
-                    ? 'Accès complet hors ligne pendant 14 jours, utilisable une seule fois sur ce poste.'
-                    : 'Full offline access for 14 days, available once per desktop installation.'}
+                    ? `Accès complet hors ligne pendant ${status.localTrialDays} jours, utilisable une seule fois sur ce poste.`
+                    : `Full offline access for ${status.localTrialDays} days, available once per desktop installation.`}
                 </p>
               </div>
               <button
@@ -472,7 +476,9 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
                     : 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
                 }`}
               >
-                {isFr ? 'Lancer l\'essai 14 jours' : 'Start 14-Day Trial'}
+                {isFr
+                  ? `Lancer l'essai ${status.localTrialDays} jours`
+                  : `Start ${status.localTrialDays}-Day Trial`}
               </button>
             </div>
           )}
