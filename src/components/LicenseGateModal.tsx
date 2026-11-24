@@ -191,23 +191,23 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
             : 'Unlicensed';
 
   const cardCls = isLight
-    ? 'bg-white border-[#E2DBD0] text-stone-900'
-    : 'bg-[#181411] border-white/[0.08] text-stone-100';
+    ? 'bg-white border-[#D4DFD3] text-stone-900'
+    : 'bg-[#101917] border-white/[0.08] text-stone-100';
   const subSurface = isLight
-    ? 'bg-[#F8F6F1] border-[#E2DBD0]'
-    : 'bg-[#120F0D] border-white/[0.08]';
+    ? 'bg-[#F3F8F1] border-[#D4DFD3]'
+    : 'bg-[#0C1312] border-white/[0.08]';
   const mutedText = isLight ? 'text-stone-500' : 'text-stone-400';
   const inputCls = isLight
-    ? 'bg-white border-[#D6CEBE] text-stone-900 placeholder-stone-400 focus:border-amber-600 focus:outline-none'
-    : 'bg-[#110E0C] border-stone-700/80 text-stone-100 placeholder-stone-500 focus:border-amber-500 focus:outline-none';
+    ? 'bg-white border-[#C2D2C2] text-stone-900 placeholder-stone-400 focus:border-amber-600 focus:outline-none'
+    : 'bg-[#0B1210] border-stone-700/80 text-stone-100 placeholder-stone-500 focus:border-amber-500 focus:outline-none';
 
   return (
     <div
       className={`fixed inset-0 z-[10000] flex items-center justify-center p-4 ${
         isBlockingGate
           ? isLight
-            ? 'bg-[#F4F0E8]'
-            : 'bg-[#0E0C0A]'
+            ? 'bg-[#ECF3E9]'
+            : 'bg-[#090F0E]'
           : 'bg-black/75 backdrop-blur-xs'
       }`}
     >
@@ -215,7 +215,7 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
         {/* Header */}
         <div
           className={`px-6 py-4 border-b flex items-center justify-between gap-3 ${
-            isLight ? 'border-[#EBE5DC] bg-[#FAF8F5]' : 'border-white/[0.07] bg-[#14110E]'
+            isLight ? 'border-[#E1E8DF] bg-[#F7FAF5]' : 'border-white/[0.07] bg-[#0D1513]'
           }`}
         >
           <div className="flex items-center gap-3">
@@ -243,7 +243,7 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
               type="button"
               onClick={onClose}
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                isLight ? 'text-stone-500 hover:bg-[#EFEAE0]' : 'text-stone-400 hover:bg-white/[0.06]'
+                isLight ? 'text-stone-500 hover:bg-[#E6EBE4]' : 'text-stone-400 hover:bg-white/[0.06]'
               }`}
               aria-label="Close"
             >
@@ -269,7 +269,7 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
             <div
               className={`rounded-xl border px-3.5 py-2.5 text-xs flex items-start justify-between gap-3 ${
                 isLight
-                  ? 'bg-[#FAF6EE] border-[#E2DBD0] text-stone-700'
+                  ? 'bg-[#F3F7F1] border-[#D4DFD3] text-stone-700'
                   : 'bg-amber-950/25 border-amber-700/30 text-amber-200/90'
               }`}
             >
@@ -325,7 +325,7 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
                 onClick={handleCopyMachineId}
                 className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer ${
                   isLight
-                    ? 'bg-white border-[#D6CEBE] text-stone-700 hover:text-stone-950'
+                    ? 'bg-white border-[#C2D2C2] text-stone-700 hover:text-stone-950'
                     : 'bg-white/[0.04] border-white/[0.1] text-stone-300 hover:text-white'
                 }`}
               >
@@ -426,7 +426,7 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
               <button
                 type="submit"
                 disabled={busy || !keyInput.trim()}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#A87945] px-4 py-2 text-xs font-semibold text-stone-950 hover:bg-[#B98953] transition-colors disabled:opacity-40 cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#A3694A] px-4 py-2 text-xs font-semibold text-stone-950 hover:bg-[#B47858] transition-colors disabled:opacity-40 cursor-pointer"
               >
                 <KeyRound className="w-3.5 h-3.5" />
                 <span>{isFr ? 'Activer la licence' : 'Activate License'}</span>
@@ -438,7 +438,7 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
                 onClick={handleImportFile}
                 className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-medium transition-colors disabled:opacity-40 cursor-pointer ${
                   isLight
-                    ? 'bg-white border-[#D6CEBE] text-stone-800 hover:bg-[#F5EFE6]'
+                    ? 'bg-white border-[#C2D2C2] text-stone-800 hover:bg-[#EBF3E8]'
                     : 'bg-white/[0.04] border-white/[0.1] text-stone-200 hover:bg-white/[0.08]'
                 }`}
               >
@@ -450,7 +450,7 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
 
           {/* Local Free Trial Option (shown if eligible and not already on annual/lifetime) */}
           {status.trialEligible && status.localTrialDays > 0 && status.tier !== 'annual' && status.tier !== 'lifetime' && !status.clockTampered && (
-            <div className={`pt-4 border-t flex flex-wrap items-center justify-between gap-3 ${isLight ? 'border-[#EBE5DC]' : 'border-white/[0.07]'}`}>
+            <div className={`pt-4 border-t flex flex-wrap items-center justify-between gap-3 ${isLight ? 'border-[#E1E8DF]' : 'border-white/[0.07]'}`}>
               <div>
                 <div className="text-xs font-semibold flex items-center gap-1.5">
                   <FileKey2 className="w-3.5 h-3.5 text-amber-500" />
@@ -472,7 +472,7 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
                 onClick={handleStartTrial}
                 className={`rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
                   isLight
-                    ? 'border-amber-600/50 bg-[#FAF6EE] text-amber-900 hover:bg-[#F3E9D4]'
+                    ? 'border-amber-600/50 bg-[#F3F7F1] text-amber-900 hover:bg-[#E1E8DF]'
                     : 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
                 }`}
               >
@@ -485,7 +485,7 @@ export const LicenseGateModal: React.FC<LicenseGateModalProps> = ({
 
           {/* Deactivate License Button (Electron desktop only when active) */}
           {status.isDesktopElectron && status.state === 'active' && status.tier !== 'trial' && (
-            <div className={`pt-3 border-t flex items-center justify-between text-xs ${isLight ? 'border-[#EBE5DC]' : 'border-white/[0.07]'}`}>
+            <div className={`pt-3 border-t flex items-center justify-between text-xs ${isLight ? 'border-[#E1E8DF]' : 'border-white/[0.07]'}`}>
               <span className={mutedText}>
                 {isFr
                   ? 'Retirer la licence stockée sur ce poste'

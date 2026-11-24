@@ -230,9 +230,9 @@ tests/test_validation.py::test_unclosed_ring_tolerance PASSED            [100%]
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="bg-[#181411] border border-stone-800 rounded-2xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden text-[#F5EBE1]">
+      <div className="bg-[#101917] border border-stone-800 rounded-2xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden text-[#EAEEE8]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#13110E]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#0D1413]">
           <div className="flex items-center space-x-2.5">
             <div className="p-2 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/25 shadow-inner">
               <Terminal className="w-5 h-5" />
@@ -251,7 +251,7 @@ tests/test_validation.py::test_unclosed_ring_tolerance PASSED            [100%]
         </div>
 
         {/* File Navigator Tabs */}
-        <div className="flex items-center justify-between px-6 py-2.5 border-b border-stone-800 bg-[#15110E] text-xs">
+        <div className="flex items-center justify-between px-6 py-2.5 border-b border-stone-800 bg-[#0E1514] text-xs">
           <div className="flex items-center space-x-1.5 overflow-x-auto">
             {Object.keys(files).map((filename) => (
               <button
@@ -259,7 +259,7 @@ tests/test_validation.py::test_unclosed_ring_tolerance PASSED            [100%]
                 onClick={() => setSelectedFile(filename)}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-mono transition-colors ${
                   selectedFile === filename
-                    ? 'bg-[#241E19] text-amber-300 font-semibold border border-amber-500/30 shadow-sm'
+                    ? 'bg-[#182523] text-amber-300 font-semibold border border-amber-500/30 shadow-sm'
                     : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
                 }`}
               >
@@ -273,14 +273,14 @@ tests/test_validation.py::test_unclosed_ring_tolerance PASSED            [100%]
             <button
               onClick={runSimulatedTests}
               disabled={isRunningTests}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#201A16] hover:bg-[#2A221C] text-stone-200 text-xs font-semibold transition-colors border border-stone-700/70"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#15211F] hover:bg-[#1B2B28] text-stone-200 text-xs font-semibold transition-colors border border-stone-700/70"
             >
               <Play className="w-3 h-3 text-amber-400" />
               <span>{isRunningTests ? 'Running...' : 'Run pytest'}</span>
             </button>
             <button
               onClick={handleCopy}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#201A16] hover:bg-[#2A221C] text-stone-200 text-xs font-semibold transition-colors border border-stone-700/70"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#15211F] hover:bg-[#1B2B28] text-stone-200 text-xs font-semibold transition-colors border border-stone-700/70"
             >
               {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-amber-400" />}
               <span>{copied ? 'Copied' : 'Copy'}</span>
@@ -296,7 +296,7 @@ tests/test_validation.py::test_unclosed_ring_tolerance PASSED            [100%]
         </div>
 
         {/* Code Content */}
-        <div className="flex-1 overflow-y-auto p-4 bg-[#100D0B] font-mono text-xs">
+        <div className="flex-1 overflow-y-auto p-4 bg-[#0B100F] font-mono text-xs">
           <div className="mb-2 text-[11px] text-stone-400 font-sans italic border-b border-stone-800/80 pb-1.5">
             # {currentFile.desc}
           </div>
@@ -306,14 +306,14 @@ tests/test_validation.py::test_unclosed_ring_tolerance PASSED            [100%]
 
           {/* Test suite output */}
           {testOutput && (
-            <div className="mt-4 p-3.5 bg-[#14120E] border border-emerald-500/40 rounded-xl text-emerald-400 whitespace-pre shadow-inner font-mono">
+            <div className="mt-4 p-3.5 bg-[#0D1513] border border-emerald-500/40 rounded-xl text-emerald-400 whitespace-pre shadow-inner font-mono">
               {testOutput}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-stone-800 bg-[#13110E] flex items-center justify-between text-xs text-stone-400">
+        <div className="px-6 py-3 border-t border-stone-800 bg-[#0D1413] flex items-center justify-between text-xs text-stone-400">
           <span className="font-sans">Desktop Architecture: Electron + Chromium | Vite + React</span>
           <button
             onClick={onClose}

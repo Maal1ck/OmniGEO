@@ -101,10 +101,10 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="bg-[#181411] border border-stone-800 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-[#F5EBE1]">
+      <div className="bg-[#101917] border border-stone-800 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-[#EAEEE8]">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#13110E]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#0D1413]">
           <div className="flex items-center space-x-2.5">
             <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/25">
               <PieChart className="w-5 h-5" />
@@ -147,7 +147,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
               <select
                 value={groupByField}
                 onChange={(e) => setGroupByField(e.target.value)}
-                className="w-full bg-[#120F0D] border border-stone-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
+                className="w-full bg-[#0C1312] border border-stone-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
               >
                 {fields.map(f => (
                   <option key={f.name} value={f.name} className="bg-stone-900 text-stone-100">
@@ -164,7 +164,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
               <select
                 value={metric}
                 onChange={(e) => setMetric(e.target.value as any)}
-                className="w-full bg-[#120F0D] border border-stone-700 rounded-xl px-3 py-2 text-xs text-stone-100 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
+                className="w-full bg-[#0C1312] border border-stone-700 rounded-xl px-3 py-2 text-xs text-stone-100 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
               >
                 <option value="count">{t.aggregation.countFeatures}</option>
                 <option value="sum">{t.aggregation.sumField}</option>
@@ -182,7 +182,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
                 <select
                   value={valueField}
                   onChange={(e) => setValueField(e.target.value)}
-                  className="w-full bg-[#120F0D] border border-stone-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
+                  className="w-full bg-[#0C1312] border border-stone-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
                 >
                   {numberFields.length > 0 ? (
                     numberFields.map(f => (
@@ -203,8 +203,8 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
           </div>
 
           {/* Aggregated Preview Table */}
-          <div className="rounded-2xl border border-stone-800 bg-[#120F0D] overflow-hidden">
-            <div className="px-4 py-2.5 bg-[#171310] border-b border-stone-800 flex items-center justify-between text-xs font-mono">
+          <div className="rounded-2xl border border-stone-800 bg-[#0C1312] overflow-hidden">
+            <div className="px-4 py-2.5 bg-[#0F1816] border-b border-stone-800 flex items-center justify-between text-xs font-mono">
               <span className="text-stone-300 font-bold">
                 {t.aggregation.summaryTitle} ({aggregation.groups.length} {t.common.all})
               </span>
@@ -213,7 +213,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
 
             <div className="max-h-56 overflow-y-auto">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 bg-[#14100E] border-b border-stone-800/80 text-stone-400 font-mono text-[11px]">
+                <thead className="sticky top-0 bg-[#0D1513] border-b border-stone-800/80 text-stone-400 font-mono text-[11px]">
                   <tr>
                     <th className="py-2 px-3">{t.aggregation.categoryCol} ({groupByField})</th>
                     <th className="py-2 px-3 text-right">{t.aggregation.countCol}</th>
@@ -251,7 +251,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
           </div>
 
           {/* New Column Name Specification */}
-          <div className="p-4 rounded-2xl bg-[#15110E] border border-stone-800/80 space-y-2">
+          <div className="p-4 rounded-2xl bg-[#0E1514] border border-stone-800/80 space-y-2">
             <div className="flex items-center space-x-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
               <label className="text-xs font-display font-bold text-stone-200">
@@ -267,7 +267,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
                 placeholder={metric === 'count' ? `count_by_${groupByField}` : `${metric}_${valueField}_by_${groupByField}`}
                 value={customColName}
                 onChange={(e) => setCustomColName(e.target.value)}
-                className="flex-1 bg-[#120F0D] border border-stone-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-500"
+                className="flex-1 bg-[#0C1312] border border-stone-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-500"
               />
               <button
                 type="button"
@@ -282,7 +282,7 @@ export const AggregationModal: React.FC<AggregationModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-stone-800 bg-[#13110E] flex items-center justify-between text-xs text-stone-400">
+        <div className="px-6 py-3.5 border-t border-stone-800 bg-[#0D1413] flex items-center justify-between text-xs text-stone-400">
           <button
             onClick={handleExportCSV}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-medium transition-colors border border-stone-700"

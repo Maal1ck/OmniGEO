@@ -14,6 +14,8 @@ import {
 import { executeConversionJob, generateBatchManifest, resolveOutputFileName } from './core/conversionEngine';
 import { PRESET_PROFILES } from './core/presets';
 import { Header, NavTab } from './components/Header';
+import { SideRail, RailMeta } from './components/SideRail';
+import { StatusBar } from './components/StatusBar';
 import { CraftStudio } from './components/CraftStudio';
 import { BatchWorkspace } from './components/BatchWorkspace';
 import { ConversionLab } from './components/ConversionLab';
@@ -497,10 +499,24 @@ export default function App() {
   const selectedDataset = datasets.find(d => d.id === selectedDatasetId) || datasets[0] || null;
   const processedJobForPreview = jobs.find(j => j.datasetId === selectedDataset?.id && j.outputGeojson) || null;
 
+  const railMeta: RailMeta = {
+    datasetCount: datasets.length,
+    readyCount: datasets.filter(d => d.status === 'ready').length,
+    selectedName: selectedDataset?.name ?? null,
+    format: settings.targetFormat,
+    crs: settings.targetCRS,
+    running: jobs.filter(j => j.status === 'running' || j.status === 'queued').length,
+    completed: jobs.filter(j => j.status === 'completed' || j.status === 'completed_warnings').length,
+    failed: jobs.filter(j => j.status === 'failed').length,
+  };
+
   return (
     <div className={`flex flex-col h-screen w-screen overflow-hidden font-sans antialiased transition-colors duration-200 ${
-      theme === 'light' ? 'bg-[#F8F6F1] text-[#1C1917]' : 'bg-[#13110E] text-[#F5EBE1]'
+      theme === 'light' ? 'bg-[#F3F8F1] text-[#141F1D]' : 'bg-[#0D1413] text-[#EAEEE8]'
     }`}>
+      <div className="flex flex-1 min-h-0">
+      <SideRail activeTab={activeTab} setActiveTab={setActiveTab} meta={railMeta} />
+      <div className="flex flex-1 min-w-0 flex-col">
       {/* App Header */}
       <Header
         activeTab={activeTab}
@@ -530,7 +546,7 @@ export default function App() {
       />
 
       {/* Main Work Area Views */}
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 min-h-0 min-w-0 flex overflow-hidden">
         {activeTab === 'craft' && (
           <CraftStudio
             datasets={datasets}
@@ -645,6 +661,9 @@ export default function App() {
           />
         )}
       </main>
+      </div>
+      </div>
+      <StatusBar meta={railMeta} crsMode={settings.crsMode} isDryRun={settings.isDryRun} workers={settings.maxConcurrentWorkers} />
 
       {/* Global Command Palette (Ctrl+K) */}
       <CommandPalette

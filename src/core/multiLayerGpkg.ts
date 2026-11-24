@@ -215,7 +215,7 @@ export function generateQgisProjectXml(
   const srsIdMatch = crsCode.match(/\d+/);
   const epsgNum = srsIdMatch ? srsIdMatch[0] : '4326';
 
-  const palette = ['#14b8a6', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#10b981'];
+  const palette = ['#14B8A6', '#E96A17', '#3B82F6', '#EC4899', '#8B5CF6', '#10B981'];
 
   const layersXml = layerNames.map((name, i) => {
     const color = palette[i % palette.length];
@@ -227,7 +227,7 @@ export function generateQgisProjectXml(
           <symbol type="fill" name="0" alpha="0.75">
             <layer pass="0" class="SimpleFill" locked="0">
               <prop k="color" v="${color}"/>
-              <prop k="outline_color" v="#0f172a"/>
+              <prop k="outline_color" v="#0F172A"/>
               <prop k="outline_width" v="0.4"/>
             </layer>
           </symbol>

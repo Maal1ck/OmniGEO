@@ -171,13 +171,13 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
       <div 
         className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden transition-colors ${
           theme === 'light'
-            ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-900 shadow-stone-500/20'
-            : 'bg-[#181411] border-stone-800 text-stone-100 shadow-stone-950/80'
+            ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-900 shadow-stone-500/20'
+            : 'bg-[#101917] border-stone-800 text-stone-100 shadow-stone-950/80'
         }`}
       >
         {/* Header */}
         <div className={`px-6 py-4 border-b flex items-center justify-between ${
-          theme === 'light' ? 'border-[#EBE5DC] bg-white' : 'border-stone-800/80 bg-[#1F1915]'
+          theme === 'light' ? 'border-[#E1E8DF] bg-white' : 'border-stone-800/80 bg-[#14201D]'
         }`}>
           <div className="flex items-center space-x-3">
             <div className={`p-2 rounded-xl ${
@@ -232,11 +232,11 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
                     className={`flex items-start justify-between p-3 rounded-xl border text-left transition-all ${
                       isSelected
                         ? theme === 'light'
-                          ? 'bg-[#FEF3C7] border-amber-500 text-amber-950 font-semibold shadow-xs'
+                          ? 'bg-[#FBE6CA] border-amber-500 text-amber-950 font-semibold shadow-xs'
                           : 'bg-amber-950/40 border-amber-600 text-amber-200 shadow-xs'
                         : theme === 'light'
-                          ? 'bg-white border-[#E2DBD0] text-stone-700 hover:border-stone-400'
-                          : 'bg-[#201A16] border-stone-800 text-stone-300 hover:border-stone-700'
+                          ? 'bg-white border-[#D4DFD3] text-stone-700 hover:border-stone-400'
+                          : 'bg-[#15211F] border-stone-800 text-stone-300 hover:border-stone-700'
                     }`}
                   >
                     <div className="min-w-0 pr-2">
@@ -270,7 +270,7 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
                 onChange={(e) => setOutputName(e.target.value)}
                 placeholder="concatenated_output"
                 className={`w-full px-3 py-2 text-xs rounded-xl border font-mono focus:outline-none focus:ring-1 focus:ring-amber-500 ${
-                  theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-900' : 'bg-[#201A16] border-stone-700 text-stone-100'
+                  theme === 'light' ? 'bg-white border-[#C2D2C2] text-stone-900' : 'bg-[#15211F] border-stone-700 text-stone-100'
                 }`}
               />
             </div>
@@ -283,7 +283,7 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
                 value={targetCRS}
                 onChange={(e) => setTargetCRS(e.target.value)}
                 className={`w-full px-3 py-2 text-xs rounded-xl border font-mono focus:outline-none focus:ring-1 focus:ring-amber-500 ${
-                  theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-900' : 'bg-[#201A16] border-stone-700 text-stone-100'
+                  theme === 'light' ? 'bg-white border-[#C2D2C2] text-stone-900' : 'bg-[#15211F] border-stone-700 text-stone-100'
                 }`}
               >
                 {COMMON_CRS_LIST.map(c => (
@@ -296,7 +296,7 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
 
             <div className="flex flex-col justify-end">
               <label className={`flex items-center space-x-2.5 p-2 rounded-xl border cursor-pointer ${
-                theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#201A16] border-stone-700'
+                theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#15211F] border-stone-700'
               }`}>
                 <input
                   type="checkbox"
@@ -321,8 +321,8 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
                   onClick={handleAutoRemap}
                   className={`flex items-center space-x-1 px-2.5 py-1 text-xs rounded-lg border font-medium transition-colors ${
                     theme === 'light' 
-                      ? 'bg-white hover:bg-stone-100 border-[#D6CEBE] text-stone-700' 
-                      : 'bg-[#201A16] hover:bg-[#28211C] border-stone-700 text-stone-300'
+                      ? 'bg-white hover:bg-stone-100 border-[#C2D2C2] text-stone-700' 
+                      : 'bg-[#15211F] hover:bg-[#1B2926] border-stone-700 text-stone-300'
                   }`}
                   title="Auto-detect matches and synonyms across layers"
                 >
@@ -341,13 +341,13 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
             </div>
 
             <div className={`border rounded-xl overflow-hidden ${
-              theme === 'light' ? 'border-[#E2DBD0] bg-white' : 'border-stone-800 bg-[#171310]'
+              theme === 'light' ? 'border-[#D4DFD3] bg-white' : 'border-stone-800 bg-[#0F1816]'
             }`}>
               <div className="overflow-x-auto max-h-72">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className={`border-b font-mono uppercase text-[10px] tracking-wider ${
-                      theme === 'light' ? 'bg-[#F5EFE6] border-[#E2DBD0] text-stone-600' : 'bg-[#201A16] border-stone-800 text-stone-400'
+                      theme === 'light' ? 'bg-[#EBF3E8] border-[#D4DFD3] text-stone-600' : 'bg-[#15211F] border-stone-800 text-stone-400'
                     }`}>
                       <th className="py-2.5 px-3">Target Field Name</th>
                       <th className="py-2.5 px-3">Type</th>
@@ -361,7 +361,7 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
                   </thead>
                   <tbody className="divide-y divide-stone-200 dark:divide-stone-800">
                     {mappings.map((m) => (
-                      <tr key={m.id} className={theme === 'light' ? 'hover:bg-[#FAF6F0]' : 'hover:bg-stone-800/30'}>
+                      <tr key={m.id} className={theme === 'light' ? 'hover:bg-[#F4F8F2]' : 'hover:bg-stone-800/30'}>
                         {/* Target Field Name */}
                         <td className="py-2 px-3">
                           <input
@@ -369,7 +369,7 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
                             value={m.targetName}
                             onChange={(e) => handleUpdateTargetName(m.id, e.target.value)}
                             className={`w-36 px-2 py-1 text-xs font-mono rounded border ${
-                              theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                              theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                             }`}
                           />
                         </td>
@@ -380,7 +380,7 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
                             value={m.targetType}
                             onChange={(e) => handleUpdateTargetType(m.id, e.target.value as any)}
                             className={`px-2 py-1 text-xs font-mono rounded border ${
-                              theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                              theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                             }`}
                           >
                             <option value="string">String</option>
@@ -402,7 +402,7 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
                                   currentVal === '__empty__'
                                     ? 'opacity-60 italic'
                                     : 'font-semibold text-amber-700 dark:text-amber-400'
-                                } ${theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'}`}
+                                } ${theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'}`}
                               >
                                 <option value="__empty__">[Empty / Null]</option>
                                 {d.fields.map(f => (
@@ -437,7 +437,7 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
 
         {/* Footer Actions */}
         <div className={`px-6 py-4 border-t flex items-center justify-between ${
-          theme === 'light' ? 'border-[#EBE5DC] bg-[#FAF8F5]' : 'border-stone-800 bg-[#1A1512]'
+          theme === 'light' ? 'border-[#E1E8DF] bg-[#F7FAF5]' : 'border-stone-800 bg-[#111B19]'
         }`}>
           <div className="text-xs font-mono text-stone-500">
             <span>Result: <strong>{totalFeatures.toLocaleString()}</strong> combined features in <strong>{targetCRS}</strong></span>
@@ -449,7 +449,7 @@ export const ConcatenationModal: React.FC<ConcatenationModalProps> = ({
               onClick={onClose}
               disabled={isProcessing}
               className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-700 hover:bg-stone-100' : 'bg-[#201A16] border-stone-700 text-stone-300 hover:bg-stone-800'
+                theme === 'light' ? 'bg-white border-[#C2D2C2] text-stone-700 hover:bg-stone-100' : 'bg-[#15211F] border-stone-700 text-stone-300 hover:bg-stone-800'
               }`}
             >
               Cancel

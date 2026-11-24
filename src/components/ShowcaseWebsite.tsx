@@ -306,10 +306,10 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
   const activeTool = walkthroughTools.find(t => t.id === activeToolId) || walkthroughTools[0];
 
   return (
-    <div className={`flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-y-auto transition-colors font-sans selection:bg-amber-500/20 selection:text-amber-900 ${
+    <div className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-y-auto transition-colors font-sans selection:bg-amber-500/20 selection:text-amber-900 ${
       theme === 'light' 
-        ? 'bg-[#FAF8F5] text-stone-900' 
-        : 'bg-[#13110E] text-[#F5EBE1]'
+        ? 'bg-[#F7FAF5] text-stone-900' 
+        : 'bg-[#0D1413] text-[#EAEEE8]'
     }`}>
       
       {/* 1. TOP ANNOUNCEMENT / CONTEXT BANNER */}
@@ -317,7 +317,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
         aria-label="Walkthrough tutorial banner" 
         className={`border-b px-4 py-2.5 text-xs flex items-center justify-between transition-colors ${
           theme === 'light' 
-            ? 'bg-[#F2ECE3] border-[#E2DBD0] text-stone-700' 
+            ? 'bg-[#E9EEE7] border-[#D4DFD3] text-stone-700' 
             : 'bg-gradient-to-r from-amber-950/80 via-stone-900 to-amber-950/80 border-amber-600/30 text-stone-300'
         }`}
       >
@@ -416,15 +416,15 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
                           ? 'bg-amber-100/90 border-amber-500 shadow-sm ring-2 ring-amber-400/40 text-stone-950 font-bold'
                           : 'bg-amber-950/60 border-amber-500 shadow-md ring-2 ring-amber-500/40 text-white font-bold')
                       : (theme === 'light'
-                          ? 'bg-white border-[#E2DBD0] hover:border-amber-400 hover:bg-stone-50 text-stone-700'
-                          : 'bg-[#181411] border-stone-800 hover:border-stone-700 hover:bg-[#201A16] text-stone-300')
+                          ? 'bg-white border-[#D4DFD3] hover:border-amber-400 hover:bg-stone-50 text-stone-700'
+                          : 'bg-[#101917] border-stone-800 hover:border-stone-700 hover:bg-[#15211F] text-stone-300')
                   }`}
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${
                       isActive
                         ? 'bg-amber-500 text-stone-950'
-                        : theme === 'light' ? 'bg-[#F2ECE3] text-stone-700' : 'bg-stone-800 text-stone-300'
+                        : theme === 'light' ? 'bg-[#E9EEE7] text-stone-700' : 'bg-stone-800 text-stone-300'
                     }`}>
                       <Icon className="w-4 h-4" />
                     </div>
@@ -448,8 +448,8 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
         {/* 4. ACTIVE TOOL DEEP-DIVE WALKTHROUGH CARD */}
         <section className={`rounded-3xl border p-6 sm:p-8 space-y-6 transition-all ${
           theme === 'light'
-            ? 'bg-white border-[#E2DBD0] shadow-sm text-stone-900'
-            : 'bg-[#181411] border-stone-800 shadow-xl text-[#FAF6F0]'
+            ? 'bg-white border-[#D4DFD3] shadow-sm text-stone-900'
+            : 'bg-[#101917] border-stone-800 shadow-xl text-[#F4F8F2]'
         }`}>
           {/* Card Title & Top Actions */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-stone-200 dark:border-stone-800">
@@ -496,7 +496,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
 
           {/* Overview Paragraph */}
           <div className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed border ${
-            theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-700' : 'bg-[#120F0D] border-stone-800 text-stone-300'
+            theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-700' : 'bg-[#0C1312] border-stone-800 text-stone-300'
           }`}>
             <p>{activeTool.summary}</p>
           </div>
@@ -515,7 +515,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
                   <div 
                     key={i} 
                     className={`p-3 rounded-xl border text-xs flex items-start space-x-2.5 ${
-                      theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-800' : 'bg-[#15110E] border-stone-800 text-stone-300'
+                      theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-800' : 'bg-[#0E1514] border-stone-800 text-stone-300'
                     }`}
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -537,7 +537,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
                   <div 
                     key={i} 
                     className={`p-3 rounded-xl border text-xs flex items-start space-x-3 ${
-                      theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-800' : 'bg-[#15110E] border-stone-800 text-stone-300'
+                      theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-800' : 'bg-[#0E1514] border-stone-800 text-stone-300'
                     }`}
                   >
                     <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-mono font-bold text-[11px] flex items-center justify-center shrink-0">
@@ -569,8 +569,8 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
         {/* 5. WINDOWS DESKTOP RELEASE & OFFLINE WEB SECTION (100% THEMED FOR LIGHT & DARK) */}
         <section className={`rounded-3xl border p-6 sm:p-8 space-y-6 transition-colors ${
           theme === 'light'
-            ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-sm'
-            : 'bg-[#181411] border-stone-800 text-[#FAF6F0]'
+            ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-sm'
+            : 'bg-[#101917] border-stone-800 text-[#F4F8F2]'
         }`}>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-stone-200 dark:border-stone-800">
             <div>
@@ -607,7 +607,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
           {/* Specs comparison */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
             <div className={`p-4 rounded-2xl border space-y-2 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0C1312] border-stone-800'
             }`}>
               <div className="text-amber-600 dark:text-amber-400 font-bold flex items-center space-x-1.5">
                 <HardDrive className="w-4 h-4" />
@@ -621,7 +621,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
             </div>
 
             <div className={`p-4 rounded-2xl border space-y-2 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0C1312] border-stone-800'
             }`}>
               <div className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center space-x-1.5">
                 <ShieldCheck className="w-4 h-4" />
@@ -635,7 +635,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
             </div>
 
             <div className={`p-4 rounded-2xl border space-y-2 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0C1312] border-stone-800'
             }`}>
               <div className="text-amber-600 dark:text-amber-400 font-bold flex items-center space-x-1.5">
                 <Cpu className="w-4 h-4" />
@@ -653,8 +653,8 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
         {/* 6. FAQ & GEODETIC TROUBLESHOOTING */}
         <section className={`rounded-3xl border p-6 sm:p-8 space-y-5 transition-colors ${
           theme === 'light'
-            ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-sm'
-            : 'bg-[#181411] border-stone-800 text-[#FAF6F0]'
+            ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-sm'
+            : 'bg-[#101917] border-stone-800 text-[#F4F8F2]'
         }`}>
           <div className="flex items-center space-x-2">
             <HelpCircle className="w-5 h-5 text-amber-500" />
@@ -666,7 +666,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
           <div className="space-y-3 text-xs">
             {/* Q1: Sud_Maroc EPSG 4261 vs 26192 */}
             <details className={`p-3.5 rounded-xl border group transition-colors ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0D1413] border-stone-800'
             }`}>
               <summary className="font-bold cursor-pointer flex items-center justify-between text-stone-800 dark:text-stone-200">
                 <span>{lang === 'fr' 
@@ -690,7 +690,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
 
             {/* Q2: Excel coordinate headers */}
             <details className={`p-3.5 rounded-xl border group transition-colors ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0D1413] border-stone-800'
             }`}>
               <summary className="font-bold cursor-pointer flex items-center justify-between text-stone-800 dark:text-stone-200">
                 <span>{lang === 'fr' 
@@ -709,7 +709,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
 
             {/* Q3: PostGIS credentials */}
             <details className={`p-3.5 rounded-xl border group transition-colors ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0D1413] border-stone-800'
             }`}>
               <summary className="font-bold cursor-pointer flex items-center justify-between text-stone-800 dark:text-stone-200">
                 <span>{lang === 'fr' 
@@ -728,7 +728,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
 
             {/* Q4: Africa zoom & feature zoom */}
             <details className={`p-3.5 rounded-xl border group transition-colors ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0D1413] border-stone-800'
             }`}>
               <summary className="font-bold cursor-pointer flex items-center justify-between text-stone-800 dark:text-stone-200">
                 <span>{lang === 'fr' 
@@ -749,7 +749,7 @@ export const ShowcaseWebsite: React.FC<ShowcaseWebsiteProps> = ({
 
         {/* 7. FOOTER */}
         <footer className={`pt-6 pb-8 border-t flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono transition-colors ${
-          theme === 'light' ? 'border-[#E2DBD0] text-stone-500' : 'border-stone-800 text-stone-400'
+          theme === 'light' ? 'border-[#D4DFD3] text-stone-500' : 'border-stone-800 text-stone-400'
         }`}>
           <div className="flex items-center space-x-2.5">
             <Logo size={22} />

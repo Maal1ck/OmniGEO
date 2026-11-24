@@ -257,12 +257,12 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in-0 duration-150">
       <div className={`relative flex flex-col w-full max-w-6xl max-h-[94vh] rounded-2xl border shadow-2xl overflow-hidden ${
         theme === 'light'
-          ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-900'
-          : 'bg-[#14100D] border-stone-800 text-stone-100'
+          ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-900'
+          : 'bg-[#0D1413] border-stone-800 text-stone-100'
       }`}>
         {/* Top Bar */}
         <div className={`px-6 py-4 border-b flex flex-wrap items-center justify-between gap-3 ${
-          theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#191410] border-stone-800'
+          theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101917] border-stone-800'
         }`}>
           <div className="flex items-center space-x-3">
             <div className="p-2 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30">
@@ -293,7 +293,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
 
         {/* 3-Step Workflow Bar */}
         <div className={`px-6 py-2.5 border-b flex flex-wrap items-center justify-between gap-3 text-xs ${
-          theme === 'light' ? 'bg-[#F5EFE6] border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+          theme === 'light' ? 'bg-[#EBF3E8] border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
         }`}>
           <div className="flex items-center space-x-2">
             {[
@@ -381,7 +381,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                     <select
                       value={newParentId}
                       onChange={(e) => setNewParentId(e.target.value)}
-                      className="w-full rounded-lg px-2.5 py-2 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                      className="w-full rounded-lg px-2.5 py-2 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                     >
                       {datasets.map((d) => (
                         <option key={d.id} value={d.id}>
@@ -398,7 +398,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                     <select
                       value={newChildId}
                       onChange={(e) => setNewChildId(e.target.value)}
-                      className="w-full rounded-lg px-2.5 py-2 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                      className="w-full rounded-lg px-2.5 py-2 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                     >
                       {datasets.map((d) => (
                         <option key={d.id} value={d.id}>
@@ -417,7 +417,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                       value={newFkCol}
                       onChange={(e) => setNewFkCol(e.target.value)}
                       placeholder="id_commune"
-                      className="w-full rounded-lg px-2.5 py-2 bg-[#14100D] border border-stone-700 text-amber-300 font-mono"
+                      className="w-full rounded-lg px-2.5 py-2 bg-[#0D1413] border border-stone-700 text-amber-300 font-mono"
                     />
                   </div>
 
@@ -428,7 +428,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                     <select
                       value={newCardinality}
                       onChange={(e) => setNewCardinality(e.target.value as RelationshipCardinality)}
-                      className="w-full rounded-lg px-2.5 py-2 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                      className="w-full rounded-lg px-2.5 py-2 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                     >
                       <option value="1:N">1:N (0..n -&gt; 1..1)</option>
                       <option value="1:1">1:1 (1..1 -&gt; 1..1)</option>
@@ -445,7 +445,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                     <select
                       value={newMatchMode}
                       onChange={(e) => setNewMatchMode(e.target.value as RelationshipMatchMode)}
-                      className="w-full rounded-lg px-2.5 py-2 bg-[#14100D] border border-stone-700 text-stone-100"
+                      className="w-full rounded-lg px-2.5 py-2 bg-[#0D1413] border border-stone-700 text-stone-100"
                     >
                       <option value="spatial_within">{isFr ? 'Spatial : Contenu dans Parent' : 'Spatial: Within Parent'}</option>
                       <option value="spatial_intersects">{isFr ? 'Spatial : Intersection' : 'Spatial: Intersects'}</option>
@@ -473,7 +473,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                       <select
                         value={newParentMatchField}
                         onChange={(e) => setNewParentMatchField(e.target.value)}
-                        className="w-full rounded-lg px-2.5 py-1.5 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                        className="w-full rounded-lg px-2.5 py-1.5 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                       >
                         {parentDataset.fields.map((f) => (
                           <option key={f.name} value={f.name}>{f.name}</option>
@@ -487,7 +487,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                       <select
                         value={newChildMatchField}
                         onChange={(e) => setNewChildMatchField(e.target.value)}
-                        className="w-full rounded-lg px-2.5 py-1.5 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                        className="w-full rounded-lg px-2.5 py-1.5 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                       >
                         {childDataset.fields.map((f) => (
                           <option key={f.name} value={f.name}>{f.name}</option>
@@ -539,7 +539,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                                 cardinality: e.target.value as RelationshipCardinality,
                               })
                             }
-                            className="rounded-lg px-2 py-1 bg-[#14100D] border border-stone-700 font-mono text-[11px] text-purple-300"
+                            className="rounded-lg px-2 py-1 bg-[#0D1413] border border-stone-700 font-mono text-[11px] text-purple-300"
                           >
                             <option value="1:N">1:N</option>
                             <option value="1:1">1:1</option>
@@ -555,7 +555,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                                 matchMode: e.target.value as RelationshipMatchMode,
                               })
                             }
-                            className="rounded-lg px-2 py-1 bg-[#14100D] border border-stone-700 text-[11px] text-stone-200"
+                            className="rounded-lg px-2 py-1 bg-[#0D1413] border border-stone-700 text-[11px] text-stone-200"
                           >
                             <option value="spatial_within">{isFr ? 'Spatial: Contenu' : 'Spatial: Within'}</option>
                             <option value="spatial_intersects">{isFr ? 'Spatial: Intersection' : 'Spatial: Intersects'}</option>
@@ -569,7 +569,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                             onChange={(e) =>
                               handleUpdateRelationship(rel.id, { fkColumnName: e.target.value })
                             }
-                            className="w-32 rounded-lg px-2 py-1 bg-[#14100D] border border-stone-700 font-mono text-[11px] text-amber-300"
+                            className="w-32 rounded-lg px-2 py-1 bg-[#0D1413] border border-stone-700 font-mono text-[11px] text-amber-300"
                             title="FK Column Name"
                           />
 
@@ -621,7 +621,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center space-x-2">
                           <KeyRound className="w-4 h-4 text-amber-400" />
-                          <span className="font-mono font-bold text-sm text-[#FAF6F0]">{ds.name}</span>
+                          <span className="font-mono font-bold text-sm text-[#F4F8F2]">{ds.name}</span>
                           <span className="text-[11px] font-mono text-stone-400">
                             ({ds.featureCount} {isFr ? 'entités' : 'rows'})
                           </span>
@@ -640,7 +640,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                             type="text"
                             value={cfg.pkColumn}
                             onChange={(e) => updateIdConfig(ds.id, { pkColumn: e.target.value })}
-                            className="w-full rounded-lg px-2.5 py-1.5 bg-[#14100D] border border-stone-700 font-mono text-amber-300"
+                            className="w-full rounded-lg px-2.5 py-1.5 bg-[#0D1413] border border-stone-700 font-mono text-amber-300"
                           />
                         </div>
 
@@ -653,7 +653,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                             onChange={(e) =>
                               updateIdConfig(ds.id, { strategy: e.target.value as IdGenerationStrategy })
                             }
-                            className="w-full rounded-lg px-2.5 py-1.5 bg-[#14100D] border border-stone-700 text-stone-100"
+                            className="w-full rounded-lg px-2.5 py-1.5 bg-[#0D1413] border border-stone-700 text-stone-100"
                           >
                             <option value="keep_existing">{isFr ? 'Conserver existant (+ completer vides)' : 'Keep Existing (+ fill blanks)'}</option>
                             <option value="auto_increment">{isFr ? 'Séquence numérique (1, 2, 3...)' : 'Auto-Increment (1, 2, 3...)'}</option>
@@ -672,7 +672,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                               type="text"
                               value={cfg.prefix || ''}
                               onChange={(e) => updateIdConfig(ds.id, { prefix: e.target.value })}
-                              className="w-full rounded-lg px-2.5 py-1.5 bg-[#14100D] border border-stone-700 font-mono text-stone-100"
+                              className="w-full rounded-lg px-2.5 py-1.5 bg-[#0D1413] border border-stone-700 font-mono text-stone-100"
                             />
                           </div>
                         )}
@@ -685,7 +685,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                             <select
                               value={cfg.sourceField || ''}
                               onChange={(e) => updateIdConfig(ds.id, { sourceField: e.target.value })}
-                              className="w-full rounded-lg px-2.5 py-1.5 bg-[#14100D] border border-stone-700 font-mono text-stone-100"
+                              className="w-full rounded-lg px-2.5 py-1.5 bg-[#0D1413] border border-stone-700 font-mono text-stone-100"
                             >
                               {ds.fields.map((f) => (
                                 <option key={f.name} value={f.name}>{f.name}</option>
@@ -705,7 +705,7 @@ export const RelationshipMapperModal: React.FC<RelationshipMapperModalProps> = (
                               onChange={(e) =>
                                 updateIdConfig(ds.id, { startAt: parseInt(e.target.value, 10) || 1 })
                               }
-                              className="w-full rounded-lg px-2.5 py-1.5 bg-[#14100D] border border-stone-700 font-mono text-stone-100"
+                              className="w-full rounded-lg px-2.5 py-1.5 bg-[#0D1413] border border-stone-700 font-mono text-stone-100"
                             />
                           </div>
                         )}

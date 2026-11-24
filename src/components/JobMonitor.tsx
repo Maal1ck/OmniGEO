@@ -130,13 +130,13 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3.5rem)] overflow-y-auto bg-[#13110E] p-6 space-y-6 text-[#F5EBE1]">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-y-auto bg-[#0D1413] p-6 space-y-6 text-[#EAEEE8]">
       {/* Top Batch Execution Overview */}
       <div className="glass-panel rounded-2xl p-6 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="text-base font-display font-bold text-[#FAF6F0] flex items-center space-x-2">
+              <h1 className="text-base font-display font-bold text-[#F4F8F2] flex items-center space-x-2">
                 <Activity className="w-4 h-4 text-amber-400" />
                 <span>Batch Execution Monitor & Pipeline Telemetry</span>
               </h1>
@@ -257,7 +257,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
         <div className="space-y-2">
           <div className="flex justify-between text-xs font-mono">
             <span className="text-stone-400">
-              Batch Progress: <span className="text-[#FAF6F0] font-bold tabular-nums">{progressPercent}%</span> ({completed + completedWarnings + failed} / {total} files completed)
+              Batch Progress: <span className="text-[#F4F8F2] font-bold tabular-nums">{progressPercent}%</span> ({completed + completedWarnings + failed} / {total} files completed)
             </span>
             <span className="text-amber-400 font-semibold flex items-center space-x-1.5">
               {running > 0 ? (
@@ -272,7 +272,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
               )}
             </span>
           </div>
-          <div className="h-3 w-full bg-[#100D0B] rounded-full overflow-hidden border border-stone-800 p-0.5 shadow-inner">
+          <div className="h-3 w-full bg-[#0B100F] rounded-full overflow-hidden border border-stone-800 p-0.5 shadow-inner">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
                 failed > 0
@@ -288,7 +288,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
           <div className="p-3 bg-stone-900/60 border border-stone-800 border-t-2 border-t-amber-500 rounded-xl text-center font-mono shadow-sm">
             <span className="text-stone-400 text-[10px] block uppercase tracking-wider">Total Files</span>
-            <span className="text-base font-bold text-[#FAF6F0] mt-0.5 block tabular-nums">{total}</span>
+            <span className="text-base font-bold text-[#F4F8F2] mt-0.5 block tabular-nums">{total}</span>
           </div>
           <div className="p-3 bg-stone-900/60 border border-stone-800 border-t-2 border-t-emerald-500 rounded-xl text-center font-mono shadow-sm">
             <span className="text-stone-400 text-[10px] block uppercase tracking-wider">Completed</span>
@@ -373,7 +373,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
                       <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center space-x-2 min-w-0">
                           <span 
-                            className="font-bold text-[#FAF6F0] font-sans text-xs truncate max-w-[170px] sm:max-w-xs md:max-w-md shrink-1"
+                            className="font-bold text-[#F4F8F2] font-sans text-xs truncate max-w-[170px] sm:max-w-xs md:max-w-md shrink-1"
                             title={job.inputDatasetName}
                           >
                             {job.inputDatasetName}
@@ -527,7 +527,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
 
                   {/* Expanded Execution Logs */}
                   {isExpanded && (
-                    <div className="bg-[#100D0B] border-t border-stone-800 p-4 space-y-3 font-mono text-xs">
+                    <div className="bg-[#0B100F] border-t border-stone-800 p-4 space-y-3 font-mono text-xs">
                       <div className="flex items-center justify-between text-stone-400 pb-2 border-b border-stone-800">
                         <span className="text-[11px] uppercase font-bold text-stone-300">
                           Execution Pipeline Log ({job.logs.length} events)

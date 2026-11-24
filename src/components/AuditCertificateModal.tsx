@@ -61,16 +61,16 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="bg-[#181411] border border-stone-700/80 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-[#101917] border border-stone-700/80 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#110E0C]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#0B1210]">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-amber-500/15 rounded-xl text-amber-400 border border-amber-500/30">
               <Award className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="font-display font-bold text-[#FAF6F0] text-base">Certified Geospatial QA/QC Audit Certificate</h3>
+                <h3 className="font-display font-bold text-[#F4F8F2] text-base">Certified Geospatial QA/QC Audit Certificate</h3>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-600/40">
                   Cryptographically Sealed
                 </span>
@@ -104,7 +104,7 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
         </div>
 
         {/* Certificate Display Canvas */}
-        <div className="flex-1 overflow-y-auto p-6 bg-[#13110E] font-sans text-xs space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 bg-[#0D1413] font-sans text-xs space-y-6">
           {/* Certificate Badge & Title Block */}
           <div className="p-6 rounded-2xl bg-stone-900/80 border border-stone-800 flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
@@ -120,7 +120,7 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
               <p className="text-xs text-stone-400 mt-1">Generated: {new Date(reportData.generatedAt).toLocaleString()}</p>
             </div>
 
-            <div className="flex items-center space-x-3 bg-[#110E0C] p-3 rounded-xl border border-stone-800 font-mono">
+            <div className="flex items-center space-x-3 bg-[#0B1210] p-3 rounded-xl border border-stone-800 font-mono">
               <ShieldCheck className="w-8 h-8 text-emerald-400" />
               <div>
                 <span className="text-[10px] text-stone-500 uppercase block font-bold">Compliance Status</span>
@@ -135,7 +135,7 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono">
             <div className="p-3.5 bg-stone-900/60 rounded-xl border border-stone-800 text-center">
               <span className="text-[10px] text-stone-400 uppercase block">Total Features</span>
-              <span className="text-lg font-bold text-[#FAF6F0] tabular-nums mt-0.5 block">{reportData.validationMetrics.totalFeatures.toLocaleString()}</span>
+              <span className="text-lg font-bold text-[#F4F8F2] tabular-nums mt-0.5 block">{reportData.validationMetrics.totalFeatures.toLocaleString()}</span>
             </div>
             <div className="p-3.5 bg-stone-900/60 rounded-xl border border-stone-800 text-center">
               <span className="text-[10px] text-stone-400 uppercase block">Geometry Validity</span>
@@ -160,7 +160,7 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
 
             <div className="space-y-1.5 max-h-48 overflow-y-auto">
               {Object.entries(reportData.outputSha256Checksums).map(([file, hash]) => (
-                <div key={file} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2.5 rounded-lg bg-[#110E0C] border border-stone-800 text-[11px] gap-2">
+                <div key={file} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2.5 rounded-lg bg-[#0B1210] border border-stone-800 text-[11px] gap-2">
                   <span className="font-semibold text-stone-200">{file}</span>
                   <span className="text-stone-400 text-[10px] truncate max-w-md">{hash}</span>
                   <span className="px-2 py-0.5 rounded-md bg-emerald-950/80 text-emerald-300 border border-emerald-600/40 text-[9px] font-bold">
@@ -199,7 +199,7 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-stone-800 bg-[#110E0C] flex items-center justify-between text-xs text-stone-400">
+        <div className="px-6 py-3 border-t border-stone-800 bg-[#0B1210] flex items-center justify-between text-xs text-stone-400">
           <span>Certificate generated by OmniGeo by Maodo Engine v1.0.0</span>
           <button
             onClick={onClose}

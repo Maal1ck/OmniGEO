@@ -328,13 +328,13 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
       <div 
         className={`w-full max-w-4xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${
           theme === 'light'
-            ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-amber-950/20'
-            : 'bg-[#181411] border-stone-800 text-stone-100 shadow-stone-950/90'
+            ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-amber-950/20'
+            : 'bg-[#101917] border-stone-800 text-stone-100 shadow-stone-950/90'
         }`}
       >
         {/* Modal Header */}
         <div className={`p-4 border-b flex items-center justify-between ${
-          theme === 'light' ? 'bg-[#F8F6F1] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+          theme === 'light' ? 'bg-[#F3F8F1] border-[#D4DFD3]' : 'bg-[#0C1412] border-stone-800'
         }`}>
           <div className="flex items-center space-x-2.5">
             <div className="p-2 rounded-xl bg-emerald-950/80 border border-emerald-600/50 text-emerald-400">
@@ -374,7 +374,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
           {/* 1. MULTI-SHEET SELECTOR & CONFIGURATION TABS (if workbook has multiple sheets) */}
           {Object.keys(sheetConfigs).length > 1 && (
             <div className={`p-3.5 rounded-2xl border space-y-3 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0D1413] border-stone-800'
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-stone-200 dark:border-stone-800">
                 <div className="flex items-center space-x-2">
@@ -424,10 +424,10 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                           : cfg.selected
                             ? (theme === 'light'
                                 ? 'bg-white border-emerald-300 hover:border-emerald-400 text-stone-800'
-                                : 'bg-[#181411] border-emerald-800/60 hover:border-emerald-600 text-stone-200')
+                                : 'bg-[#101917] border-emerald-800/60 hover:border-emerald-600 text-stone-200')
                             : (theme === 'light'
-                                ? 'bg-[#F2ECE3]/60 border-stone-300/70 text-stone-400 opacity-60'
-                                : 'bg-[#120F0D] border-stone-800/60 text-stone-500 opacity-60')
+                                ? 'bg-[#E9EEE7]/60 border-stone-300/70 text-stone-400 opacity-60'
+                                : 'bg-[#0C1312] border-stone-800/60 text-stone-500 opacity-60')
                       }`}
                     >
                       {/* Checkbox & Details */}
@@ -503,7 +503,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
           {/* 2. ACTIVE SHEET CONFIGURATION CARD */}
           {activeConfig && (
             <div className={`p-4 rounded-2xl border space-y-4 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#15110E] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0E1514] border-stone-800'
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-stone-200 dark:border-stone-800">
                 <div className="flex items-center space-x-2">
@@ -555,7 +555,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                     value={activeConfig.outputName}
                     onChange={(e) => updateActiveConfig({ outputName: e.target.value })}
                     className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 ${
-                      theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                      theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                     }`}
                   />
                 </div>
@@ -565,7 +565,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                     {lang === 'fr' ? 'Type d’ingestion pour cette feuille :' : 'Ingestion Mode for this Sheet :'}
                   </label>
                   <div className={`grid grid-cols-2 gap-1 p-1 rounded-xl border ${
-                    theme === 'light' ? 'bg-[#EFEAE2] border-[#DCD5C9]' : 'bg-[#120F0D] border-stone-800'
+                    theme === 'light' ? 'bg-[#E7ECE5] border-[#CCDACB]' : 'bg-[#0C1312] border-stone-800'
                   }`}>
                     <button
                       type="button"
@@ -622,7 +622,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Longitude (X) Column */}
                 <div className={`p-3 rounded-xl border space-y-1.5 ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0C1312] border-stone-800'
                 }`}>
                   <div className="flex items-center space-x-1.5">
                     <MapPin className="w-3.5 h-3.5 text-emerald-500" />
@@ -634,7 +634,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                     value={activeConfig.xCol}
                     onChange={(e) => updateActiveConfig({ xCol: e.target.value })}
                     className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-emerald-500 ${
-                      theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#181411] border-stone-700'
+                      theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#101917] border-stone-700'
                     }`}
                   >
                     <option value="">-- {lang === 'fr' ? 'Sélectionner la colonne Longitude' : 'Select Longitude Column'} --</option>
@@ -649,7 +649,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
 
                 {/* Latitude (Y) Column */}
                 <div className={`p-3 rounded-xl border space-y-1.5 ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0C1312] border-stone-800'
                 }`}>
                   <div className="flex items-center space-x-1.5">
                     <MapPin className="w-3.5 h-3.5 text-amber-500" />
@@ -661,7 +661,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                     value={activeConfig.yCol}
                     onChange={(e) => updateActiveConfig({ yCol: e.target.value })}
                     className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 ${
-                      theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#181411] border-stone-700'
+                      theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#101917] border-stone-700'
                     }`}
                   >
                     <option value="">-- {lang === 'fr' ? 'Sélectionner la colonne Latitude' : 'Select Latitude Column'} --</option>
@@ -679,7 +679,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
               {/* Coordinate Reference System (CRS) Selection for this sheet (spatial mode only) */}
               {!activeConfig.isNonSpatial && (
               <div className={`p-3.5 rounded-xl border space-y-2.5 ${
-                theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+                theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0C1312] border-stone-800'
               }`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center space-x-2">
@@ -692,7 +692,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                   {/* Tabs */}
                   <div className="flex items-center space-x-1.5">
                     <div className={`flex items-center p-0.5 rounded-lg border text-[11px] font-mono ${
-                      theme === 'light' ? 'bg-[#EFEAE2] border-[#DCD5C9]' : 'bg-[#181411] border-stone-800'
+                      theme === 'light' ? 'bg-[#E7ECE5] border-[#CCDACB]' : 'bg-[#101917] border-stone-800'
                     }`}>
                       <button
                         type="button"
@@ -729,8 +729,8 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                       onClick={() => setIsFullCRSModalOpen(true)}
                       className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-[11px] font-mono transition-colors ${
                         theme === 'light'
-                          ? 'bg-white border-[#D6CEBE] text-stone-700 hover:bg-[#F2ECE3]'
-                          : 'bg-[#181411] border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800'
+                          ? 'bg-white border-[#C2D2C2] text-stone-700 hover:bg-[#E9EEE7]'
+                          : 'bg-[#101917] border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800'
                       }`}
                       title="Open full CRS Registry dialog"
                     >
@@ -743,8 +743,8 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                 {/* Currently Active Selected CRS Badge Card */}
                 <div className={`p-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
                   theme === 'light'
-                    ? 'bg-[#FAF8F5] border-amber-300/80 shadow-xs'
-                    : 'bg-[#181411] border-amber-600/40 shadow-inner'
+                    ? 'bg-[#F7FAF5] border-amber-300/80 shadow-xs'
+                    : 'bg-[#101917] border-amber-600/40 shadow-inner'
                 }`}>
                   <div className="flex items-center space-x-3 min-w-0">
                     <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-500 font-mono font-bold text-xs border border-amber-500/30 shrink-0">
@@ -783,8 +783,8 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                           placeholder="Search 6,900+ CRS (e.g. 4261, 26192, 2154, 4326, Merchich, Lambert)..."
                           className={`w-full rounded-xl pl-9 pr-8 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 transition-colors ${
                             theme === 'light'
-                              ? 'bg-stone-50 border-[#D6CEBE] text-stone-900 placeholder-stone-400'
-                              : 'bg-[#181411] border-stone-700 text-stone-100 placeholder-stone-500'
+                              ? 'bg-stone-50 border-[#C2D2C2] text-stone-900 placeholder-stone-400'
+                              : 'bg-[#101917] border-stone-700 text-stone-100 placeholder-stone-500'
                           }`}
                         />
                         {crsSearchQuery && (
@@ -799,7 +799,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                       </div>
 
                       <div className={`flex items-center p-0.5 rounded-xl border text-[10px] font-mono self-start sm:self-auto ${
-                        theme === 'light' ? 'bg-[#EFEAE2] border-[#DCD5C9]' : 'bg-[#181411] border-stone-800'
+                        theme === 'light' ? 'bg-[#E7ECE5] border-[#CCDACB]' : 'bg-[#101917] border-stone-800'
                       }`}>
                         {(['all', 'geographic', 'projected'] as const).map(type => (
                           <button
@@ -823,8 +823,8 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                     {/* Scrollable Results List */}
                     <div className={`max-h-36 overflow-y-auto rounded-xl border divide-y ${
                       theme === 'light'
-                        ? 'bg-white border-[#E2DBD0] divide-[#F0EBE3]'
-                        : 'bg-[#181411] border-stone-800 divide-stone-800/60'
+                        ? 'bg-white border-[#D4DFD3] divide-[#E8EDE6]'
+                        : 'bg-[#101917] border-stone-800 divide-stone-800/60'
                     }`}>
                       {searchResults.length > 0 ? (
                         searchResults.map(crs => {
@@ -836,9 +836,9 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                               className={`p-2 flex items-center justify-between cursor-pointer transition-colors ${
                                 isSelected
                                   ? theme === 'light'
-                                    ? 'bg-[#FEF3C7] text-stone-900 font-bold'
+                                    ? 'bg-[#FBE6CA] text-stone-900 font-bold'
                                     : 'bg-amber-950/40 text-amber-200 font-semibold'
-                                  : theme === 'light' ? 'hover:bg-[#FAF6F0]' : 'hover:bg-stone-900/60'
+                                  : theme === 'light' ? 'hover:bg-[#F4F8F2]' : 'hover:bg-stone-900/60'
                               }`}
                             >
                               <div className="flex items-center space-x-2.5 min-w-0 flex-1 pr-2">
@@ -901,8 +901,8 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                             isSelected
                               ? 'border-amber-500 bg-amber-950/40 text-amber-200 shadow-xs'
                               : theme === 'light'
-                              ? 'bg-stone-50 border-[#E2DBD0] hover:border-amber-400/80 text-stone-800'
-                              : 'bg-[#181411] border-stone-800 hover:border-stone-700 text-stone-300'
+                              ? 'bg-stone-50 border-[#D4DFD3] hover:border-amber-400/80 text-stone-800'
+                              : 'bg-[#101917] border-stone-800 hover:border-stone-700 text-stone-300'
                           }`}
                         >
                           <div className="flex items-center justify-between">
@@ -927,11 +927,11 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                     : `Data Preview for "${activeConfig.sheetName}" (${Math.min(4, activeConfig.previewRows.length)} rows) :`}
                 </span>
                 <div className={`rounded-xl border overflow-x-auto ${
-                  theme === 'light' ? 'border-[#E2DBD0]' : 'border-stone-800/80'
+                  theme === 'light' ? 'border-[#D4DFD3]' : 'border-stone-800/80'
                 }`}>
                   {activeConfig.isNonSpatial ? (
                     <table className="w-full text-left text-[11px] font-mono border-collapse">
-                      <thead className={theme === 'light' ? 'bg-[#F2EFEA]' : 'bg-[#120F0D]'}>
+                      <thead className={theme === 'light' ? 'bg-[#ECF3E9]' : 'bg-[#0C1312]'}>
                         <tr>
                           <th className="p-2 text-stone-400 font-medium border-b border-stone-200 dark:border-stone-800">#</th>
                           {activeConfig.headers.slice(0, 6).map((h) => (
@@ -964,7 +964,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
                     </table>
                   ) : (
                   <table className="w-full text-left text-[11px] font-mono border-collapse">
-                    <thead className={theme === 'light' ? 'bg-[#F2EFEA]' : 'bg-[#120F0D]'}>
+                    <thead className={theme === 'light' ? 'bg-[#ECF3E9]' : 'bg-[#0C1312]'}>
                       <tr>
                         <th className="p-2 text-stone-400 font-medium border-b border-stone-200 dark:border-stone-800">#</th>
                         <th className="p-2 text-emerald-600 dark:text-emerald-400 font-bold border-b border-stone-200 dark:border-stone-800">
@@ -1013,7 +1013,7 @@ export const ExcelCoordinateModal: React.FC<ExcelCoordinateModalProps> = ({
 
         {/* Modal Footer */}
         <div className={`p-4 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-          theme === 'light' ? 'bg-[#F8F6F1] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+          theme === 'light' ? 'bg-[#F3F8F1] border-[#D4DFD3]' : 'bg-[#0C1412] border-stone-800'
         }`}>
           <div className="text-xs font-mono text-stone-500">
             {Object.keys(sheetConfigs).length > 1 ? (

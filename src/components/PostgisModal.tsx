@@ -160,13 +160,13 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
       <div 
         className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden transition-colors ${
           theme === 'light'
-            ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-900 shadow-stone-500/20'
-            : 'bg-[#181411] border-stone-800 text-stone-100 shadow-stone-950/80'
+            ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-900 shadow-stone-500/20'
+            : 'bg-[#101917] border-stone-800 text-stone-100 shadow-stone-950/80'
         }`}
       >
         {/* Header */}
         <div className={`px-6 py-4 border-b flex items-center justify-between ${
-          theme === 'light' ? 'border-[#EBE5DC] bg-white' : 'border-stone-800/80 bg-[#1F1915]'
+          theme === 'light' ? 'border-[#E1E8DF] bg-white' : 'border-stone-800/80 bg-[#14201D]'
         }`}>
           <div className="flex items-center space-x-3">
             <div className={`p-2 rounded-xl ${
@@ -227,7 +227,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                 value={selectedDatasetId}
                 onChange={(e) => setSelectedDatasetId(e.target.value)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-lg border font-mono ${
-                  theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                  theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                 }`}
               >
                 {datasets.map(d => (
@@ -260,7 +260,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                 value={schemaName}
                 onChange={(e) => setSchemaName(e.target.value)}
                 className={`w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border ${
-                  theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                  theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                 }`}
               />
             </div>
@@ -274,7 +274,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                 value={tableName}
                 onChange={(e) => setTableName(e.target.value)}
                 className={`w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border ${
-                  theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                  theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                 }`}
               />
             </div>
@@ -288,7 +288,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                 value={geomColumnName}
                 onChange={(e) => setGeomColumnName(e.target.value)}
                 className={`w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border ${
-                  theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                  theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                 }`}
               />
             </div>
@@ -313,7 +313,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                   value={srid}
                   onChange={(e) => setSrid(parseInt(e.target.value, 10) || 4326)}
                   className={`w-20 px-2 py-1.5 text-xs font-mono rounded-lg border font-bold text-center ${
-                    theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                    theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                   }`}
                   title="Direct numeric EPSG code"
                 />
@@ -322,8 +322,8 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                   onClick={() => setIsCrsSearchOpen(true)}
                   className={`flex-1 flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
                     theme === 'light'
-                      ? 'bg-white border-[#D6CEBE] text-stone-800 hover:bg-stone-50 hover:border-amber-400'
-                      : 'bg-[#120F0D] border-stone-700 text-stone-200 hover:bg-stone-800 hover:border-amber-500'
+                      ? 'bg-white border-[#C2D2C2] text-stone-800 hover:bg-stone-50 hover:border-amber-400'
+                      : 'bg-[#0C1312] border-stone-700 text-stone-200 hover:bg-stone-800 hover:border-amber-500'
                   }`}
                   title="Search from all 6,900+ EPSG CRS database"
                 >
@@ -451,7 +451,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                   {/* Step 1 */}
                   <div className={`p-3.5 rounded-xl border flex flex-col justify-between ${
-                    theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#14100E] border-stone-800'
+                    theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'
                   }`}>
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
@@ -469,7 +469,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
                   {/* Step 2 */}
                   <div className={`p-3.5 rounded-xl border flex flex-col justify-between ${
-                    theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#14100E] border-stone-800'
+                    theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'
                   }`}>
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
@@ -493,7 +493,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
                   {/* Step 3 */}
                   <div className={`p-3.5 rounded-xl border flex flex-col justify-between ${
-                    theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#14100E] border-stone-800'
+                    theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'
                   }`}>
                     <div>
                       <div className="flex items-center space-x-2 mb-2">
@@ -523,7 +523,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
               {/* SQL Preview collapse/peek */}
               <div className={`p-3.5 rounded-xl border ${
-                theme === 'light' ? 'bg-stone-50/80 border-[#E2DBD0]' : 'bg-[#100D0B] border-stone-800'
+                theme === 'light' ? 'bg-stone-50/80 border-[#D4DFD3]' : 'bg-[#0B100F] border-stone-800'
               }`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[11px] font-mono font-bold uppercase text-stone-500">
@@ -556,7 +556,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                     className={`flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                       copiedSection === 'sql'
                         ? 'bg-emerald-600 text-white border-emerald-600'
-                        : theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-800 hover:bg-stone-100' : 'bg-[#201A16] border-stone-700 text-stone-200 hover:bg-stone-800'
+                        : theme === 'light' ? 'bg-white border-[#C2D2C2] text-stone-800 hover:bg-stone-100' : 'bg-[#15211F] border-stone-700 text-stone-200 hover:bg-stone-800'
                     }`}
                   >
                     {copiedSection === 'sql' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -574,8 +574,8 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
               <div className={`p-4 rounded-xl font-mono text-xs max-h-72 overflow-y-auto border whitespace-pre select-all ${
                 theme === 'light'
-                  ? 'bg-white border-[#E2DBD0] text-stone-800'
-                  : 'bg-[#100D0B] border-stone-800 text-stone-300'
+                  ? 'bg-white border-[#D4DFD3] text-stone-800'
+                  : 'bg-[#0B100F] border-stone-800 text-stone-300'
               }`}>
                 {generatedSql}
               </div>
@@ -660,7 +660,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                   </button>
                 </div>
                 <div className={`p-3 rounded-xl font-mono text-xs border ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#100D0B] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0B100F] border-stone-800'
                 }`}>
                   {psqlSnippet}
                 </div>
@@ -681,7 +681,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                   </button>
                 </div>
                 <div className={`p-3 rounded-xl font-mono text-xs border overflow-x-auto whitespace-pre ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#100D0B] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0B100F] border-stone-800'
                 }`}>
                   {ogr2ogrSnippet}
                 </div>
@@ -773,7 +773,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                     className={`flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                       copiedSection === 'python'
                         ? 'bg-emerald-600 text-white border-emerald-600'
-                        : theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-800 hover:bg-stone-100' : 'bg-[#201A16] border-stone-700 text-stone-200 hover:bg-stone-800'
+                        : theme === 'light' ? 'bg-white border-[#C2D2C2] text-stone-800 hover:bg-stone-100' : 'bg-[#15211F] border-stone-700 text-stone-200 hover:bg-stone-800'
                     }`}
                   >
                     {copiedSection === 'python' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -783,8 +783,8 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
                 <div className={`p-4 rounded-xl font-mono text-xs max-h-72 overflow-y-auto border whitespace-pre select-all ${
                   theme === 'light'
-                    ? 'bg-white border-[#E2DBD0] text-stone-800'
-                    : 'bg-[#100D0B] border-stone-800 text-stone-300'
+                    ? 'bg-white border-[#D4DFD3] text-stone-800'
+                    : 'bg-[#0B100F] border-stone-800 text-stone-300'
                 }`}>
                   {pythonSnippet}
                 </div>
@@ -795,7 +795,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
         {/* Footer */}
         <div className={`px-6 py-4 border-t flex items-center justify-between ${
-          theme === 'light' ? 'border-[#EBE5DC] bg-[#FAF8F5]' : 'border-stone-800 bg-[#1A1512]'
+          theme === 'light' ? 'border-[#E1E8DF] bg-[#F7FAF5]' : 'border-stone-800 bg-[#111B19]'
         }`}>
           <div className="text-xs font-mono text-stone-500">
             Exporting <strong>{tableName}</strong> to PostGIS ({activeDataset?.featureCount || 0} features)
@@ -805,7 +805,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
             type="button"
             onClick={onClose}
             className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-              theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-700 hover:bg-stone-100' : 'bg-[#201A16] border-stone-700 text-stone-300 hover:bg-stone-800'
+              theme === 'light' ? 'bg-white border-[#C2D2C2] text-stone-700 hover:bg-stone-100' : 'bg-[#15211F] border-stone-700 text-stone-300 hover:bg-stone-800'
             }`}
           >
             Close
@@ -819,13 +819,13 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
           <div 
             className={`w-full max-w-2xl max-h-[85vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden transition-colors ${
               theme === 'light'
-                ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900'
-                : 'bg-[#181411] border-stone-700 text-[#FAF6F0]'
+                ? 'bg-[#F7FAF5] border-[#C2D2C2] text-stone-900'
+                : 'bg-[#101917] border-stone-700 text-[#F4F8F2]'
             }`}
           >
             {/* Header */}
             <div className={`p-4 border-b flex items-center justify-between ${
-              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3]' : 'border-stone-800 bg-[#14100D]'
+              theme === 'light' ? 'border-[#D4DFD3] bg-[#E9EEE7]' : 'border-stone-800 bg-[#0D1413]'
             }`}>
               <div className="flex items-center space-x-2.5">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-500">
@@ -853,7 +853,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
             {/* Search Input Bar */}
             <div className={`p-4 border-b space-y-3 ${
-              theme === 'light' ? 'border-[#E2DBD0] bg-white' : 'border-stone-800 bg-[#120F0D]'
+              theme === 'light' ? 'border-[#D4DFD3] bg-white' : 'border-stone-800 bg-[#0C1312]'
             }`}>
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -865,8 +865,8 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                   placeholder="Search by EPSG (4261, 26192, 4326, 2154), name (Merchich, Lambert, UTM), or area..."
                   className={`w-full pl-9 pr-8 py-2 text-xs font-mono rounded-xl border focus:outline-none focus:ring-2 focus:ring-amber-500 ${
                     theme === 'light'
-                      ? 'bg-stone-50 border-[#D6CEBE] text-stone-900 placeholder:text-stone-400'
-                      : 'bg-[#181411] border-stone-700 text-stone-100 placeholder:text-stone-500'
+                      ? 'bg-stone-50 border-[#C2D2C2] text-stone-900 placeholder:text-stone-400'
+                      : 'bg-[#101917] border-stone-700 text-stone-100 placeholder:text-stone-500'
                   }`}
                 />
                 {crsQuery && (
@@ -934,7 +934,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                         isCurrent
                           ? (theme === 'light'
                               ? 'bg-amber-100/90 border border-amber-400 text-stone-950 shadow-xs'
-                              : 'bg-amber-950/40 border border-amber-500/60 text-[#FAF6F0]')
+                              : 'bg-amber-950/40 border border-amber-500/60 text-[#F4F8F2]')
                           : (theme === 'light'
                               ? 'hover:bg-stone-100 text-stone-800'
                               : 'hover:bg-stone-850 text-stone-300')
@@ -974,7 +974,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                           <span className={`text-[11px] font-mono px-2.5 py-1 rounded-lg border transition-colors ${
                             theme === 'light'
                               ? 'bg-white border-stone-300 text-stone-700 hover:bg-amber-50 hover:border-amber-400'
-                              : 'bg-[#201A16] border-stone-700 text-stone-300 hover:bg-stone-800 hover:border-amber-500'
+                              : 'bg-[#15211F] border-stone-700 text-stone-300 hover:bg-stone-800 hover:border-amber-500'
                           }`}>
                             Choose
                           </span>
@@ -988,7 +988,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
             {/* Results Footer Counter */}
             <div className={`p-3 border-t flex items-center justify-between text-[11px] font-mono ${
-              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3] text-stone-600' : 'border-stone-800 bg-[#14100D] text-stone-400'
+              theme === 'light' ? 'border-[#D4DFD3] bg-[#E9EEE7] text-stone-600' : 'border-stone-800 bg-[#0D1413] text-stone-400'
             }`}>
               <span>Showing {matchingCrsList.length} matches (from 6,942 EPSG database)</span>
               <button

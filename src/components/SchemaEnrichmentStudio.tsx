@@ -455,22 +455,22 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
     (engine === 'sql' && sqlMode === 'alter_and_update');
 
   // Shared surface styles (single-elevation, hairline borders, high contrast in both themes)
-  const panelBg = isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#181411] border-white/[0.08]';
-  const subSurface = isLight ? 'bg-[#F8F6F1] border-[#E2DBD0]' : 'bg-[#13110E] border-white/[0.08]';
+  const panelBg = isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#101917] border-white/[0.08]';
+  const subSurface = isLight ? 'bg-[#F3F8F1] border-[#D4DFD3]' : 'bg-[#0D1413] border-white/[0.08]';
   const inputCls = isLight
-    ? 'bg-white border-[#D6CEBE] text-stone-900 placeholder-stone-400 focus:border-amber-600 focus:outline-none'
-    : 'bg-[#120F0D] border-stone-700/80 text-stone-100 placeholder-stone-500 focus:border-amber-500 focus:outline-none';
+    ? 'bg-white border-[#C2D2C2] text-stone-900 placeholder-stone-400 focus:border-amber-600 focus:outline-none'
+    : 'bg-[#0C1312] border-stone-700/80 text-stone-100 placeholder-stone-500 focus:border-amber-500 focus:outline-none';
   const mutedText = isLight ? 'text-stone-500' : 'text-stone-400';
   const labelText = isLight ? 'text-stone-700' : 'text-stone-300';
 
   // Empty state when no dataset is imported
   if (!sourceDataset) {
     return (
-      <div className={`flex-1 flex items-center justify-center p-8 overflow-y-auto ${isLight ? 'bg-[#F8F6F1]' : 'bg-[#13110E]'}`}>
+      <div className={`flex-1 flex items-center justify-center p-8 overflow-y-auto ${isLight ? 'bg-[#F3F8F1]' : 'bg-[#0D1413]'}`}>
         <div className={`max-w-xl w-full rounded-xl border p-8 ${panelBg}`}>
           <div className="flex items-center gap-3 mb-4">
             <div className={`w-10 h-10 rounded-lg border flex items-center justify-center ${
-              isLight ? 'bg-[#FAF6EE] border-[#E2DBD0] text-amber-700' : 'bg-[#201A15] border-white/[0.08] text-amber-400'
+              isLight ? 'bg-[#F3F7F1] border-[#D4DFD3] text-amber-700' : 'bg-[#15201E] border-white/[0.08] text-amber-400'
             }`}>
               <FileCode2 className="w-5 h-5" />
             </div>
@@ -516,7 +516,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
           <button
             type="button"
             onClick={onGoToWorkspace}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#A87945] px-4 py-2.5 text-xs font-semibold text-stone-950 hover:bg-[#B98953] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#A3694A] px-4 py-2.5 text-xs font-semibold text-stone-950 hover:bg-[#B47858] transition-colors cursor-pointer"
           >
             <FolderInput className="w-4 h-4" />
             <span>{isFr ? 'Importer un fichier dans l\'Espace de Travail' : 'Import a Dataset in Workspace'}</span>
@@ -531,14 +531,14 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
   const missingCount = columns.filter((c) => !c.existsInTarget).length;
 
   return (
-    <div className={`flex-1 flex flex-col overflow-hidden ${isLight ? 'bg-[#F8F6F1] text-stone-900' : 'bg-[#13110E] text-stone-100'}`}>
+    <div className={`flex-1 flex flex-col overflow-hidden ${isLight ? 'bg-[#F3F8F1] text-stone-900' : 'bg-[#0D1413] text-stone-100'}`}>
       {/* Top Action & Context Bar */}
       <div className={`shrink-0 border-b px-5 py-3 flex flex-wrap items-center justify-between gap-4 ${
-        isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#181411] border-white/[0.08]'
+        isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#101917] border-white/[0.08]'
       }`}>
         <div className="flex items-center gap-3 min-w-0">
           <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 ${
-            isLight ? 'bg-[#FAF6EE] border-[#E2DBD0] text-amber-700' : 'bg-[#201A15] border-white/[0.08] text-amber-400'
+            isLight ? 'bg-[#F3F7F1] border-[#D4DFD3] text-amber-700' : 'bg-[#15201E] border-white/[0.08] text-amber-400'
           }`}>
             <FileCode2 className="w-4 h-4" />
           </div>
@@ -578,7 +578,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
               onClick={() => setEngine('arcpy')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                 engine === 'arcpy'
-                  ? 'bg-[#A87945] text-stone-950 font-semibold'
+                  ? 'bg-[#A3694A] text-stone-950 font-semibold'
                   : isLight
                     ? 'text-stone-600 hover:text-stone-950'
                     : 'text-stone-400 hover:text-stone-100'
@@ -592,7 +592,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
               onClick={() => setEngine('sql')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                 engine === 'sql'
-                  ? 'bg-[#A87945] text-stone-950 font-semibold'
+                  ? 'bg-[#A3694A] text-stone-950 font-semibold'
                   : isLight
                     ? 'text-stone-600 hover:text-stone-950'
                     : 'text-stone-400 hover:text-stone-100'
@@ -609,7 +609,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.18fr)_minmax(0,0.82fr)] overflow-hidden">
         {/* LEFT PANE: Configuration & Column Mapping */}
         <div className={`overflow-y-auto p-5 space-y-5 border-r ${
-          isLight ? 'border-[#E2DBD0]' : 'border-white/[0.08]'
+          isLight ? 'border-[#D4DFD3]' : 'border-white/[0.08]'
         }`}>
           {/* 1. Source & Target Definition */}
           <section className={`rounded-xl border p-4 space-y-4 ${panelBg}`}>
@@ -748,7 +748,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
 
             {/* Secondary path / source table row when needed */}
             {needsExternalSourceRef && (
-              <div className={`grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2 border-t ${isLight ? 'border-[#EBE5DC]' : 'border-white/[0.06]'}`}>
+              <div className={`grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2 border-t ${isLight ? 'border-[#E1E8DF]' : 'border-white/[0.06]'}`}>
                 {engine === 'sql' ? (
                   <>
                     <div className="grid grid-cols-[96px_1fr] gap-2">
@@ -839,7 +839,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
 
             {/* Collapsible: Paste existing target columns for diffing when external */}
             {targetSourceMode === 'external' && (
-              <div className={`pt-2 border-t ${isLight ? 'border-[#EBE5DC]' : 'border-white/[0.06]'}`}>
+              <div className={`pt-2 border-t ${isLight ? 'border-[#E1E8DF]' : 'border-white/[0.06]'}`}>
                 <button
                   type="button"
                   onClick={() => setShowExistingColsBox((v) => !v)}
@@ -937,10 +937,10 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
                       className={`text-left rounded-lg border p-2.5 transition-colors cursor-pointer ${
                         active
                           ? isLight
-                            ? 'border-amber-600 bg-[#FAF6EE]'
+                            ? 'border-amber-600 bg-[#F3F7F1]'
                             : 'border-amber-500/80 bg-amber-500/[0.08]'
                           : isLight
-                            ? 'border-[#E2DBD0] hover:bg-[#FAF8F5]'
+                            ? 'border-[#D4DFD3] hover:bg-[#F7FAF5]'
                             : 'border-white/[0.08] hover:bg-white/[0.03]'
                       }`}
                     >
@@ -978,10 +978,10 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
                       className={`text-left rounded-lg border p-2.5 transition-colors cursor-pointer ${
                         active
                           ? isLight
-                            ? 'border-amber-600 bg-[#FAF6EE]'
+                            ? 'border-amber-600 bg-[#F3F7F1]'
                             : 'border-amber-500/80 bg-amber-500/[0.08]'
                           : isLight
-                            ? 'border-[#E2DBD0] hover:bg-[#FAF8F5]'
+                            ? 'border-[#D4DFD3] hover:bg-[#F7FAF5]'
                             : 'border-white/[0.08] hover:bg-white/[0.03]'
                       }`}
                     >
@@ -995,7 +995,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
 
             {/* Join Key & Overwrite Options */}
             {needsJoinConfig && (
-              <div className={`pt-3 border-t space-y-3 ${isLight ? 'border-[#EBE5DC]' : 'border-white/[0.06]'}`}>
+              <div className={`pt-3 border-t space-y-3 ${isLight ? 'border-[#E1E8DF]' : 'border-white/[0.06]'}`}>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <label className={`flex items-center gap-1 text-[11px] font-medium ${labelText}`}>
@@ -1087,7 +1087,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
                             embeddedRowLimit === lim
                               ? 'border-amber-500 text-amber-600 dark:text-amber-400 font-semibold'
                               : isLight
-                                ? 'border-[#D6CEBE] text-stone-600 hover:text-stone-950'
+                                ? 'border-[#C2D2C2] text-stone-600 hover:text-stone-950'
                                 : 'border-stone-700 text-stone-400 hover:text-stone-100'
                           }`}
                         >
@@ -1101,7 +1101,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
             )}
 
             {/* Engine Options Checkboxes */}
-            <div className={`flex flex-wrap items-center gap-x-5 gap-y-2 pt-2 border-t text-xs ${isLight ? 'border-[#EBE5DC]' : 'border-white/[0.06]'}`}>
+            <div className={`flex flex-wrap items-center gap-x-5 gap-y-2 pt-2 border-t text-xs ${isLight ? 'border-[#E1E8DF]' : 'border-white/[0.06]'}`}>
               {needsJoinConfig && !(engine === 'arcpy' && arcpyMode === 'join_field') && (
                 <label className="inline-flex items-center gap-2 cursor-pointer select-none">
                   <input
@@ -1172,7 +1172,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
 
           {/* 3. Column Selection & Mapping Table */}
           <section className={`rounded-xl border overflow-hidden ${panelBg}`}>
-            <div className={`p-4 border-b space-y-3 ${isLight ? 'border-[#EBE5DC]' : 'border-white/[0.06]'}`}>
+            <div className={`p-4 border-b space-y-3 ${isLight ? 'border-[#E1E8DF]' : 'border-white/[0.06]'}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                   {isFr ? '3. Colonnes à Créer & Types Cibles' : '3. Columns to Create & Target Types'}
@@ -1251,7 +1251,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className={`border-b text-[11px] font-medium ${
-                    isLight ? 'bg-[#F8F6F1] border-[#E2DBD0] text-stone-600' : 'bg-[#13110E] border-white/[0.08] text-stone-400'
+                    isLight ? 'bg-[#F3F8F1] border-[#D4DFD3] text-stone-600' : 'bg-[#0D1413] border-white/[0.08] text-stone-400'
                   }`}>
                     <th className="py-2 pl-3 pr-2 w-8"></th>
                     <th className="py-2 px-2">{isFr ? 'Colonne source' : 'Source field'}</th>
@@ -1262,7 +1262,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
                     <th className="py-2 pl-2 pr-3 text-right">{isFr ? 'Statut' : 'Status'}</th>
                   </tr>
                 </thead>
-                <tbody className={`divide-y ${isLight ? 'divide-[#EBE5DC]' : 'divide-white/[0.05]'}`}>
+                <tbody className={`divide-y ${isLight ? 'divide-[#E1E8DF]' : 'divide-white/[0.05]'}`}>
                   {filteredColumns.map((col) => {
                     const resolvedType =
                       engine === 'sql'
@@ -1278,10 +1278,10 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
                         className={`transition-colors ${
                           col.selected
                             ? isLight
-                              ? 'bg-white hover:bg-[#FAF8F5]'
+                              ? 'bg-white hover:bg-[#F7FAF5]'
                               : 'bg-transparent hover:bg-white/[0.02]'
                             : isLight
-                              ? 'bg-[#FAF8F5]/60 opacity-65'
+                              ? 'bg-[#F7FAF5]/60 opacity-65'
                               : 'bg-white/[0.01] opacity-55'
                         }`}
                       >
@@ -1385,9 +1385,9 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
         </div>
 
         {/* RIGHT PANE: Live Generated Script Preview & Export */}
-        <div className={`flex flex-col overflow-hidden ${isLight ? 'bg-[#1A1613] text-stone-100' : 'bg-[#0F0D0B] text-stone-100'}`}>
+        <div className={`flex flex-col overflow-hidden ${isLight ? 'bg-[#121B19] text-stone-100' : 'bg-[#0A100F] text-stone-100'}`}>
           {/* Preview Header */}
-          <div className="shrink-0 px-4 py-3 border-b border-white/[0.08] flex flex-wrap items-center justify-between gap-3 bg-[#15120F]">
+          <div className="shrink-0 px-4 py-3 border-b border-white/[0.08] flex flex-wrap items-center justify-between gap-3 bg-[#0E1614]">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 {engine === 'arcpy' ? (
@@ -1421,7 +1421,7 @@ export const SchemaEnrichmentStudio: React.FC<SchemaEnrichmentStudioProps> = ({
                 type="button"
                 onClick={handleDownload}
                 disabled={!generatedResult}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#A87945] px-3 py-1.5 text-xs font-semibold text-stone-950 hover:bg-[#B98953] transition-colors disabled:opacity-40 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#A3694A] px-3 py-1.5 text-xs font-semibold text-stone-950 hover:bg-[#B47858] transition-colors disabled:opacity-40 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>

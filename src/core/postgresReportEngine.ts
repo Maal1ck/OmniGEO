@@ -250,6 +250,7 @@ columns_metadata AS (
     c.udt_name,
     CASE 
       WHEN c.udt_name = 'geometry' THEN 'geometry(Geometry, 4326)'
+      WHEN c.udt_name = 'st_geometry' THEN 'sde.st_geometry'
       WHEN c.character_maximum_length IS NOT NULL AND c.data_type = 'character varying' THEN 'character varying(' || c.character_maximum_length || ')'
       WHEN c.character_maximum_length IS NOT NULL AND c.data_type = 'character' THEN 'character(' || c.character_maximum_length || ')'
       WHEN c.numeric_precision IS NOT NULL AND c.data_type = 'numeric' THEN 'numeric(' || c.numeric_precision || ',' || COALESCE(c.numeric_scale, 0) || ')'
@@ -268,7 +269,11 @@ columns_metadata AS (
     fk.target_table AS fk_target_table,
     fk.target_column AS fk_target_column,
     fk.target_schema AS fk_target_schema,
-    (c.udt_name = 'geometry' OR c.data_type = 'USER-DEFINED' AND c.udt_name IN ('geometry', 'geography')) AS is_geometry,
+    (
+      c.udt_name IN ('geometry', 'geography', 'st_geometry')
+      OR (c.data_type = 'USER-DEFINED' AND LOWER(c.udt_name) IN ('geometry', 'geography', 'st_geometry', 'esri_geometry'))
+      OR LOWER(c.column_name) IN ('shape', 'geometry', 'geom', 'the_geom', 'wkb_geometry', 'sde_shape')
+    ) AS is_geometry,
     col_description(pa.attrelid, pa.attnum) AS column_comment
   FROM information_schema.columns c
   JOIN pg_class pc ON pc.relname = c.table_name
@@ -388,6 +393,76 @@ except Exception as e:
 }
 
 /**
+ * Detects whether a column represents a spatial geometry field:
+ * 1) PostGIS / SQL-MM spatial types (geometry, geography, st_geometry, point, polygon, linestring...)
+ * 2) ArcGIS / SDE / non-PostGIS fallback by field name ("geometry", "shape", "geom", "the_geom", "wkb_geometry")
+ *    while excluding measurement/metadata fields like shape_length, shape_area, geometry_type.
+ */
+const SPATIAL_MEASUREMENT_OR_META_REGEX =
+  /^(shape_(len|length|area|stlength|starea|perimeter)|st_(area|length)|geom(etry)?_(type|len|length|area|valid|srid|wkt|text|json|hash)|shape_(type|valid|srid))$/i;
+
+export function isPostgisType(typeStr: string): boolean {
+  const lower = (typeStr || '').toLowerCase();
+  return (
+    (lower.includes('geometry') && !lower.includes('st_geometry') && !lower.includes('esri_geometry')) ||
+    lower.includes('geography') ||
+    /\b(point|linestring|polygon|multipoint|multilinestring|multipolygon|geometrycollection)\b/i.test(lower)
+  );
+}
+
+export function isArcgisSpatialColumn(col: { name?: string; dataType?: string }): boolean {
+  const lowerType = (col.dataType || '').toLowerCase();
+  if (lowerType.includes('st_geometry') || lowerType.includes('esri_geometry') || lowerType.includes('sde.')) {
+    return true;
+  }
+  const colName = (col.name || '').trim().toLowerCase();
+  if (!colName || SPATIAL_MEASUREMENT_OR_META_REGEX.test(colName)) {
+    return false;
+  }
+  // Exact common spatial column names (ArcGIS SDE uses "shape", others use "geometry", "geom", "the_geom", "wkb_geometry")
+  if (/^(shape|geometry|geom|the_geom|wkb_geometry|sde_shape|esri_shape|geom_wkb|shape_geom)$/.test(colName)) {
+    return true;
+  }
+  // Prefixed/suffixed geometry or shape columns (excluding numeric/metric fields like shape_area / geom_len)
+  if (/(^|_)(shape|geometry)$/.test(colName) && !/(area|len|length|perim|type|srid|valid|count|id|code|name|label)$/.test(colName)) {
+    return true;
+  }
+  return false;
+}
+
+export function isSpatialColumn(col: {
+  name?: string;
+  dataType?: string;
+  isGeometry?: boolean;
+  geometryType?: string;
+}): boolean {
+  if (col.isGeometry) return true;
+  if (isPostgisType(col.dataType || '')) return true;
+  if (isArcgisSpatialColumn(col)) return true;
+  return false;
+}
+
+export function detectSpatialProvider(table: PostgresTableSchema): 'postgis' | 'arcgis' | null {
+  const cols = table.columns || [];
+  // 1. Check PostGIS first
+  if (cols.some(c => isPostgisType(c.dataType || ''))) {
+    return 'postgis';
+  }
+  // 2. Fallback: check ArcGIS / shape / geometry column names or st_geometry
+  if (cols.some(c => isArcgisSpatialColumn(c) || c.isGeometry)) {
+    return 'arcgis';
+  }
+  if (table.isSpatial) {
+    return 'postgis';
+  }
+  return null;
+}
+
+export function isTableSpatial(table: PostgresTableSchema): boolean {
+  return detectSpatialProvider(table) !== null;
+}
+
+/**
  * Builds schema metadata summary from tables and relationships.
  */
 export function computeDatabaseSummary(
@@ -401,10 +476,10 @@ export function computeDatabaseSummary(
 
   for (const t of (tables || [])) {
     totalRecords += t.estimatedRows || 0;
-    if (t.isSpatial) totalSpatialTables++;
+    if (isTableSpatial(t)) totalSpatialTables++;
     for (const c of (t.columns || [])) {
       totalColumns++;
-      const typeCategory = categorizeDataType(c.dataType || 'text');
+      const typeCategory = isSpatialColumn(c) ? 'Spatial (PostGIS)' : categorizeDataType(c.dataType || 'text');
       dataTypesDistribution[typeCategory] = (dataTypesDistribution[typeCategory] || 0) + 1;
     }
   }
@@ -419,9 +494,18 @@ export function computeDatabaseSummary(
   };
 }
 
-export function categorizeDataType(typeStr: string): string {
-  const lower = typeStr.toLowerCase();
-  if (lower.includes('geom') || lower.includes('geog') || lower.includes('point') || lower.includes('polygon') || lower.includes('linestring')) {
+export function categorizeDataType(typeStr: string, colName?: string): string {
+  const lower = (typeStr || '').toLowerCase();
+  if (
+    lower.includes('geom') ||
+    lower.includes('geog') ||
+    lower.includes('st_geometry') ||
+    lower.includes('esri_geometry') ||
+    lower.includes('point') ||
+    lower.includes('polygon') ||
+    lower.includes('linestring') ||
+    (colName ? isArcgisSpatialColumn({ name: colName, dataType: typeStr }) : false)
+  ) {
     return 'Spatial (PostGIS)';
   }
   if (lower.includes('int') || lower.includes('serial') || lower.includes('numeric') || lower.includes('decimal') || lower.includes('float') || lower.includes('double') || lower.includes('real')) {
@@ -538,7 +622,7 @@ export function parsePostgresDDL(sqlContent: string, dbName = 'imported_postgres
           });
         }
 
-        const isGeom = /geometry|geography|point|linestring|polygon/i.test(colType);
+        const isGeom = isSpatialColumn({ name: colName, dataType: rawColType }) || isSpatialColumn({ name: colName, dataType: colType });
         if (isGeom) isSpatial = true;
 
         columns.push({
@@ -686,9 +770,10 @@ export function buildSchemaFromDatasets(
       });
     }
 
-    // Geometry column (omit for non-spatial attribute tables)
-    const isSpatial = !ds.isNonSpatial && ds.geometryType !== 'Unknown';
-    if (isSpatial) {
+    // Geometry column (omit for non-spatial attribute tables unless a shape/geometry column exists)
+    const hasNativeGeom = !ds.isNonSpatial && ds.geometryType !== 'Unknown';
+    let isSpatial = hasNativeGeom;
+    if (hasNativeGeom) {
       const srid = ds.detectedCRS?.code.replace(/^EPSG:/i, '') || '4326';
       const geomType = ds.geometryType === 'Polygon' ? 'MultiPolygon' : ds.geometryType || 'Geometry';
       columns.push({
@@ -723,6 +808,10 @@ export function buildSchemaFromDatasets(
         const otherName = other.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
         return colSlug.startsWith(otherName) || otherName.includes(colSlug.replace(/_id$/, ''));
       });
+      const colIsGeom = isSpatialColumn({ name: f.name, dataType: pgType });
+      if (colIsGeom) {
+        isSpatial = true;
+      }
 
       columns.push({
         name: colSlug,
@@ -731,7 +820,7 @@ export function buildSchemaFromDatasets(
         defaultValue: null,
         isPrimaryKey: isPk,
         isForeignKey: !!isFkCandidate,
-        isGeometry: false,
+        isGeometry: colIsGeom,
       });
     }
 
@@ -753,7 +842,9 @@ export function buildSchemaFromDatasets(
       isSpatial,
       comment:
         ds.tableComment ||
-        `Couche géospatiale importée: ${ds.originalFileName} (${ds.format.toUpperCase()})`,
+        (isSpatial
+          ? `Couche géospatiale importée: ${ds.originalFileName} (${ds.format.toUpperCase()})`
+          : `Table tabulaire importée: ${ds.originalFileName} (${ds.format.toUpperCase()})`),
     });
   }
 
@@ -1330,15 +1421,24 @@ export function computeTableProfile(
   // 2. Table name
   const tableName = `${table.schema ? table.schema + '.' : ''}${table.name}`;
 
-  // 3. Nature
+  // 3. Nature (PostGIS first, then fallback to ArcGIS / shape / geometry column check)
   let nature = isFr ? 'Donnée tabulaire' : 'Tabular data';
-  if (table.isSpatial) {
-    const geomCol = (table.columns || []).find(c => c.isGeometry);
-    const geomType = geomCol?.geometryType || (table.columns || []).find(c => /geom/i.test(c.name))?.geometryType || 'Geometry';
-    const srid = geomCol?.srid || (geomCol?.dataType.match(/\d{4,5}/)?.[0]) || '4326';
-    nature = isFr 
-      ? `Donnée spatiale (${geomType}, EPSG:${srid})`
-      : `Spatial vector data (${geomType}, EPSG:${srid})`;
+  const spatialProvider = detectSpatialProvider(table);
+  if (spatialProvider) {
+    const geomCol = (table.columns || []).find(c => isSpatialColumn(c));
+    if (spatialProvider === 'postgis') {
+      const geomType = geomCol?.geometryType || (geomCol?.dataType.match(/\(([A-Za-z0-9_]+)/)?.[1]) || 'Geometry';
+      const srid = geomCol?.srid || (geomCol?.dataType.match(/\d{4,5}/)?.[0]) || '4326';
+      nature = isFr
+        ? `Donnée spatiale PostGIS (${geomType}, EPSG:${srid})`
+        : `Spatial vector data PostGIS (${geomType}, EPSG:${srid})`;
+    } else {
+      const colLabel = geomCol?.name ? `champ "${geomCol.name}"` : 'ArcGIS / SDE';
+      const colLabelEn = geomCol?.name ? `field "${geomCol.name}"` : 'ArcGIS / SDE';
+      nature = isFr
+        ? `Donnée spatiale ArcGIS / SIG (${colLabel})`
+        : `Spatial layer ArcGIS / GIS (${colLabelEn})`;
+    }
   }
 
   // 4. Identifiant métier (Primary Key)
@@ -1738,41 +1838,432 @@ export function generateProfileSheetCsv(schema: PostgresDatabaseSchema, lang: 'f
   return '\uFEFF' + lines.join('\r\n');
 }
 
+export type HtmlReportFontKey =
+  | 'plus-jakarta'
+  | 'times-new-roman'
+  | 'arial'
+  | 'calibri'
+  | 'georgia'
+  | 'garamond'
+  | 'cambria'
+  | 'inter'
+  | 'roboto'
+  | 'jetbrains-mono';
+
+export type ProfileRubriqueKey =
+  | 'service'
+  | 'tableName'
+  | 'nature'
+  | 'identifiantMetier'
+  | 'rattachement'
+  | 'champsTemporels'
+  | 'champsQuantitatifs'
+  | 'nombreEnregistrements'
+  | 'controles'
+  | 'etatValidation';
+
+export type PhysicalColumnKey =
+  | 'name'
+  | 'dataType'
+  | 'isNullable'
+  | 'keys'
+  | 'defaultValue'
+  | 'comment';
+
+export interface CustomProfileRubrique {
+  id: string;
+  label: string;
+  value: string;
+  enabled: boolean;
+}
+
+export interface CustomReportSection {
+  id: string;
+  title: string;
+  content: string;
+  position: 'top' | 'bottom';
+  enabled: boolean;
+}
+
+export type HtmlReportDensity = 'ultra-compact' | 'compact' | 'normal';
+
+export interface HtmlReportConfig {
+  fontFamily: HtmlReportFontKey;
+  baseFontSize: number;
+  keepMonospaceForCode: boolean;
+  accentColor: string;
+  density: HtmlReportDensity;
+  twoColumnProfile: boolean;
+  header: {
+    showHeader: boolean;
+    layout: 'left' | 'center' | 'split';
+    showBrandBadge: boolean;
+    brandBadgeText: string;
+    customTitle: string;
+    customSubtitle: string;
+    organization: string;
+    author: string;
+    documentRef: string;
+    customDate: string;
+    showServerVersion: boolean;
+    showPrintButton: boolean;
+    logoLeft: string;
+    logoRight: string;
+    logoHeight: number;
+    footerText: string;
+  };
+  sections: {
+    kpis: boolean;
+    typeDistribution: boolean;
+    relationships: boolean;
+    filterPanel: boolean;
+    tableDescription: boolean;
+    tableProfile: boolean;
+    physicalFields: boolean;
+  };
+  profileRubriques: Record<ProfileRubriqueKey, boolean>;
+  customProfileRubriques: CustomProfileRubrique[];
+  physicalColumns: Record<PhysicalColumnKey, boolean>;
+  customSections: CustomReportSection[];
+}
+
+export interface McdRelationshipOverride {
+  cardinality?: string;
+  sourceCardinality?: string;
+  targetCardinality?: string;
+  constraintName?: string;
+}
+
+export interface McdReportConfig {
+  customTitle: string;
+  customSubtitle: string;
+  badgeText: string;
+  organization: string;
+  author: string;
+  documentRef: string;
+  customDate: string;
+  logoLeft: string;
+  logoRight: string;
+  logoHeight: number;
+  fontFamily: HtmlReportFontKey;
+  themeMode: 'dark' | 'light';
+  accentColor: string;
+  businessOnly: boolean;
+  excludedTables: string[];
+  tableLabelOverrides: Record<string, string>;
+  tableCommentOverrides: Record<string, string>;
+  cardWidth: number;
+  compactColumns: boolean;
+  showDataTypes: boolean;
+  showNotNull: boolean;
+  showRowCounts: boolean;
+  showServiceStrip: boolean;
+  showLegend: boolean;
+  showFilterBar: boolean;
+  customRelationships: PostgresRelationship[];
+  removedRelationshipIds: string[];
+  relationshipOverrides: Record<string, McdRelationshipOverride>;
+}
+
+export function createDefaultMcdConfig(): McdReportConfig {
+  return {
+    customTitle: '',
+    customSubtitle: '',
+    badgeText: '',
+    organization: '',
+    author: '',
+    documentRef: '',
+    customDate: '',
+    logoLeft: '',
+    logoRight: '',
+    logoHeight: 46,
+    fontFamily: 'plus-jakarta',
+    themeMode: 'dark',
+    accentColor: '#3B82F6',
+    businessOnly: true,
+    excludedTables: [],
+    tableLabelOverrides: {},
+    tableCommentOverrides: {},
+    cardWidth: 340,
+    compactColumns: false,
+    showDataTypes: true,
+    showNotNull: true,
+    showRowCounts: true,
+    showServiceStrip: true,
+    showLegend: true,
+    showFilterBar: true,
+    customRelationships: [],
+    removedRelationshipIds: [],
+    relationshipOverrides: {},
+  };
+}
+
+export interface HtmlReportFontOption {
+  key: HtmlReportFontKey;
+  label: string;
+  category: 'serif' | 'sans' | 'mono';
+  cssStack: string;
+  googleFontFamily?: string;
+  offlineSafe: boolean;
+}
+
+export const HTML_REPORT_FONTS: HtmlReportFontOption[] = [
+  {
+    key: 'plus-jakarta',
+    label: 'Plus Jakarta Sans (Moderne)',
+    category: 'sans',
+    cssStack: `'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
+    googleFontFamily: 'Plus+Jakarta+Sans:wght@400;500;600;700;800',
+    offlineSafe: false,
+  },
+  {
+    key: 'times-new-roman',
+    label: 'Times New Roman (Classique / Officiel)',
+    category: 'serif',
+    cssStack: `'Times New Roman', Times, Georgia, serif`,
+    offlineSafe: true,
+  },
+  {
+    key: 'arial',
+    label: 'Arial / Helvetica (Bureautique)',
+    category: 'sans',
+    cssStack: `Arial, Helvetica, sans-serif`,
+    offlineSafe: true,
+  },
+  {
+    key: 'calibri',
+    label: 'Calibri / Segoe UI (Rapport Office)',
+    category: 'sans',
+    cssStack: `Calibri, 'Segoe UI', Candara, Arial, sans-serif`,
+    offlineSafe: true,
+  },
+  {
+    key: 'georgia',
+    label: 'Georgia (Éditorial Serif)',
+    category: 'serif',
+    cssStack: `Georgia, 'Times New Roman', Times, serif`,
+    offlineSafe: true,
+  },
+  {
+    key: 'garamond',
+    label: 'EB Garamond / Garamond (Académique)',
+    category: 'serif',
+    cssStack: `'EB Garamond', Garamond, 'Times New Roman', serif`,
+    googleFontFamily: 'EB+Garamond:wght@400;500;600;700',
+    offlineSafe: false,
+  },
+  {
+    key: 'cambria',
+    label: 'Cambria (Administratif)',
+    category: 'serif',
+    cssStack: `Cambria, Georgia, 'Times New Roman', serif`,
+    offlineSafe: true,
+  },
+  {
+    key: 'inter',
+    label: 'Inter (Technique épuré)',
+    category: 'sans',
+    cssStack: `'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`,
+    googleFontFamily: 'Inter:wght@400;500;600;700;800',
+    offlineSafe: false,
+  },
+  {
+    key: 'roboto',
+    label: 'Roboto (Standard Web)',
+    category: 'sans',
+    cssStack: `'Roboto', Arial, sans-serif`,
+    googleFontFamily: 'Roboto:wght@400;500;700',
+    offlineSafe: false,
+  },
+  {
+    key: 'jetbrains-mono',
+    label: 'JetBrains Mono / Consolas (Technique)',
+    category: 'mono',
+    cssStack: `'JetBrains Mono', Consolas, 'Courier New', monospace`,
+    googleFontFamily: 'JetBrains+Mono:wght@400;500;600;700',
+    offlineSafe: false,
+  },
+];
+
+export const PROFILE_RUBRIQUES_META: Array<{ key: ProfileRubriqueKey; labelFr: string; labelEn: string }> = [
+  { key: 'service', labelFr: 'Service', labelEn: 'Service' },
+  { key: 'tableName', labelFr: 'Table', labelEn: 'Table' },
+  { key: 'nature', labelFr: 'Nature', labelEn: 'Nature' },
+  { key: 'identifiantMetier', labelFr: 'Identifiant métier', labelEn: 'Business Identifier (PK)' },
+  { key: 'rattachement', labelFr: 'Rattachement', labelEn: 'Foreign Key Links' },
+  { key: 'champsTemporels', labelFr: 'Champs temporels', labelEn: 'Temporal Fields' },
+  { key: 'champsQuantitatifs', labelFr: 'Champs quantitatifs', labelEn: 'Quantitative Fields' },
+  { key: 'nombreEnregistrements', labelFr: "Nombre d'enregistrements", labelEn: 'Record Count' },
+  { key: 'controles', labelFr: 'Contrôles', labelEn: 'Integrity Controls' },
+  { key: 'etatValidation', labelFr: 'État de validation', labelEn: 'Validation Status' },
+];
+
+export const PHYSICAL_COLUMNS_META: Array<{ key: PhysicalColumnKey; labelFr: string; labelEn: string }> = [
+  { key: 'name', labelFr: 'Nom du Champ', labelEn: 'Field Name' },
+  { key: 'dataType', labelFr: 'Type PostgreSQL', labelEn: 'PostgreSQL Type' },
+  { key: 'isNullable', labelFr: 'Nullabilité', labelEn: 'Nullability' },
+  { key: 'keys', labelFr: 'Contrainte / Clé', labelEn: 'Key / Constraint' },
+  { key: 'defaultValue', labelFr: 'Valeur par Défaut', labelEn: 'Default Value' },
+  { key: 'comment', labelFr: 'Description', labelEn: 'Description' },
+];
+
+export function createDefaultHtmlReportConfig(): HtmlReportConfig {
+  return {
+    fontFamily: 'plus-jakarta',
+    baseFontSize: 13,
+    keepMonospaceForCode: true,
+    accentColor: '#CE5311',
+    density: 'compact',
+    twoColumnProfile: true,
+    header: {
+      showHeader: true,
+      layout: 'center',
+      showBrandBadge: true,
+      brandBadgeText: '',
+      customTitle: '',
+      customSubtitle: '',
+      organization: '',
+      author: '',
+      documentRef: '',
+      customDate: '',
+      showServerVersion: true,
+      showPrintButton: true,
+      logoLeft: '',
+      logoRight: '',
+      logoHeight: 56,
+      footerText: '',
+    },
+    sections: {
+      kpis: true,
+      typeDistribution: true,
+      relationships: true,
+      filterPanel: true,
+      tableDescription: true,
+      tableProfile: true,
+      physicalFields: true,
+    },
+    profileRubriques: {
+      service: true,
+      tableName: true,
+      nature: true,
+      identifiantMetier: true,
+      rattachement: true,
+      champsTemporels: true,
+      champsQuantitatifs: true,
+      nombreEnregistrements: true,
+      controles: true,
+      etatValidation: true,
+    },
+    customProfileRubriques: [],
+    physicalColumns: {
+      name: true,
+      dataType: true,
+      isNullable: true,
+      keys: true,
+      defaultValue: true,
+      comment: true,
+    },
+    customSections: [],
+  };
+}
+
+function sanitizeImageUrl(url: string): string {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return '';
+  if (/^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=\s]+$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (/^https?:\/\/[^\s"'<>]+$/i.test(trimmed)) {
+    return trimmed;
+  }
+  return '';
+}
+
+function sanitizeHexColor(hex: string, fallback = '#CE5311'): string {
+  return /^#[0-9a-fA-F]{6}$/.test((hex || '').trim()) ? hex.trim() : fallback;
+}
+
 /**
  * Generates an executive, publication-grade standalone HTML Data Dictionary Report.
- * Supports French ('fr') or English ('en').
- * Self-contained with CSS, print-friendly, multi-criteria filtering, and interactive badges.
+ * Supports French ('fr') or English ('en'), plus full customization of sections,
+ * profile rubriques, custom rubriques, editable header with logos, and font selection
+ * (including Times New Roman).
  */
-export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lang: 'fr' | 'en' = 'fr'): string {
+export function generateStandaloneHtmlReport(
+  schema: PostgresDatabaseSchema,
+  lang: 'fr' | 'en' = 'fr',
+  userConfig?: Partial<HtmlReportConfig>
+): string {
+  const defaults = createDefaultHtmlReportConfig();
+  const cfg: HtmlReportConfig = {
+    ...defaults,
+    ...userConfig,
+    header: { ...defaults.header, ...(userConfig?.header || {}) },
+    sections: { ...defaults.sections, ...(userConfig?.sections || {}) },
+    profileRubriques: { ...defaults.profileRubriques, ...(userConfig?.profileRubriques || {}) },
+    physicalColumns: { ...defaults.physicalColumns, ...(userConfig?.physicalColumns || {}) },
+    customProfileRubriques: userConfig?.customProfileRubriques ?? defaults.customProfileRubriques,
+    customSections: userConfig?.customSections ?? defaults.customSections,
+  };
+
   const isFr = lang === 'fr';
-  const generatedTimeStr = new Date(schema.generatedAt).toUTCString();
-  const title = isFr
+  const generatedTimeStr = cfg.header.customDate.trim() || new Date(schema.generatedAt).toUTCString();
+  const displayTitle = cfg.header.customTitle.trim() || schema.databaseName;
+  const pageTitle = cfg.header.customTitle.trim()
+    ? cfg.header.customTitle.trim()
+    : isFr
     ? `Dictionnaire de Données & Architecture PostgreSQL - ${schema.databaseName}`
     : `PostgreSQL Data Dictionary & Schema Architecture - ${schema.databaseName}`;
+
+  const fontOption = HTML_REPORT_FONTS.find(f => f.key === cfg.fontFamily) || HTML_REPORT_FONTS[0];
+  const baseFontSize = Math.min(18, Math.max(11, Math.round(cfg.baseFontSize || 14)));
+  const logoHeight = Math.min(120, Math.max(28, Math.round(cfg.header.logoHeight || 56)));
+  const accentColor = sanitizeHexColor(cfg.accentColor, '#CE5311');
+  const safeLogoLeft = sanitizeImageUrl(cfg.header.logoLeft);
+  const safeLogoRight = sanitizeImageUrl(cfg.header.logoRight);
+
+  // Build Google Fonts link only if needed
+  const googleFontsNeeded: string[] = [];
+  if (fontOption.googleFontFamily) googleFontsNeeded.push(fontOption.googleFontFamily);
+  if (cfg.keepMonospaceForCode && fontOption.key !== 'jetbrains-mono') {
+    googleFontsNeeded.push('JetBrains+Mono:wght@400;500;600;700');
+  }
+  const googleFontsLink = googleFontsNeeded.length > 0
+    ? `  <link rel="preconnect" href="https://fonts.googleapis.com">\n  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n  <link href="https://fonts.googleapis.com/css2?${googleFontsNeeded.map(f => `family=${f}`).join('&')}&display=swap" rel="stylesheet">`
+    : '';
+
+  const monoStack = cfg.keepMonospaceForCode
+    ? `'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`
+    : fontOption.cssStack;
 
   const allTables = schema.tables || [];
   const uniqueSchemas = Array.from(new Set(allTables.map(t => t.schema || 'public'))).sort();
   const uniqueFamilies = Array.from(new Set(allTables.map(t => classifyTableFamily(t, allTables, lang)))).sort();
 
+  const spatialTableCount = allTables.filter(t => isSpatialTable(t)).length;
+
   const i18n = {
-    brand: isFr ? 'OmniGeo • Dictionnaire PostgreSQL' : 'OmniGeo • PostgreSQL Data Dictionary',
-    desc: schema.description || (isFr 
-      ? 'Rapport architectural complet de la base de données relationnelle et spatiale.' 
+    brand: cfg.header.brandBadgeText.trim() || (isFr ? 'OmniGeo • Dictionnaire PostgreSQL' : 'OmniGeo • PostgreSQL Data Dictionary'),
+    desc: cfg.header.customSubtitle.trim() || schema.description || (isFr
+      ? 'Rapport architectural complet de la base de données relationnelle et spatiale.'
       : 'Comprehensive architectural report of the relational and spatial database schema.'),
     printBtn: isFr ? 'Imprimer / PDF' : 'Print / PDF',
     viewMpdBtn: isFr ? 'Schéma MPD' : 'MPD Schema',
-    genAt: isFr ? 'Généré le :' : 'Generated on:',
+    genAt: isFr ? 'Date :' : 'Date:',
     serverVer: isFr ? 'Version serveur :' : 'Server version:',
+    orgLabel: isFr ? 'Organisation :' : 'Organization:',
+    authorLabel: isFr ? 'Auteur :' : 'Author:',
+    refLabel: isFr ? 'Référence :' : 'Reference:',
     kpiTables: isFr ? 'Tables Base' : 'Total Tables',
-    kpiTablesSub: isFr ? 'Total des tables inventoriées' : 'Total inventoried tables',
-    kpiSpatial: isFr ? 'Couches Spatiales (PostGIS)' : 'Spatial Layers (PostGIS)',
-    kpiSpatialSub: isFr ? 'Colonnes géométriques indexées' : 'Indexed geometry columns',
-    kpiRecords: isFr ? 'Total Enregistrements' : 'Total Records',
-    kpiRecordsSub: isFr ? 'Volume de données estimé' : 'Estimated row count',
-    kpiCols: isFr ? 'Total Colonnes' : 'Total Columns',
-    kpiColsSub: isFr ? 'Attributs & géométries typés' : 'Typed attributes & geometries',
-    kpiRels: isFr ? 'Relations (Clés Étrangères)' : 'Foreign Key Relations',
-    kpiRelsSub: isFr ? "Liens d'intégrité référentielle" : 'Referential integrity links',
+    kpiTablesSub: isFr ? 'Tables inventoriées' : 'Inventoried tables',
+    kpiSpatial: isFr ? 'Couches Spatiales' : 'Spatial Layers',
+    kpiSpatialSub: isFr ? 'PostGIS & ArcGIS (shape/geom)' : 'PostGIS & ArcGIS (shape/geom)',
+    kpiRecords: isFr ? 'Enregistrements' : 'Total Records',
+    kpiRecordsSub: isFr ? 'Volume estimé' : 'Estimated rows',
+    kpiCols: isFr ? 'Colonnes' : 'Total Columns',
+    kpiColsSub: isFr ? 'Attributs & géométries' : 'Typed attributes',
+    kpiRels: isFr ? 'Relations (FK)' : 'Foreign Keys',
+    kpiRelsSub: isFr ? "Intégrité référentielle" : 'Referential links',
     distLabel: isFr ? 'Distribution des Types PostgreSQL :' : 'PostgreSQL Canonical Types Distribution:',
     relSectionTitle: isFr ? 'Matrice des Relations & Clés Étrangères' : 'Relational Model & Foreign Keys Matrix',
     relSectionSub: isFr ? 'Liaisons référentielles et intégrité entre les tables' : 'Referential integrity links and constraint mapping',
@@ -1795,91 +2286,143 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     thDesc: isFr ? 'Description' : 'Description',
     fieldsWord: isFr ? 'champs' : 'columns',
     recordsWord: isFr ? 'enregistrements' : 'records',
-    spatialBadge: isFr ? 'COUCHE POSTGIS' : 'POSTGIS LAYER',
+    spatialBadgePostgis: isFr ? 'COUCHE POSTGIS' : 'POSTGIS LAYER',
+    spatialBadgeArcgis: isFr ? 'SPATIAL ARCGIS' : 'ARCGIS SPATIAL',
     techBadge: isFr ? 'TECHNIQUE' : 'SYSTEM',
   };
+
+  // Determine active physical columns
+  const activePhysCols: PhysicalColumnKey[] = (
+    ['name', 'dataType', 'isNullable', 'keys', 'defaultValue', 'comment'] as PhysicalColumnKey[]
+  ).filter(k => cfg.physicalColumns[k]);
+  if (activePhysCols.length === 0) activePhysCols.push('name');
+
+  const physColHeaderMap: Record<PhysicalColumnKey, { label: string; alignCenter?: boolean }> = {
+    name: { label: i18n.thColName },
+    dataType: { label: i18n.thColType },
+    isNullable: { label: i18n.thNullable, alignCenter: true },
+    keys: { label: i18n.thKeys },
+    defaultValue: { label: i18n.thDefault },
+    comment: { label: i18n.thDesc },
+  };
+
+  const activeCustomProfileRubriques = (cfg.customProfileRubriques || []).filter(
+    r => r.enabled && r.label.trim().length > 0
+  );
+
+  const showBothTableBlocks = cfg.sections.tableProfile && cfg.sections.physicalFields;
 
   // Tables catalog rows
   const tablesHtml = allTables.map(table => {
     const tableFamily = classifyTableFamily(table, allTables, lang);
     const isBiz = isBusinessTable(table);
+    const spatialEngine = detectSpatialEngine(table);
+    const tableIsSpatial = spatialEngine !== null;
 
     const columnsHtml = (table.columns || []).map(col => {
       const canonicalType = normalizeToPostgresType(col.dataType || 'text');
-      const category = categorizeDataType(canonicalType);
+      const colSpatial = isSpatialColumn(col);
+      const colArcgis = isArcgisSpatialColumn(col);
+      const category = categorizeDataType(canonicalType, col.name);
       const pkBadge = col.isPrimaryKey ? `<span class="badge badge-pk">PK</span>` : '';
-      const fkBadge = col.isForeignKey && col.foreignKeyTarget 
-        ? `<span class="badge badge-fk" title="Liaison vers ${escapeHtml(col.foreignKeyTarget.table)}.${escapeHtml(col.foreignKeyTarget.column)}">FK &rarr; ${escapeHtml(col.foreignKeyTarget.table)}</span>` 
+      const fkBadge = col.isForeignKey && col.foreignKeyTarget
+        ? `<span class="badge badge-fk" title="Liaison vers ${escapeHtml(col.foreignKeyTarget.table)}.${escapeHtml(col.foreignKeyTarget.column)}">FK &rarr; ${escapeHtml(col.foreignKeyTarget.table)}</span>`
         : '';
-      const geomBadge = col.isGeometry 
-        ? `<span class="badge badge-geom" title="PostGIS Geometry">${escapeHtml(col.geometryType || 'GEOMETRY')}${col.srid ? ` (${col.srid})` : ''}</span>` 
+      const geomBadge = colSpatial
+        ? `<span class="badge badge-geom" title="${colArcgis ? 'ArcGIS / GIS Geometry Field' : 'PostGIS Geometry'}">${colArcgis ? 'ARCGIS GEOM' : `${escapeHtml(col.geometryType || 'GEOMETRY')}${col.srid ? ` (${col.srid})` : ''}`}</span>`
         : '';
 
-      const nullBadge = col.isNullable 
-        ? `<span class="nullable-tag tag-null">NULL</span>` 
+      const nullBadge = col.isNullable
+        ? `<span class="nullable-tag tag-null">NULL</span>`
         : `<span class="nullable-tag tag-notnull">NOT NULL</span>`;
 
       const fkText = col.foreignKeyTarget ? `${col.foreignKeyTarget.table}.${col.foreignKeyTarget.column}` : '';
 
+      const cellMap: Record<PhysicalColumnKey, string> = {
+        name: `<td class="col-name font-mono font-bold" title="${escapeHtml(col.name)}">${escapeHtml(col.name)}</td>`,
+        dataType: `<td class="col-type-cell" title="${escapeHtml(canonicalType)}"><span class="type-badge font-mono">${escapeHtml(canonicalType)}</span></td>`,
+        isNullable: `<td class="text-center">${nullBadge}</td>`,
+        keys: `<td><div class="badges-row">${pkBadge}${fkBadge}${geomBadge}</div></td>`,
+        defaultValue: `<td class="col-default font-mono" title="${col.defaultValue ? escapeHtml(col.defaultValue) : ''}">${col.defaultValue ? escapeHtml(col.defaultValue) : '<span class="text-subtle">&mdash;</span>'}</td>`,
+        comment: `<td class="col-comment" title="${col.comment ? escapeHtml(col.comment) : ''}">${col.comment ? escapeHtml(col.comment) : '<span class="text-subtle">&mdash;</span>'}</td>`,
+      };
+
       return `
         <tr class="col-row"
+            data-colname="${escapeHtml((col.name || '').toLowerCase())}"
+            data-coltype="${escapeHtml(canonicalType.toLowerCase())}"
             data-category="${escapeHtml(category)}"
             data-pk="${col.isPrimaryKey ? '1' : '0'}"
             data-fk="${col.isForeignKey ? '1' : '0'}"
             data-notnull="${!col.isNullable ? '1' : '0'}"
             data-comment="${escapeHtml((col.comment || '').toLowerCase())}"
             data-fktarget="${escapeHtml(fkText.toLowerCase())}">
-          <td class="col-name font-mono font-bold" title="${escapeHtml(col.name)}">${escapeHtml(col.name)}</td>
-          <td class="col-type-cell" title="${escapeHtml(canonicalType)}">
-            <span class="type-badge font-mono">${escapeHtml(canonicalType)}</span>
-          </td>
-          <td class="text-center">${nullBadge}</td>
-          <td>
-            <div class="badges-row">
-              ${pkBadge}
-              ${fkBadge}
-              ${geomBadge}
-            </div>
-          </td>
-          <td class="col-default font-mono" title="${col.defaultValue ? escapeHtml(col.defaultValue) : ''}">${col.defaultValue ? escapeHtml(col.defaultValue) : '<span class="text-subtle">&mdash;</span>'}</td>
-          <td class="col-comment" title="${col.comment ? escapeHtml(col.comment) : ''}">${col.comment ? escapeHtml(col.comment) : '<span class="text-subtle">&mdash;</span>'}</td>
+          ${activePhysCols.map(k => cellMap[k]).join('\n          ')}
         </tr>
       `;
     }).join('\n');
 
     const profile = computeTableProfile(table, schema, lang);
 
-    return `
-      <section class="table-card"
-               id="tbl-${escapeHtml(table.name)}"
-               data-schema="${escapeHtml((table.schema || 'public').toLowerCase())}"
-               data-family="${escapeHtml(tableFamily)}"
-               data-spatial="${table.isSpatial ? '1' : '0'}"
-               data-business="${isBiz ? '1' : '0'}"
-               data-rows="${table.estimatedRows || 0}"
-               data-comment="${escapeHtml((table.comment || '').toLowerCase())}">
-        <div class="table-card-header" onclick="toggleCardBody(this)">
-          <div class="table-title-group">
-            <span class="schema-tag font-mono">${escapeHtml(table.schema || 'public')}</span>
-            <h3 class="table-name font-mono" title="${escapeHtml(table.name)}">${escapeHtml(table.name)}</h3>
-            <span class="family-pill">${escapeHtml(tableFamily)}</span>
-            ${table.isSpatial ? `<span class="badge badge-postgis">${i18n.spatialBadge}</span>` : ''}
-            ${!isBiz ? `<span class="badge" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;">${i18n.techBadge}</span>` : ''}
-          </div>
-          <div class="table-meta-row font-mono">
-            <span><strong>${(table.columns || []).length}</strong> ${i18n.fieldsWord}</span>
-            <span class="meta-sep">&bull;</span>
-            <span><strong>${(table.estimatedRows || 0).toLocaleString()}</strong> ${i18n.recordsWord}</span>
-            ${table.sizeFormatted ? `<span class="meta-sep">&bull;</span><span>${escapeHtml(table.sizeFormatted)}</span>` : ''}
-            <span class="collapse-chevron" style="margin-left:8px; font-weight:700; opacity:0.6;">&#9662;</span>
-          </div>
-        </div>
-        <div class="table-card-body">
-          ${table.comment ? `<p class="table-description">${escapeHtml(table.comment)}</p>` : ''}
+    // Build profile rubriques rows based on config
+    const builtInProfileRows: Array<{ key: ProfileRubriqueKey; label: string; value: string; valueClass?: string }> = [
+      { key: 'service', label: isFr ? 'Service' : 'Service', value: profile.service },
+      { key: 'tableName', label: isFr ? 'Table' : 'Table', value: profile.tableName, valueClass: 'font-mono font-bold' },
+      { key: 'nature', label: isFr ? 'Nature' : 'Nature', value: profile.nature },
+      { key: 'identifiantMetier', label: isFr ? 'Identifiant métier' : 'Business Identifier (PK)', value: profile.identifiantMetier, valueClass: 'font-mono font-bold text-accent' },
+      { key: 'rattachement', label: isFr ? 'Rattachement' : 'Foreign Key Links', value: profile.rattachement, valueClass: 'font-mono' },
+      { key: 'champsTemporels', label: isFr ? 'Champs temporels' : 'Temporal Fields', value: profile.champsTemporels, valueClass: 'font-mono' },
+      { key: 'champsQuantitatifs', label: isFr ? 'Champs quantitatifs' : 'Quantitative Fields', value: profile.champsQuantitatifs, valueClass: 'font-mono' },
+      { key: 'nombreEnregistrements', label: isFr ? "Nombre d'enregistrements" : 'Record Count', value: profile.nombreEnregistrements, valueClass: 'font-mono' },
+      { key: 'controles', label: isFr ? 'Contrôles' : 'Integrity Controls', value: profile.controles },
+      { key: 'etatValidation', label: isFr ? 'État de validation' : 'Validation Status', value: profile.etatValidation },
+    ];
 
-          <!-- 1- Fiche descriptive par table -->
-          <div class="fiche-box">
-            <div class="fiche-box-title">1- ${isFr ? `Fiche descriptive : ${escapeHtml(table.name)}` : `Table Profile: ${escapeHtml(table.name)}`}</div>
+    const allProfileItems: Array<{ label: string; valueHtml: string; valueClass?: string }> = [
+      ...builtInProfileRows
+        .filter(row => cfg.profileRubriques[row.key])
+        .map(row => ({
+          label: row.label,
+          valueHtml: row.value ? escapeHtml(row.value) : '<span class="text-subtle">&mdash;</span>',
+          valueClass: row.valueClass,
+        })),
+      ...activeCustomProfileRubriques.map(custom => ({
+        label: custom.label,
+        valueHtml: custom.value.trim() ? escapeHtml(custom.value) : '<span class="text-subtle">&mdash;</span>',
+      })),
+    ];
+
+    let profileTableHtml = '';
+    if (cfg.twoColumnProfile && allProfileItems.length > 1) {
+      const pairedRows: string[] = [];
+      for (let i = 0; i < allProfileItems.length; i += 2) {
+        const left = allProfileItems[i];
+        const right = allProfileItems[i + 1];
+        pairedRows.push(`
+                <tr>
+                  <td class="fiche-label-2col">${escapeHtml(left.label)}</td>
+                  <td class="fiche-value-2col${left.valueClass ? ` ${left.valueClass}` : ''}">${left.valueHtml}</td>
+                  ${right
+                    ? `<td class="fiche-label-2col fiche-col-divider">${escapeHtml(right.label)}</td>
+                  <td class="fiche-value-2col${right.valueClass ? ` ${right.valueClass}` : ''}">${right.valueHtml}</td>`
+                    : `<td class="fiche-label-2col fiche-col-divider"></td><td class="fiche-value-2col"></td>`}
+                </tr>`);
+      }
+      profileTableHtml = `
+            <table class="fiche-table fiche-table-2col">
+              <tbody>
+                ${pairedRows.join('\n')}
+              </tbody>
+            </table>`;
+    } else {
+      const singleRows = allProfileItems
+        .map(item => `
+                <tr>
+                  <td class="fiche-label">${escapeHtml(item.label)}</td>
+                  <td class="fiche-value${item.valueClass ? ` ${item.valueClass}` : ''}">${item.valueHtml}</td>
+                </tr>`)
+        .join('\n');
+      profileTableHtml = `
             <table class="fiche-table">
               <thead>
                 <tr>
@@ -1888,69 +2431,67 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td class="fiche-label">${isFr ? 'Service' : 'Service'}</td>
-                  <td class="fiche-value">${escapeHtml(profile.service)}</td>
-                </tr>
-                <tr>
-                  <td class="fiche-label">${isFr ? 'Table' : 'Table'}</td>
-                  <td class="fiche-value font-mono font-bold">${escapeHtml(profile.tableName)}</td>
-                </tr>
-                <tr>
-                  <td class="fiche-label">${isFr ? 'Nature' : 'Nature'}</td>
-                  <td class="fiche-value">${escapeHtml(profile.nature)}</td>
-                </tr>
-                <tr>
-                  <td class="fiche-label">${isFr ? 'Identifiant métier' : 'Business Identifier (PK)'}</td>
-                  <td class="fiche-value font-mono font-bold text-accent">${escapeHtml(profile.identifiantMetier)}</td>
-                </tr>
-                <tr>
-                  <td class="fiche-label">${isFr ? 'Rattachement' : 'Foreign Key Links'}</td>
-                  <td class="fiche-value font-mono">${escapeHtml(profile.rattachement)}</td>
-                </tr>
-                <tr>
-                  <td class="fiche-label">${isFr ? 'Champs temporels' : 'Temporal Fields'}</td>
-                  <td class="fiche-value font-mono">${escapeHtml(profile.champsTemporels)}</td>
-                </tr>
-                <tr>
-                  <td class="fiche-label">${isFr ? 'Champs quantitatifs' : 'Quantitative Fields'}</td>
-                  <td class="fiche-value font-mono">${escapeHtml(profile.champsQuantitatifs)}</td>
-                </tr>
-                <tr>
-                  <td class="fiche-label">${isFr ? "Nombre d'enregistrements" : 'Record Count'}</td>
-                  <td class="fiche-value font-mono">${escapeHtml(profile.nombreEnregistrements)}</td>
-                </tr>
-                <tr>
-                  <td class="fiche-label">${isFr ? 'Contrôles' : 'Integrity Controls'}</td>
-                  <td class="fiche-value">${escapeHtml(profile.controles)}</td>
-                </tr>
-                <tr>
-                  <td class="fiche-label">${isFr ? 'État de validation' : 'Validation Status'}</td>
-                  <td class="fiche-value">${escapeHtml(profile.etatValidation)}</td>
-                </tr>
+                ${singleRows}
               </tbody>
-            </table>
-          </div>
+            </table>`;
+    }
 
-          <!-- 2- Structure physique des champs -->
-          <div class="fiche-box-title" style="margin-top: 20px;">2- ${isFr ? `Structure physique des champs : ${escapeHtml(table.name)}` : `Physical Fields Structure: ${escapeHtml(table.name)}`}</div>
-          <div class="table-wrap">
+    const profileBlockHtml = (cfg.sections.tableProfile && allProfileItems.length > 0) ? `
+          <!-- Fiche descriptive par table -->
+          <div class="fiche-box">
+            <div class="fiche-box-title">${showBothTableBlocks ? '1- ' : ''}${isFr ? `Fiche descriptive : ${escapeHtml(table.name)}` : `Table Profile: ${escapeHtml(table.name)}`}</div>
+            ${profileTableHtml}
+          </div>` : '';
+
+    const physicalBlockHtml = cfg.sections.physicalFields ? `
+          <!-- Structure physique des champs -->
+          <div class="fiche-box-title physical-title">${showBothTableBlocks ? '2- ' : ''}${isFr ? `Structure physique des champs : ${escapeHtml(table.name)}` : `Physical Fields Structure: ${escapeHtml(table.name)}`}</div>
+          <div class="table-wrap table-responsive">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width: 24%">${i18n.thColName}</th>
-                  <th style="width: 24%">${i18n.thColType}</th>
-                  <th style="width: 12%" class="text-center">${i18n.thNullable}</th>
-                  <th style="width: 18%">${i18n.thKeys}</th>
-                  <th style="width: 11%">${i18n.thDefault}</th>
-                  <th style="width: 11%">${i18n.thDesc}</th>
+                  ${activePhysCols.map(k => {
+                    const meta = physColHeaderMap[k];
+                    return `<th${meta.alignCenter ? ' class="text-center"' : ''}>${escapeHtml(meta.label)}</th>`;
+                  }).join('\n                  ')}
                 </tr>
               </thead>
               <tbody>
                 ${columnsHtml}
               </tbody>
             </table>
+          </div>` : '';
+
+    return `
+      <section class="table-card"
+               id="tbl-${escapeHtml(table.name)}"
+               data-schema="${escapeHtml((table.schema || 'public').toLowerCase())}"
+               data-family="${escapeHtml(tableFamily)}"
+               data-spatial="${tableIsSpatial ? '1' : '0'}"
+               data-business="${isBiz ? '1' : '0'}"
+               data-rows="${table.estimatedRows || 0}"
+               data-comment="${escapeHtml((table.comment || '').toLowerCase())}">
+        <div class="table-card-header" onclick="toggleCardBody(this)">
+          <div class="table-title-group">
+            <span class="schema-badge font-mono">${escapeHtml(table.schema || 'public')}</span>
+            <h3 class="table-name font-mono" title="${escapeHtml(table.name)}">${escapeHtml(table.name)}</h3>
+            <span class="family-pill">${escapeHtml(tableFamily)}</span>
+            ${spatialEngine === 'postgis' ? `<span class="badge badge-postgis">${i18n.spatialBadgePostgis}</span>` : ''}
+            ${spatialEngine === 'arcgis' ? `<span class="badge badge-arcgis">${i18n.spatialBadgeArcgis}</span>` : ''}
+            ${!isBiz ? `<span class="badge" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;">${i18n.techBadge}</span>` : ''}
           </div>
+          <div class="table-meta-row font-mono">
+            <span><strong>${(table.columns || []).length}</strong> ${i18n.fieldsWord}</span>
+            <span class="meta-sep">&bull;</span>
+            <span><strong>${(table.estimatedRows || 0).toLocaleString()}</strong> ${i18n.recordsWord}</span>
+            ${table.sizeFormatted ? `<span class="meta-sep">&bull;</span><span>${escapeHtml(table.sizeFormatted)}</span>` : ''}
+            <span class="collapse-chevron" style="margin-left:6px; font-weight:700; opacity:0.6;">&#9662;</span>
+          </div>
+        </div>
+        <div class="table-card-body">
+          ${cfg.sections.tableDescription && table.comment ? `<p class="table-description">${escapeHtml(table.comment)}</p>` : ''}
+          ${profileBlockHtml}
+          ${physicalBlockHtml}
         </div>
       </section>
     `;
@@ -1981,620 +2522,107 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     </div>
   `).join('\n');
 
-  return `<!DOCTYPE html>
-<html lang="${lang}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(title)}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #F8FAFC;
-      --card-bg: #FFFFFF;
-      --text: #0F172A;
-      --text-muted: #64748B;
-      --text-subtle: #94A3B8;
-      --border: #E2E8F0;
-      --border-dark: #CBD5E1;
-      --primary: #1E293B;
-      --accent: #2563EB;
-      --accent-subtle: #EFF6FF;
-      --success: #059669;
-      --success-subtle: #ECFDF5;
-      --warning: #D97706;
-      --warning-subtle: #FFFBEB;
-      --purple: #7C3AED;
-      --purple-subtle: #F5F3FF;
-      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
+  // Custom free-text sections (top & bottom)
+  const renderCustomSection = (sec: CustomReportSection) => {
+    const paragraphs = (sec.content || '')
+      .split(/\n{2,}/)
+      .map(p => p.trim())
+      .filter(Boolean)
+      .map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+      .join('\n');
+    return `
+    <section class="custom-section-card">
+      <h2 class="custom-section-title">${escapeHtml(sec.title)}</h2>
+      <div class="custom-section-body">${paragraphs || `<p class="text-subtle">&mdash;</p>`}</div>
+    </section>`;
+  };
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: var(--font-sans);
-      font-size: 14px;
-      line-height: 1.5;
-      padding: 32px;
-    }
+  const topCustomSectionsHtml = (cfg.customSections || [])
+    .filter(s => s.enabled && s.position === 'top' && s.title.trim())
+    .map(renderCustomSection)
+    .join('\n');
 
-    .container {
-      max-width: 1280px;
-      margin: 0 auto;
-    }
+  const bottomCustomSectionsHtml = (cfg.customSections || [])
+    .filter(s => s.enabled && s.position === 'bottom' && s.title.trim())
+    .map(renderCustomSection)
+    .join('\n');
 
-    header.report-header {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 32px;
-      margin-bottom: 24px;
-      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.03);
-    }
+  // Header metadata items
+  const headerMetaItems: string[] = [];
+  if (cfg.header.organization.trim()) {
+    headerMetaItems.push(`<span>${escapeHtml(i18n.orgLabel)} <strong>${escapeHtml(cfg.header.organization.trim())}</strong></span>`);
+  }
+  if (cfg.header.author.trim()) {
+    headerMetaItems.push(`<span>${escapeHtml(i18n.authorLabel)} <strong>${escapeHtml(cfg.header.author.trim())}</strong></span>`);
+  }
+  if (cfg.header.documentRef.trim()) {
+    headerMetaItems.push(`<span>${escapeHtml(i18n.refLabel)} <strong>${escapeHtml(cfg.header.documentRef.trim())}</strong></span>`);
+  }
+  headerMetaItems.push(`<span>${escapeHtml(i18n.genAt)} <strong>${escapeHtml(generatedTimeStr)}</strong></span>`);
+  if (cfg.header.showServerVersion) {
+    headerMetaItems.push(`<span>${escapeHtml(i18n.serverVer)} <strong>${escapeHtml(schema.serverVersion || 'PostgreSQL 16+')}</strong></span>`);
+  }
 
-    .header-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-
-    .badge-brand {
-      background: #451A03;
-      color: #FDE68A;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      display: inline-block;
-      margin-bottom: 10px;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-    }
-
-    h1.db-title {
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      color: #1C1917;
-      margin-bottom: 6px;
-    }
-
-    p.db-desc {
-      color: var(--text-muted);
-      font-size: 14px;
-      max-width: 750px;
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 10px;
-    }
-
-    button.btn-action {
-      background: #FFFFFF;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 16px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.15s ease;
-      color: #1C1917;
-    }
-    button.btn-action:hover {
-      background: #F5EFE6;
-      border-color: #D6CEBE;
-    }
-
-    /* KPI Cards */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .kpi-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-    }
-    .kpi-title {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
-    .kpi-val {
-      font-size: 30px;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      color: #1C1917;
-      line-height: 1;
-    }
-    .kpi-sub {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 6px;
-    }
-
-    /* Distribution Pills */
-    .dist-box {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 16px 20px;
-      margin-bottom: 24px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px;
-    }
-    .dist-label {
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-right: 6px;
-    }
-    .dist-pill {
-      background: #FAF8F5;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 4px 10px;
-      font-size: 12px;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .dist-name { color: #44403C; }
-    .dist-count { color: var(--primary); }
-
-    /* Quick Filter & Search Panel */
-    .filter-panel {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 16px 20px;
-      margin-bottom: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
-    }
-    .filter-top-row {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .search-input {
-      flex: 1;
-      min-width: 240px;
-      background: #FAF8F5;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 9px 14px;
-      font-size: 13px;
-      outline: none;
-      font-family: var(--font-sans);
-    }
-    .search-input:focus {
-      border-color: #B45309;
-      background: #FFFFFF;
-      box-shadow: 0 0 0 3px rgba(180,83,9,0.1);
-    }
-    .filter-controls-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      min-width: 155px;
-      flex: 1;
-    }
-    .filter-group label {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-    }
-    .filter-select {
-      background: #FAF8F5;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-family: var(--font-sans);
-      color: var(--text);
-      outline: none;
-      cursor: pointer;
-    }
-    .filter-select:focus {
-      border-color: var(--accent);
-      background: #FFFFFF;
-    }
-    .filter-bottom-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding-top: 8px;
-      border-top: 1px solid var(--border);
-      font-size: 12px;
-    }
-    .filter-toggles {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 16px;
-    }
-    .filter-checkbox {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      color: #44403C;
-      font-weight: 500;
-      user-select: none;
-    }
-    .filter-checkbox input {
-      accent-color: var(--accent);
-      width: 14px;
-      height: 14px;
-      cursor: pointer;
-    }
-    .filter-status-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .match-counter {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 6px;
-      background: var(--accent-subtle);
-      color: var(--accent);
-      border: 1px solid #BFDBFE;
-    }
-    .btn-filter-mini {
-      background: #FAF8F5;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 4px 10px;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      color: #44403C;
-    }
-    .btn-filter-mini:hover {
-      background: #F1F5F9;
-      border-color: var(--border-dark);
-    }
-    .family-pill {
-      font-size: 10px;
-      font-weight: 600;
-      background: #F1F5F9;
-      color: #475569;
-      border: 1px solid #CBD5E1;
-      padding: 2px 7px;
-      border-radius: 4px;
-    }
-    .empty-filter-state {
-      display: none;
-      text-align: center;
-      padding: 40px 24px;
-      background: var(--card-bg);
-      border: 1px dashed var(--border-dark);
-      border-radius: 16px;
-      color: var(--text-muted);
-      margin-bottom: 24px;
-    }
-    .table-card-header { cursor: pointer; }
-    .table-card.collapsed .table-card-body { display: none; }
-    .table-card.collapsed .collapse-chevron { transform: rotate(-90deg); display: inline-block; }
-
-    /* Table Cards */
-    .table-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      margin-bottom: 24px;
-      overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
-    }
-    .table-card-header {
-      background: #FDFBF8;
-      border-bottom: 1px solid var(--border);
-      padding: 16px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .table-title-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .schema-badge {
-      background: #E7E5E4;
-      color: #44403C;
-      font-size: 10px;
-      font-weight: 700;
-      font-family: var(--font-mono);
-      padding: 2px 6px;
-      border-radius: 4px;
-      text-transform: uppercase;
-    }
-    h3.table-name {
-      font-size: 18px;
-      font-weight: 700;
-      color: #1C1917;
-    }
-    .table-meta-pills {
-      font-size: 12px;
-      color: var(--text-muted);
-      display: flex;
-      gap: 12px;
-    }
-    .table-meta-pills span {
-      background: #F5EFE6;
-      padding: 3px 8px;
-      border-radius: 6px;
-    }
-    .table-description {
-      padding: 12px 24px 0 24px;
-      color: var(--text-muted);
-      font-size: 13px;
-      font-style: italic;
-    }
-
-    /* Fiche Par Table (Section 1) */
-    .fiche-box {
-      margin: 16px 24px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      background: var(--card-bg);
-    }
-    .fiche-box-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: #D97706;
-      padding: 10px 24px;
-      letter-spacing: -0.01em;
-      border-bottom: 1px solid var(--border);
-      background: rgba(217, 119, 6, 0.05);
-    }
-    .fiche-table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-    }
-    .fiche-table th {
-      padding: 8px 18px;
-      border-bottom: 1px solid var(--border);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 700;
-      text-align: left;
-      background: #F8FAFC;
-      color: #475569;
-    }
-    .fiche-table th.fiche-th-label {
-      width: 260px;
-      border-right: 1px solid var(--border);
-    }
-    .fiche-table td {
-      padding: 9px 18px;
-      border-bottom: 1px solid var(--border);
-      font-size: 13px;
-      vertical-align: middle;
-      line-height: 1.4;
-    }
-    .fiche-table tr:last-child td {
-      border-bottom: none;
-    }
-    .fiche-label {
-      width: 260px;
-      font-weight: 700;
-      color: #1C1917;
-      background: rgba(0, 0, 0, 0.02);
-      border-right: 1px solid var(--border);
-    }
-    .fiche-value {
-      color: #44403C;
-      word-break: break-word;
-    }
-    .dark-theme .fiche-label {
-      color: #FAF6F0;
-      background: rgba(255, 255, 255, 0.02);
-    }
-    .dark-theme .fiche-value {
-      color: #D6D3D1;
-    }
-    .dark-theme .fiche-box-title {
-      background: rgba(217, 119, 6, 0.12);
-    }
-
-    /* Tables */
-    .table-responsive {
-      overflow-x: auto;
-    }
-    table.data-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 13px;
-    }
-    table.data-table th {
-      background: #FAF8F5;
-      color: #57534E;
-      font-weight: 700;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: 10px 24px;
-      border-bottom: 1px solid var(--border);
-    }
-    table.data-table td {
-      padding: 10px 24px;
-      border-bottom: 1px solid #F0ECE4;
-      vertical-align: middle;
-    }
-    table.data-table tr:last-child td {
-      border-bottom: none;
-    }
-    table.data-table tr:hover td {
-      background: #FBF9F6;
-    }
-
-    /* Badges */
-    /* Badges */
-    .badges-row { display: flex; gap: 4px; align-items: center; overflow: hidden; }
-    .badge {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      font-weight: 700;
-      padding: 2px 5px;
-      border-radius: 3px;
-      display: inline-block;
-      line-height: 1.2;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      white-space: nowrap;
-    }
-    .badge-pk { background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D; }
-    .badge-fk { background: #EDE9FE; color: #6D28D9; border: 1px solid #C4B5FD; }
-    .badge-geom { background: #ECFDF5; color: #047857; border: 1px solid #6EE7B7; }
-    .badge-postgis { background: #047857; color: #FFFFFF; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
-    
-    .type-badge {
-      display: inline-block;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 11px;
-      color: #1E293B;
-      background: #F1F5F9;
-      border: 1px solid #CBD5E1;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    .nullable-tag {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      font-weight: 700;
-      padding: 2px 5px;
-      border-radius: 3px;
-      display: inline-block;
-    }
-    .tag-null { color: var(--text-subtle); background: transparent; }
-    .tag-notnull { color: #DC2626; background: #FEF2F2; border: 1px solid #FCA5A5; }
-
-    .cardinality-chip {
-      display: inline-block;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 11px;
-      color: var(--text);
-    }
-
-    .font-mono { font-family: var(--font-mono); }
-    .font-bold { font-weight: 700; }
-    .text-center { text-align: center; }
-    .text-muted { color: var(--text-muted); }
-    .text-subtle { color: var(--text-subtle); }
-    .text-accent { color: var(--accent); }
-    .text-success { color: var(--success); }
-    .text-truncate {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    /* Section Headers */
-    .section-header {
-      margin: 32px 0 16px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-    }
-    .section-title {
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: -0.01em;
-      color: #1C1917;
-    }
-    .section-subtitle {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
-    /* Print media query */
-    @media print {
-      body { background: #FFFFFF; padding: 0; font-size: 11px; }
-      .container { max-width: 100%; }
-      .header-actions, .filter-panel { display: none !important; }
-      .table-card { break-inside: avoid; border-color: #CCCCCC; box-shadow: none; margin-bottom: 20px; }
-      header.report-header { box-shadow: none; border-color: #CCCCCC; }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <!-- Header -->
-    <header class="report-header">
-      <div class="header-top">
-        <div>
-          <span class="badge-brand">${escapeHtml(i18n.brand)}</span>
-          <h1 class="db-title">${escapeHtml(schema.databaseName)}</h1>
-          <p class="db-desc">${escapeHtml(i18n.desc)}</p>
-        </div>
+  const printButtonHtml = cfg.header.showPrintButton ? `
         <div class="header-actions">
           <button class="btn-action" onclick="window.print()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
             ${escapeHtml(i18n.printBtn)}
           </button>
-        </div>
-      </div>
-      <div style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); border-top: 1px solid var(--border); padding-top: 14px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-        <span>${escapeHtml(i18n.genAt)} <strong>${generatedTimeStr}</strong></span>
-        <span>${escapeHtml(i18n.serverVer)} <strong>${escapeHtml(schema.serverVersion || 'PostgreSQL 16+')}</strong></span>
-      </div>
-    </header>
+        </div>` : '';
 
+  const logoLeftImg = safeLogoLeft
+    ? `<img src="${escapeHtml(safeLogoLeft)}" alt="Logo gauche" class="report-logo report-logo-left" />`
+    : '';
+  const logoRightImg = safeLogoRight
+    ? `<img src="${escapeHtml(safeLogoRight)}" alt="Logo droit" class="report-logo report-logo-right" />`
+    : '';
+
+  // Two dedicated logo slots strictly ABOVE the header content
+  const topLogosRowHtml = (logoLeftImg || logoRightImg) ? `
+      <div class="header-logos-top">
+        <div class="header-logo-slot header-logo-slot-left">${logoLeftImg}</div>
+        <div class="header-logo-slot header-logo-slot-right">${logoRightImg}</div>
+      </div>` : '';
+
+  const titleBlockHtml = `
+        <div class="header-title-block">
+          ${cfg.header.showBrandBadge ? `<span class="badge-brand">${escapeHtml(i18n.brand)}</span>` : ''}
+          <h1 class="db-title">${escapeHtml(displayTitle)}</h1>
+          <p class="db-desc">${escapeHtml(i18n.desc)}</p>
+        </div>`;
+
+  let headerInnerTopHtml = '';
+  if (cfg.header.layout === 'center' || cfg.header.layout === 'split') {
+    headerInnerTopHtml = `
+      ${topLogosRowHtml}
+      <div class="header-top header-layout-center">
+        ${titleBlockHtml}
+        ${printButtonHtml}
+      </div>`;
+  } else {
+    headerInnerTopHtml = `
+      ${topLogosRowHtml}
+      <div class="header-top header-layout-left">
+        <div class="header-left-brand">
+          ${titleBlockHtml}
+        </div>
+        <div class="header-right-slot">
+          ${printButtonHtml}
+        </div>
+      </div>`;
+  }
+
+  const headerHtml = cfg.header.showHeader ? `
+    <!-- Header -->
+    <header class="report-header">
+      ${headerInnerTopHtml}
+      <div class="header-meta-bar">
+        ${headerMetaItems.join('\n        ')}
+      </div>
+    </header>` : '';
+
+  const kpiHtml = cfg.sections.kpis ? `
     <!-- KPI Summary Grid -->
     <div class="kpi-grid">
       <div class="kpi-card">
@@ -2604,7 +2632,7 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
       </div>
       <div class="kpi-card">
         <div class="kpi-title">${escapeHtml(i18n.kpiSpatial)}</div>
-        <div class="kpi-val text-emerald">${schema.summary.totalSpatialTables}</div>
+        <div class="kpi-val text-success">${spatialTableCount}</div>
         <div class="kpi-sub">${escapeHtml(i18n.kpiSpatialSub)}</div>
       </div>
       <div class="kpi-card">
@@ -2619,17 +2647,19 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
       </div>
       <div class="kpi-card">
         <div class="kpi-title">${escapeHtml(i18n.kpiRels)}</div>
-        <div class="kpi-val text-amber">${schema.summary.totalRelationships}</div>
+        <div class="kpi-val text-report-accent">${schema.summary.totalRelationships}</div>
         <div class="kpi-sub">${escapeHtml(i18n.kpiRelsSub)}</div>
       </div>
-    </div>
+    </div>` : '';
 
+  const typeDistHtml = cfg.sections.typeDistribution ? `
     <!-- Data Types Distribution -->
     <div class="dist-box">
       <span class="dist-label">${escapeHtml(i18n.distLabel)}</span>
       ${typeDistributionHtml}
-    </div>
+    </div>` : '';
 
+  const relationshipsHtml = cfg.sections.relationships ? `
     <!-- Relationships Section -->
     <div class="section-header">
       <div>
@@ -2656,17 +2686,9 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
           </tbody>
         </table>
       </div>
-    </div>
+    </div>` : '';
 
-    <!-- Tables Catalog Section -->
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">${escapeHtml(i18n.catSectionTitle)}</h2>
-        <p class="section-subtitle">${escapeHtml(i18n.catSectionSub)}</p>
-      </div>
-      <span class="font-mono text-muted" style="font-size: 12px;">${schema.tables.length} ${escapeHtml(i18n.docTables)}</span>
-    </div>
-
+  const filterPanelHtml = cfg.sections.filterPanel ? `
     <!-- Advanced Multi-Criteria Search & Filter Panel -->
     <div class="filter-panel" id="search-filter-panel">
       <div class="filter-top-row">
@@ -2753,12 +2775,764 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
       <button type="button" class="btn-action" onclick="resetFilters()">
         ${isFr ? 'Réinitialiser tous les filtres' : 'Reset all filters'}
       </button>
+    </div>` : '';
+
+  const footerHtml = cfg.header.footerText.trim() ? `
+    <footer class="report-footer">
+      <span>${escapeHtml(cfg.header.footerText.trim())}</span>
+    </footer>` : '';
+
+  const density = cfg.density || 'compact';
+  const sp = density === 'ultra-compact'
+    ? {
+        bodyPad: '10px 14px',
+        blockGap: '10px',
+        headerPad: '12px 16px',
+        cardRadius: '10px',
+        kpiPad: '8px 12px',
+        kpiValSize: '20px',
+        cardHeaderPad: '7px 12px',
+        ficheMargin: '6px 12px',
+        ficheTitlePad: '5px 12px',
+        cellPad: '3px 9px',
+        sectionMargin: '14px 0 8px 0',
+        titleSize: '20px',
+        tableTitleSize: '14px',
+      }
+    : density === 'compact'
+    ? {
+        bodyPad: '16px 20px',
+        blockGap: '14px',
+        headerPad: '16px 22px',
+        cardRadius: '12px',
+        kpiPad: '11px 14px',
+        kpiValSize: '23px',
+        cardHeaderPad: '10px 16px',
+        ficheMargin: '10px 16px',
+        ficheTitlePad: '6px 16px',
+        cellPad: '5px 12px',
+        sectionMargin: '18px 0 10px 0',
+        titleSize: '22px',
+        tableTitleSize: '15px',
+      }
+    : {
+        bodyPad: '28px',
+        blockGap: '22px',
+        headerPad: '24px 28px',
+        cardRadius: '16px',
+        kpiPad: '16px 18px',
+        kpiValSize: '26px',
+        cardHeaderPad: '14px 22px',
+        ficheMargin: '14px 22px',
+        ficheTitlePad: '9px 20px',
+        cellPad: '8px 18px',
+        sectionMargin: '26px 0 14px 0',
+        titleSize: '25px',
+        tableTitleSize: '17px',
+      };
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(pageTitle)}</title>
+${googleFontsLink}
+  <style>
+    :root {
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --text-subtle: #94A3B8;
+      --border: #E2E8F0;
+      --border-dark: #CBD5E1;
+      --primary: #1E293B;
+      --accent: #2563EB;
+      --accent-subtle: #EFF6FF;
+      --report-accent: ${accentColor};
+      --success: #059669;
+      --success-subtle: #ECFDF5;
+      --warning: ${accentColor};
+      --warning-subtle: #FEF6EC;
+      --purple: #7C3AED;
+      --purple-subtle: #F5F3FF;
+      --font-sans: ${fontOption.cssStack};
+      --font-mono: ${monoStack};
+      --logo-height: ${logoHeight}px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: ${baseFontSize}px;
+      line-height: 1.42;
+      padding: ${sp.bodyPad};
+    }
+
+    .container {
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+
+    header.report-header {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-top: 4px solid var(--report-accent);
+      border-radius: ${sp.cardRadius};
+      padding: ${sp.headerPad};
+      margin-bottom: ${sp.blockGap};
+      box-shadow: 0 2px 12px -2px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Two dedicated logo slots ABOVE header content */
+    .header-logos-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-logo-slot {
+      display: flex;
+      align-items: center;
+      min-height: 24px;
+    }
+    .header-logo-slot-left { justify-content: flex-start; }
+    .header-logo-slot-right { justify-content: flex-end; }
+
+    .report-logo {
+      max-height: var(--logo-height);
+      max-width: 220px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .header-layout-left .header-left-brand {
+      flex: 1;
+      min-width: 0;
+    }
+    .header-layout-left .header-right-slot {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .header-layout-center {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .header-layout-center .db-desc {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .badge-brand {
+      background: var(--report-accent);
+      color: #FFFFFF;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 5px;
+      display: inline-block;
+      margin-bottom: 6px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    h1.db-title {
+      font-size: ${sp.titleSize};
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #141F1D;
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+
+    p.db-desc {
+      color: var(--text-muted);
+      font-size: 0.95em;
+      max-width: 780px;
+    }
+
+    .header-meta-bar {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    button.btn-action {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      color: #141F1D;
+    }
+    button.btn-action:hover {
+      background: #EBF3E8;
+      border-color: #C2D2C2;
+    }
+
+    /* Custom Free-Text Sections */
+    .custom-section-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--report-accent);
+      border-radius: ${sp.cardRadius};
+      padding: ${sp.cardHeaderPad};
+      margin-bottom: ${sp.blockGap};
+    }
+    .custom-section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #141F1D;
+      margin-bottom: 6px;
+    }
+    .custom-section-body p {
+      color: var(--text);
+      margin-bottom: 6px;
+      line-height: 1.5;
+    }
+    .custom-section-body p:last-child { margin-bottom: 0; }
+
+    /* KPI Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: ${sp.blockGap};
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: ${sp.cardRadius};
+      padding: ${sp.kpiPad};
+    }
+    .kpi-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+    }
+    .kpi-val {
+      font-size: ${sp.kpiValSize};
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: #141F1D;
+      line-height: 1.05;
+    }
+    .kpi-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    /* Distribution Pills */
+    .dist-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: ${sp.cardRadius};
+      padding: 8px 14px;
+      margin-bottom: ${sp.blockGap};
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+    .dist-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+    .dist-item, .dist-pill {
+      background: #F7FAF5;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dist-name { color: #324E48; }
+    .dist-count { color: var(--primary); }
+
+    /* Quick Filter & Search Panel */
+    .filter-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: ${sp.cardRadius};
+      padding: 10px 14px;
+      margin-bottom: ${sp.blockGap};
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .filter-top-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .search-input {
+      flex: 1;
+      min-width: 220px;
+      background: #F7FAF5;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      outline: none;
+      font-family: var(--font-sans);
+    }
+    .search-input:focus {
+      border-color: var(--report-accent);
+      background: #FFFFFF;
+    }
+    .filter-controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 140px;
+      flex: 1;
+    }
+    .filter-group label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .filter-select {
+      background: #F7FAF5;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-family: var(--font-sans);
+      color: var(--text);
+      outline: none;
+      cursor: pointer;
+    }
+    .filter-bottom-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .filter-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+    }
+    .filter-checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      color: #324E48;
+      font-weight: 500;
+      user-select: none;
+    }
+    .filter-checkbox input {
+      accent-color: var(--report-accent);
+      width: 13px;
+      height: 13px;
+      cursor: pointer;
+    }
+    .filter-status-actions { display: flex; align-items: center; gap: 8px; }
+    .match-counter {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border: 1px solid #BFDBFE;
+    }
+    .btn-filter-mini {
+      background: #F7FAF5;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      color: #324E48;
+    }
+    .btn-filter-mini:hover { background: #F1F5F9; border-color: var(--border-dark); }
+    .family-pill {
+      font-size: 10px;
+      font-weight: 600;
+      background: #F1F5F9;
+      color: #475569;
+      border: 1px solid #CBD5E1;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .empty-filter-state {
+      display: none;
+      text-align: center;
+      padding: 28px 18px;
+      background: var(--card-bg);
+      border: 1px dashed var(--border-dark);
+      border-radius: ${sp.cardRadius};
+      color: var(--text-muted);
+      margin-bottom: ${sp.blockGap};
+    }
+    .table-card-header { cursor: pointer; }
+    .table-card.collapsed .table-card-body { display: none; }
+    .table-card.collapsed .collapse-chevron { transform: rotate(-90deg); display: inline-block; }
+
+    /* Table Cards */
+    .table-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: ${sp.cardRadius};
+      margin-bottom: ${sp.blockGap};
+      overflow: hidden;
+    }
+    .table-card-header {
+      background: #FAFCF9;
+      border-bottom: 1px solid var(--border);
+      padding: ${sp.cardHeaderPad};
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .table-title-group {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+    .table-meta-row {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .schema-badge {
+      background: #E3EAE1;
+      color: #324E48;
+      font-size: 9px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding: 1px 5px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    h3.table-name {
+      font-size: ${sp.tableTitleSize};
+      font-weight: 700;
+      color: #141F1D;
+    }
+    .table-description {
+      padding: 6px 16px 0 16px;
+      color: var(--text-muted);
+      font-size: 0.9em;
+      font-style: italic;
+    }
+
+    /* Fiche Par Table (Section 1) */
+    .fiche-box {
+      margin: ${sp.ficheMargin};
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--card-bg);
+    }
+    .fiche-box-title {
+      font-size: 0.88em;
+      font-weight: 700;
+      color: var(--report-accent);
+      padding: ${sp.ficheTitlePad};
+      letter-spacing: -0.01em;
+      border-bottom: 1px solid var(--border);
+      background: #FAFCF9;
+    }
+    .fiche-box-title.physical-title {
+      border-top: 1px solid var(--border);
+    }
+    .fiche-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .fiche-table th {
+      padding: ${sp.cellPad};
+      border-bottom: 1px solid var(--border);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      text-align: left;
+      background: #F8FAFC;
+      color: #475569;
+    }
+    .fiche-table th.fiche-th-label {
+      width: 220px;
+      border-right: 1px solid var(--border);
+    }
+    .fiche-table td {
+      padding: ${sp.cellPad};
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9em;
+      vertical-align: middle;
+      line-height: 1.35;
+    }
+    .fiche-table tr:last-child td { border-bottom: none; }
+    .fiche-label {
+      width: 220px;
+      font-weight: 700;
+      color: #141F1D;
+      background: rgba(0, 0, 0, 0.02);
+      border-right: 1px solid var(--border);
+    }
+    .fiche-value {
+      color: #324E48;
+      word-break: break-word;
+    }
+    /* Space-saving 2-column profile table */
+    .fiche-table-2col .fiche-label-2col {
+      width: 16%;
+      font-weight: 700;
+      color: #141F1D;
+      background: rgba(0, 0, 0, 0.02);
+      border-right: 1px solid var(--border);
+    }
+    .fiche-table-2col .fiche-value-2col {
+      width: 34%;
+      color: #324E48;
+      word-break: break-word;
+    }
+    .fiche-table-2col .fiche-col-divider {
+      border-left: 1px solid var(--border-dark);
+    }
+
+    /* Tables */
+    .table-responsive { overflow-x: auto; }
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9em;
+    }
+    table.data-table th {
+      background: #F7FAF5;
+      color: #475E59;
+      font-weight: 700;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: ${sp.cellPad};
+      border-bottom: 1px solid var(--border);
+    }
+    table.data-table td {
+      padding: ${sp.cellPad};
+      border-bottom: 1px solid #E8EDE7;
+      vertical-align: middle;
+    }
+    table.data-table tr:last-child td { border-bottom: none; }
+    table.data-table tr:hover td { background: #F8FAF7; }
+
+    /* Badges */
+    .badges-row { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
+    .badge {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      display: inline-block;
+      line-height: 1.25;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .badge-pk { background: #FBE6CA; color: #AB4012; border: 1px solid #F3AA56; }
+    .badge-fk { background: #EDE9FE; color: #6D28D9; border: 1px solid #C4B5FD; }
+    .badge-geom { background: #ECFDF5; color: #047857; border: 1px solid #6EE7B7; }
+    .badge-postgis { background: #047857; color: #FFFFFF; font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 4px; }
+    .badge-arcgis { background: #0369A1; color: #FFFFFF; font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 4px; }
+
+    .type-badge {
+      display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.88em;
+      color: #1E293B;
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    .nullable-tag {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .tag-null { color: var(--text-subtle); background: transparent; }
+    .tag-notnull { color: #DC2626; background: #FEF2F2; border: 1px solid #FCA5A5; }
+
+    .cardinality-chip {
+      display: inline-block;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      color: var(--text);
+    }
+
+    .font-mono { font-family: var(--font-mono); }
+    .font-bold { font-weight: 700; }
+    .text-center { text-align: center; }
+    .text-muted { color: var(--text-muted); }
+    .text-subtle { color: var(--text-subtle); }
+    .text-accent { color: var(--accent); }
+    .text-report-accent { color: var(--report-accent); }
+    .text-success { color: var(--success); }
+    .text-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Section Headers */
+    .section-header {
+      margin: ${sp.sectionMargin};
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .section-title {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #141F1D;
+    }
+    .section-subtitle {
+      font-size: 0.88em;
+      color: var(--text-muted);
+    }
+
+    /* Footer */
+    footer.report-footer {
+      margin-top: 20px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    @media (max-width: 720px) {
+      body { padding: 10px; }
+      .header-layout-left { flex-direction: column; }
+      .fiche-table th.fiche-th-label, .fiche-label { width: 130px; }
+      .fiche-table-2col .fiche-label-2col { width: 22%; }
+      .fiche-table-2col .fiche-value-2col { width: 28%; }
+    }
+
+    @media print {
+      body { background: #FFFFFF; padding: 0; font-size: ${Math.max(9, baseFontSize - 2)}px; }
+      .container { max-width: 100%; }
+      .header-actions, .filter-panel, .empty-filter-state { display: none !important; }
+      .table-card { break-inside: avoid; border-color: #CCCCCC; box-shadow: none; margin-bottom: 10px; }
+      header.report-header, .custom-section-card { box-shadow: none; border-color: #CCCCCC; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    ${headerHtml}
+    ${topCustomSectionsHtml}
+    ${kpiHtml}
+    ${typeDistHtml}
+    ${relationshipsHtml}
+
+    <!-- Tables Catalog Section -->
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">${escapeHtml(i18n.catSectionTitle)}</h2>
+        <p class="section-subtitle">${escapeHtml(i18n.catSectionSub)}</p>
+      </div>
+      <span class="font-mono text-muted" style="font-size: 12px;">${schema.tables.length} ${escapeHtml(i18n.docTables)}</span>
     </div>
+
+    ${filterPanelHtml}
 
     <!-- Tables List -->
     <div id="tablesContainer">
       ${tablesHtml}
     </div>
+
+    ${bottomCustomSectionsHtml}
+    ${footerHtml}
   </div>
 
   <script>
@@ -2775,7 +3549,9 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     }
 
     function resetFilters() {
-      document.getElementById('tableFilter').value = '';
+      const inputEl = document.getElementById('tableFilter');
+      if (!inputEl) return;
+      inputEl.value = '';
       document.getElementById('filterSchema').value = 'all';
       document.getElementById('filterFamily').value = 'all';
       document.getElementById('filterScope').value = 'all';
@@ -2787,7 +3563,9 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
     }
 
     function filterReport() {
-      const q = (document.getElementById('tableFilter').value || '').toLowerCase().trim();
+      const inputEl = document.getElementById('tableFilter');
+      if (!inputEl) return;
+      const q = (inputEl.value || '').toLowerCase().trim();
       const schemaVal = document.getElementById('filterSchema').value;
       const familyVal = document.getElementById('filterFamily').value;
       const scopeVal = document.getElementById('filterScope').value;
@@ -2826,8 +3604,8 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
         let matchingRowsInCard = 0;
 
         rows.forEach(r => {
-          const colName = (r.querySelector('.col-name')?.textContent || '').toLowerCase();
-          const colType = (r.querySelector('.type-badge')?.textContent || '').toLowerCase();
+          const colName = r.getAttribute('data-colname') || (r.querySelector('.col-name')?.textContent || '').toLowerCase();
+          const colType = r.getAttribute('data-coltype') || (r.querySelector('.type-badge')?.textContent || '').toLowerCase();
           const colCat = r.getAttribute('data-category') || '';
           const isPk = r.getAttribute('data-pk') === '1';
           const isFk = r.getAttribute('data-fk') === '1';
@@ -2858,7 +3636,6 @@ export function generateStandaloneHtmlReport(schema: PostgresDatabaseSchema, lan
           } else if (colTypeVal !== 'all' || constraintVal !== 'all') {
             r.style.display = isColMatch ? '' : 'none';
           } else {
-            // Only text query active and table header didn't match -> filter rows
             r.style.display = tableTextMatch ? '' : (isColMatch ? '' : 'none');
           }
         });
@@ -2999,7 +3776,7 @@ export function generatePhysicalDataModelHtml(
       --text: #F3F4F6;
       --text-muted: #9CA3AF;
       --accent: #3B82F6;
-      --pk-color: #F59E0B;
+      --pk-color: #E96A17;
       --fk-color: #A855F7;
       --geom-color: #10B981;
       --line-color: #3B82F6;
@@ -3017,7 +3794,7 @@ export function generatePhysicalDataModelHtml(
       --text: #0F172A;
       --text-muted: #64748B;
       --accent: #2563EB;
-      --pk-color: #D97706;
+      --pk-color: #CE5311;
       --fk-color: #7C3AED;
       --geom-color: #059669;
       --line-color: #2563EB;
@@ -3206,7 +3983,7 @@ export function generatePhysicalDataModelHtml(
       padding: 4px 12px;
       font-size: 10px;
       color: var(--text-muted);
-      border-bottom: 1px solid rgba(120, 113, 108, 0.14);
+      border-bottom: 1px solid rgba(98, 130, 124, 0.14);
       background: rgba(59, 130, 246, 0.04);
       white-space: nowrap;
       overflow: hidden;
@@ -3352,7 +4129,7 @@ export function generatePhysicalDataModelHtml(
       font-size: 9px;
       font-weight: 700;
       text-transform: uppercase;
-      background: rgba(120, 113, 108, 0.25);
+      background: rgba(98, 130, 124, 0.25);
       padding: 2px 5px;
       border-radius: 3px;
       color: var(--text-muted);
@@ -3407,7 +4184,7 @@ export function generatePhysicalDataModelHtml(
       gap: 8px;
       padding: 5px 12px;
       font-size: 11px;
-      border-bottom: 1px solid rgba(120, 113, 108, 0.08);
+      border-bottom: 1px solid rgba(98, 130, 124, 0.08);
       position: relative;
       box-sizing: border-box;
       width: 100%;
@@ -3438,9 +4215,9 @@ export function generatePhysicalDataModelHtml(
       flex-shrink: 0;
     }
     .tag-pk {
-      background: rgba(245, 158, 11, 0.2);
+      background: rgba(233, 106, 23, 0.2);
       color: var(--pk-color);
-      border: 1px solid rgba(245, 158, 11, 0.4);
+      border: 1px solid rgba(233, 106, 23, 0.4);
     }
     .tag-fk {
       background: rgba(168, 85, 247, 0.2);
@@ -3501,7 +4278,7 @@ export function generatePhysicalDataModelHtml(
       display: flex;
       flex-direction: column;
       gap: 4px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 16px rgba(0, 0, 0,0.3);
       z-index: 60;
     }
     .canvas-hud button {
@@ -3536,7 +4313,7 @@ export function generatePhysicalDataModelHtml(
       align-items: center;
       font-size: 12px;
       font-family: var(--font-mono);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 16px rgba(0, 0, 0,0.3);
       z-index: 60;
     }
     .legend-item {

@@ -51,15 +51,15 @@ export const GdbLayerModal: React.FC<GdbLayerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in-0 duration-150">
-      <div className="relative w-full max-w-2xl rounded-2xl bg-[#191410] border border-stone-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh] text-stone-100">
+      <div className="relative w-full max-w-2xl rounded-2xl bg-[#101917] border border-stone-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh] text-stone-100">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-stone-800 flex items-center justify-between bg-[#14100D]">
+        <div className="px-6 py-4 border-b border-stone-800 flex items-center justify-between bg-[#0D1413]">
           <div className="flex items-center space-x-3">
             <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30">
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-display font-bold text-[#FAF6F0]">
+              <h2 className="text-sm font-display font-bold text-[#F4F8F2]">
                 {isFr ? 'Inspecteur Esri File Geodatabase (.gdb)' : 'Esri File Geodatabase (.gdb) Inspector'}
               </h2>
               <p className="text-xs text-stone-400 font-mono truncate max-w-md">
@@ -116,7 +116,7 @@ export const GdbLayerModal: React.FC<GdbLayerModalProps> = ({
                     )}
                     <div className="min-w-0">
                       <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        <span className="font-mono font-bold text-xs text-[#FAF6F0]">
+                        <span className="font-mono font-bold text-xs text-[#F4F8F2]">
                           {layer.tableName}
                         </span>
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-stone-800 text-stone-400 border border-stone-700">
@@ -178,7 +178,7 @@ export const GdbLayerModal: React.FC<GdbLayerModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-stone-800 bg-[#14100D] flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-stone-800 bg-[#0D1413] flex items-center justify-between">
           <span className="text-xs font-mono text-stone-400">
             {selected.length} / {gdbInfo.layers.length} {isFr ? 'sélectionnée(s)' : 'selected'}
           </span>

@@ -146,12 +146,12 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3.5rem)] overflow-y-auto bg-[#13110E] p-6 text-[#F5EBE1]">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-y-auto bg-[#0D1413] p-6 text-[#EAEEE8]">
       <div className="max-w-5xl mx-auto w-full space-y-6">
         {/* Header Banner */}
         <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-stone-800/80">
           <div>
-            <h1 className="text-base font-display font-bold text-[#FAF6F0] flex items-center space-x-2">
+            <h1 className="text-base font-display font-bold text-[#F4F8F2] flex items-center space-x-2">
               <Settings2 className="w-4 h-4 text-amber-400" />
               <span>Conversion Lab & Geodetic Parameters</span>
             </h1>
@@ -202,7 +202,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                 >
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-display font-bold text-sm text-[#FAF6F0]">{fmt.name}</span>
+                      <span className="font-display font-bold text-sm text-[#F4F8F2]">{fmt.name}</span>
                       {fmt.tag && (
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-amber-950 text-amber-300 border border-amber-700/50">
                           {fmt.tag}
@@ -269,7 +269,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                 <span className="font-mono text-xs font-bold text-amber-300 bg-amber-950/80 px-2.5 py-0.5 rounded-md border border-amber-700/50">
                   {currentCRS.code}
                 </span>
-                <span className="font-display font-bold text-sm text-[#FAF6F0]">{currentCRS.name}</span>
+                <span className="font-display font-bold text-sm text-[#F4F8F2]">{currentCRS.name}</span>
               </div>
               <p className="text-xs text-stone-400">
                 Area of Use: <span className="text-stone-200 font-medium">{currentCRS.area}</span> · Units: <span className="text-stone-200 font-medium">{currentCRS.unit}</span>
@@ -325,7 +325,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 rounded-full bg-amber-400" />
-                    <span className="text-xs font-display font-bold text-[#FAF6F0]">Reproject Coordinates (Rigorous PROJ Math)</span>
+                    <span className="text-xs font-display font-bold text-[#F4F8F2]">Reproject Coordinates (Rigorous PROJ Math)</span>
                   </div>
                   {settings.crsMode === 'reproject' && <Check className="w-4 h-4 text-amber-400" />}
                 </div>
@@ -345,7 +345,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 rounded-full bg-orange-400" />
-                    <span className="text-xs font-display font-bold text-[#FAF6F0]">Assign CRS Only (Header Override)</span>
+                    <span className="text-xs font-display font-bold text-[#F4F8F2]">Assign CRS Only (Header Override)</span>
                   </div>
                   {settings.crsMode === 'assign' && <Check className="w-4 h-4 text-orange-400" />}
                 </div>
@@ -378,7 +378,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                 type="text"
                 value={settings.namingPattern}
                 onChange={(e) => setSettings(s => ({ ...s, namingPattern: e.target.value }))}
-                className="w-full bg-[#13110E] border border-stone-700 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:border-amber-500 focus:outline-none"
+                className="w-full bg-[#0D1413] border border-stone-700 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:border-amber-500 focus:outline-none"
               />
               <div className="flex flex-wrap gap-1.5 text-[10px] text-stone-500">
                 <span>Available tokens:</span>
@@ -395,7 +395,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
               <select
                 value={settings.collisionPolicy}
                 onChange={(e) => setSettings(s => ({ ...s, collisionPolicy: e.target.value as any }))}
-                className="w-full bg-[#13110E] border border-stone-700 rounded-xl px-3 py-2 text-xs text-stone-100 focus:border-amber-500 focus:outline-none cursor-pointer"
+                className="w-full bg-[#0D1413] border border-stone-700 rounded-xl px-3 py-2 text-xs text-stone-100 focus:border-amber-500 focus:outline-none cursor-pointer"
               >
                 <option value="rename" className="bg-stone-900">Auto-increment filename (e.g. parcels_1.gpkg)</option>
                 <option value="overwrite" className="bg-stone-900">Overwrite existing target files</option>
@@ -442,7 +442,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                   type="checkbox"
                   checked={settings.validateGeometries}
                   onChange={(e) => setSettings(s => ({ ...s, validateGeometries: e.target.checked }))}
-                  className="rounded border-stone-700 bg-[#13110E] text-amber-500 focus:ring-0"
+                  className="rounded border-stone-700 bg-[#0D1413] text-amber-500 focus:ring-0"
                 />
                 <span className="text-xs text-stone-200 font-medium">Enforce Strict Geometry Audit before Export</span>
               </label>
@@ -477,10 +477,10 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                   type="checkbox"
                   checked={consolidationSettings.consolidateToSingleGeoPackage}
                   onChange={(e) => setConsolidationSettings(s => ({ ...s, consolidateToSingleGeoPackage: e.target.checked }))}
-                  className="rounded border-stone-700 bg-[#13110E] text-amber-500 focus:ring-0 mt-0.5"
+                  className="rounded border-stone-700 bg-[#0D1413] text-amber-500 focus:ring-0 mt-0.5"
                 />
                 <div>
-                  <span className="text-xs font-display font-bold text-[#FAF6F0] block">
+                  <span className="text-xs font-display font-bold text-[#F4F8F2] block">
                     Consolidate Batch into Single Multi-Layer GeoPackage (.gpkg)
                   </span>
                   <p className="text-[11px] text-stone-400 mt-0.5 leading-relaxed">
@@ -497,7 +497,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                       type="text"
                       value={consolidationSettings.packageFileName}
                       onChange={(e) => setConsolidationSettings(s => ({ ...s, packageFileName: e.target.value }))}
-                      className="w-full bg-[#13110E] border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-300 focus:outline-none"
+                      className="w-full bg-[#0D1413] border border-stone-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-300 focus:outline-none"
                     />
                   </div>
 
@@ -506,7 +506,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                       type="checkbox"
                       checked={consolidationSettings.generateQgisProject}
                       onChange={(e) => setConsolidationSettings(s => ({ ...s, generateQgisProject: e.target.checked }))}
-                      className="rounded border-stone-700 bg-[#13110E] text-amber-500 focus:ring-0"
+                      className="rounded border-stone-700 bg-[#0D1413] text-amber-500 focus:ring-0"
                     />
                     <span className="text-[11px] font-sans text-stone-200">
                       Generate QGIS 3.x Project File (.qgs) with automated symbology
@@ -519,7 +519,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
             {/* Quick Access to Schema Harmonizer & Spatial Doctor */}
             <div className="p-4 rounded-xl bg-stone-900/80 border border-stone-800 flex flex-col justify-between">
               <div className="space-y-2">
-                <span className="text-xs font-display font-bold text-[#FAF6F0] block">
+                <span className="text-xs font-display font-bold text-[#F4F8F2] block">
                   Groundbreaking Integrity Workflows
                 </span>
                 <p className="text-[11px] text-stone-400 leading-relaxed">
@@ -553,7 +553,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                     <button
                       type="button"
                       onClick={onOpenConcatenationModal}
-                      className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl bg-[#1C1713] hover:bg-[#251E19] text-amber-400 border border-amber-600/40 text-xs font-semibold transition-all"
+                      className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl bg-[#121D1B] hover:bg-[#182623] text-amber-400 border border-amber-600/40 text-xs font-semibold transition-all"
                     >
                       <Layers className="w-3.5 h-3.5 text-amber-500" />
                       <span>Concatenate Layers</span>
@@ -563,7 +563,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                     <button
                       type="button"
                       onClick={onOpenPostgisModal}
-                      className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl bg-[#1C1713] hover:bg-[#251E19] text-indigo-400 border border-indigo-600/40 text-xs font-semibold transition-all"
+                      className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl bg-[#121D1B] hover:bg-[#182623] text-indigo-400 border border-indigo-600/40 text-xs font-semibold transition-all"
                     >
                       <Database className="w-3.5 h-3.5 text-indigo-500" />
                       <span>PostGIS / SQL</span>

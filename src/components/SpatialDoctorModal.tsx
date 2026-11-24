@@ -91,16 +91,16 @@ export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="bg-[#181411] border border-stone-700/80 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-[#101917] border border-stone-700/80 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#110E0C]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#0B1210]">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-amber-500/15 rounded-xl text-amber-400 border border-amber-500/30">
               <Stethoscope className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="font-display font-bold text-[#FAF6F0] text-base">Spatial Pre-Flight Doctor & Auto-Repair</h3>
+                <h3 className="font-display font-bold text-[#F4F8F2] text-base">Spatial Pre-Flight Doctor & Auto-Repair</h3>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-amber-950 text-amber-300 border border-amber-600/40">
                   Pre-Flight
                 </span>
@@ -123,7 +123,7 @@ export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
             <select
               value={selectedDatasetId}
               onChange={(e) => setSelectedDatasetId(e.target.value)}
-              className="bg-[#13110E] border border-stone-700 rounded-lg px-3 py-1 text-stone-100 font-medium focus:border-amber-500 focus:outline-none cursor-pointer"
+              className="bg-[#0D1413] border border-stone-700 rounded-lg px-3 py-1 text-stone-100 font-medium focus:border-amber-500 focus:outline-none cursor-pointer"
             >
               {datasets.map((d) => (
                 <option key={d.id} value={d.id} className="bg-stone-900 text-stone-100">
@@ -135,7 +135,7 @@ export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
 
           <div className="flex items-center space-x-2">
             <span className="text-stone-400">Health Index:</span>
-            <div className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-[#13110E] border border-stone-700 font-mono font-bold">
+            <div className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-[#0D1413] border border-stone-700 font-mono font-bold">
               <span className={`w-2 h-2 rounded-full ${diagnosis.healthScore > 80 ? 'bg-emerald-400' : diagnosis.healthScore > 50 ? 'bg-amber-400' : 'bg-rose-400'}`} />
               <span className={diagnosis.healthScore > 80 ? 'text-emerald-400' : diagnosis.healthScore > 50 ? 'text-amber-400' : 'text-rose-400'}>
                 {diagnosis.healthScore}%
@@ -159,7 +159,7 @@ export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center space-x-2">
                 <ArrowLeftRight className={`w-4 h-4 ${diagnosis.hasInvertedCoordinates ? 'text-amber-400' : 'text-emerald-400'}`} />
-                <span className="font-display font-bold text-sm text-[#FAF6F0]">Coordinate Axis Inversion Anomaly (X ↔ Y)</span>
+                <span className="font-display font-bold text-sm text-[#F4F8F2]">Coordinate Axis Inversion Anomaly (X ↔ Y)</span>
               </div>
               {diagnosis.hasInvertedCoordinates ? (
                 <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/50 font-mono text-[10px] font-bold">
@@ -195,7 +195,7 @@ export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Globe className="w-4 h-4 text-amber-400" />
-                <span className="font-display font-bold text-sm text-[#FAF6F0]">CRS Bounding Box Fingerprinting</span>
+                <span className="font-display font-bold text-sm text-[#F4F8F2]">CRS Bounding Box Fingerprinting</span>
               </div>
               <span className="text-[11px] font-mono text-stone-400">
                 Current: <b className="text-amber-400">{currentDataset.detectedCRS?.code || 'Undefined'}</b>
@@ -242,7 +242,7 @@ export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Wrench className="w-4 h-4 text-amber-400" />
-                <span className="font-display font-bold text-sm text-[#FAF6F0]">Topological Integrity & Vertex Audit</span>
+                <span className="font-display font-bold text-sm text-[#F4F8F2]">Topological Integrity & Vertex Audit</span>
               </div>
               <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${diagnosis.repairAvailable ? 'bg-amber-950/50 text-amber-300 border border-amber-600/40' : 'bg-emerald-950/50 text-emerald-300 border border-emerald-600/40'}`}>
                 {diagnosis.repairAvailable ? 'Repairs Available' : 'Clean Topology'}
@@ -282,7 +282,7 @@ export const SpatialDoctorModal: React.FC<SpatialDoctorModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-stone-800 bg-[#110E0C] flex items-center justify-between gap-3">
+        <div className="px-6 py-3 border-t border-stone-800 bg-[#0B1210] flex items-center justify-between gap-3">
           {onOpenDataCleaning ? (
             <button
               type="button"

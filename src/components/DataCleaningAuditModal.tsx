@@ -306,14 +306,14 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
       <div
         className={`w-full max-w-6xl h-[90vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden ${
           isLight
-            ? 'bg-white border-[#E2DBD0] text-stone-900'
-            : 'bg-[#171310] border-stone-800 text-stone-100'
+            ? 'bg-white border-[#D4DFD3] text-stone-900'
+            : 'bg-[#0F1816] border-stone-800 text-stone-100'
         }`}
       >
         {/* Header */}
         <div
           className={`px-6 py-4 border-b flex items-center justify-between gap-4 ${
-            isLight ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#120F0C] border-stone-800'
+            isLight ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0C1211] border-stone-800'
           }`}
         >
           <div className="flex items-center gap-3 min-w-0">
@@ -374,8 +374,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
               aria-label={isFr ? 'Couche a auditer' : 'Dataset to audit'}
               className={`rounded-lg border px-3 py-1.5 text-xs font-medium focus:outline-none focus:border-amber-500 cursor-pointer ${
                 isLight
-                  ? 'bg-white border-[#D6CEBE] text-stone-900'
-                  : 'bg-[#1D1814] border-stone-700 text-stone-100'
+                  ? 'bg-white border-[#C2D2C2] text-stone-900'
+                  : 'bg-[#131E1C] border-stone-700 text-stone-100'
               }`}
             >
               {datasets.map((d) => (
@@ -391,7 +391,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                 onClick={handleRevertSnapshot}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
                   isLight
-                    ? 'bg-white border-[#D6CEBE] text-stone-700 hover:bg-stone-100'
+                    ? 'bg-white border-[#C2D2C2] text-stone-700 hover:bg-stone-100'
                     : 'bg-stone-900 border-stone-700 text-stone-300 hover:bg-stone-800'
                 }`}
               >
@@ -417,7 +417,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
         {(auditReport.blockedNumericColumnsCount > 0 || notice) && (
           <div
             className={`px-6 py-2.5 border-b flex flex-wrap items-center justify-between gap-3 text-xs ${
-              isLight ? 'bg-[#FDFBF7] border-[#EBE5DC]' : 'bg-[#1A1511] border-stone-800/80'
+              isLight ? 'bg-[#FDFAF7] border-[#E1E8DF]' : 'bg-[#111A18] border-stone-800/80'
             }`}
           >
             {notice ? (
@@ -458,10 +458,10 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
           {/* Left Column Sidebar */}
           <div
             className={`w-80 border-r flex flex-col shrink-0 ${
-              isLight ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14110E] border-stone-800'
+              isLight ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'
             }`}
           >
-            <div className={`p-3 border-b space-y-2.5 ${isLight ? 'border-[#EBE5DC]' : 'border-stone-800'}`}>
+            <div className={`p-3 border-b space-y-2.5 ${isLight ? 'border-[#E1E8DF]' : 'border-stone-800'}`}>
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
@@ -471,14 +471,14 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                   placeholder={isFr ? 'Filtrer les colonnes...' : 'Filter columns...'}
                   className={`w-full rounded-lg pl-8 pr-3 py-1.5 text-xs border focus:outline-none focus:border-amber-500 ${
                     isLight
-                      ? 'bg-white border-[#D6CEBE] text-stone-900 placeholder-stone-400'
-                      : 'bg-[#1D1814] border-stone-800 text-stone-100 placeholder-stone-500'
+                      ? 'bg-white border-[#C2D2C2] text-stone-900 placeholder-stone-400'
+                      : 'bg-[#131E1C] border-stone-800 text-stone-100 placeholder-stone-500'
                   }`}
                 />
               </div>
 
               {/* Segmented Filter Controls */}
-              <div className={`grid grid-cols-4 gap-1 p-1 rounded-lg ${isLight ? 'bg-[#EDE7DC]' : 'bg-stone-900'}`}>
+              <div className={`grid grid-cols-4 gap-1 p-1 rounded-lg ${isLight ? 'bg-[#E2E9E0]' : 'bg-stone-900'}`}>
                 {(
                   [
                     { id: 'all', label: isFr ? 'Toutes' : 'All' },
@@ -525,9 +525,9 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                         isActive
                           ? isLight
                             ? 'bg-amber-50 border-r-2 border-amber-600'
-                            : 'bg-[#241D17] border-r-2 border-amber-500'
+                            : 'bg-[#172421] border-r-2 border-amber-500'
                           : isLight
-                          ? 'hover:bg-[#F2ECE3]'
+                          ? 'hover:bg-[#E9EEE7]'
                           : 'hover:bg-stone-900/60'
                       }`}
                     >
@@ -617,7 +617,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                 </div>
 
                 {/* Action Studio Mode Switcher */}
-                <div className={`flex items-center gap-1 p-1 rounded-lg ${isLight ? 'bg-[#EFE9DF]' : 'bg-stone-900'}`}>
+                <div className={`flex items-center gap-1 p-1 rounded-lg ${isLight ? 'bg-[#E5EBE3]' : 'bg-stone-900'}`}>
                   <button
                     type="button"
                     onClick={() => setStudioTab('numeric')}
@@ -673,7 +673,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
               {studioTab === 'numeric' && (
                 <div
                   className={`p-5 rounded-xl border space-y-4 ${
-                    isLight ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#1D1814] border-stone-800'
+                    isLight ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#131E1C] border-stone-800'
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -693,19 +693,19 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
 
                   {/* Numeric Breakdown */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs tabular-nums">
-                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#14110E] border-stone-800'}`}>
+                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'}`}>
                       <div className="text-[11px] text-stone-500">{isFr ? 'Nombres valides' : 'Valid Numbers'}</div>
                       <div className="text-base font-bold text-emerald-500 mt-0.5">{activeCol.validNumericCount}</div>
                     </div>
-                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#14110E] border-stone-800'}`}>
+                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'}`}>
                       <div className="text-[11px] text-stone-500">{isFr ? 'Chaines numeriques' : 'Numeric Strings'}</div>
                       <div className="text-base font-bold text-amber-500 mt-0.5">{activeCol.cleanNumericStringCount}</div>
                     </div>
-                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#14110E] border-stone-800'}`}>
+                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'}`}>
                       <div className="text-[11px] text-stone-500">{isFr ? 'Malformees (ex: 19,.7)' : 'Malformed (e.g. 19,.7)'}</div>
                       <div className="text-base font-bold text-rose-500 mt-0.5">{activeCol.malformedNumericCount}</div>
                     </div>
-                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#14110E] border-stone-800'}`}>
+                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'}`}>
                       <div className="text-[11px] text-stone-500">{isFr ? 'Texte / Sentinelles' : 'Text / Sentinels'}</div>
                       <div className="text-base font-bold text-stone-400 mt-0.5">
                         {activeCol.nonNumericStringCount + activeCol.sentinelCount}
@@ -770,8 +770,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                             onChange={(e) => setTargetNumericKind(e.target.value as 'auto' | 'double' | 'integer')}
                             className={`w-full rounded-lg border px-3 py-1.5 text-xs ${
                               isLight
-                                ? 'bg-white border-[#D6CEBE] text-stone-900'
-                                : 'bg-[#14110E] border-stone-700 text-stone-100'
+                                ? 'bg-white border-[#C2D2C2] text-stone-900'
+                                : 'bg-[#0D1513] border-stone-700 text-stone-100'
                             }`}
                           >
                             <option value="double">Double / Float (REAL / DOUBLE PRECISION)</option>
@@ -789,8 +789,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                             onChange={(e) => setDecimalStringSep(e.target.value as '.' | ',')}
                             className={`w-full rounded-lg border px-3 py-1.5 text-xs ${
                               isLight
-                                ? 'bg-white border-[#D6CEBE] text-stone-900'
-                                : 'bg-[#14110E] border-stone-700 text-stone-100'
+                                ? 'bg-white border-[#C2D2C2] text-stone-900'
+                                : 'bg-[#0D1513] border-stone-700 text-stone-100'
                             }`}
                           >
                             <option value=".">Point decimal (19.7)</option>
@@ -819,7 +819,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
               {studioTab === 'case' && (
                 <div
                   className={`p-5 rounded-xl border space-y-4 ${
-                    isLight ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#1D1814] border-stone-800'
+                    isLight ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#131E1C] border-stone-800'
                   }`}
                 >
                   <div>
@@ -836,19 +836,19 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs tabular-nums">
-                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#14110E] border-stone-800'}`}>
+                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'}`}>
                       <div className="text-[11px] text-stone-500">UPPERCASE</div>
                       <div className="text-base font-bold mt-0.5">{activeCol.caseStats.uppercase}</div>
                     </div>
-                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#14110E] border-stone-800'}`}>
+                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'}`}>
                       <div className="text-[11px] text-stone-500">lowercase</div>
                       <div className="text-base font-bold mt-0.5">{activeCol.caseStats.lowercase}</div>
                     </div>
-                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#14110E] border-stone-800'}`}>
+                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'}`}>
                       <div className="text-[11px] text-stone-500">Title Case</div>
                       <div className="text-base font-bold mt-0.5">{activeCol.caseStats.titlecase}</div>
                     </div>
-                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#E2DBD0]' : 'bg-[#14110E] border-stone-800'}`}>
+                    <div className={`p-3 rounded-lg border ${isLight ? 'bg-white border-[#D4DFD3]' : 'bg-[#0D1513] border-stone-800'}`}>
                       <div className="text-[11px] text-stone-500">{isFr ? 'Mixte / Espaces' : 'Mixed / Spaces'}</div>
                       <div className="text-base font-bold text-amber-500 mt-0.5">
                         {activeCol.caseStats.mixed} / {activeCol.whitespaceIssuesCount}
@@ -872,8 +872,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                         onClick={() => handleApplyCase(btn.mode)}
                         className={`px-3.5 py-2 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
                           isLight
-                            ? 'bg-white border-[#D6CEBE] text-stone-900 hover:bg-amber-50 hover:border-amber-400'
-                            : 'bg-[#14110E] border-stone-700 text-stone-100 hover:bg-amber-950/50 hover:border-amber-600'
+                            ? 'bg-white border-[#C2D2C2] text-stone-900 hover:bg-amber-50 hover:border-amber-400'
+                            : 'bg-[#0D1513] border-stone-700 text-stone-100 hover:bg-amber-950/50 hover:border-amber-600'
                         }`}
                       >
                         {btn.label}
@@ -887,7 +887,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
               {studioTab === 'separators' && (
                 <div
                   className={`p-5 rounded-xl border space-y-4 ${
-                    isLight ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#1D1814] border-stone-800'
+                    isLight ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#131E1C] border-stone-800'
                   }`}
                 >
                   <div>
@@ -907,8 +907,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                       onClick={() => handleApplySeparatorPreset('collapse_malformed_decimals')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer ${
                         isLight
-                          ? 'bg-white border-[#D6CEBE] hover:bg-amber-50 text-stone-900'
-                          : 'bg-[#14110E] border-stone-700 hover:bg-stone-800 text-stone-200'
+                          ? 'bg-white border-[#C2D2C2] hover:bg-amber-50 text-stone-900'
+                          : 'bg-[#0D1513] border-stone-700 hover:bg-stone-800 text-stone-200'
                       }`}
                     >
                       {isFr ? 'Corriger doubles separateurs (19,.7 -> 19.7)' : 'Fix Double Separators (19,.7 -> 19.7)'}
@@ -918,8 +918,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                       onClick={() => handleApplySeparatorPreset('decimal_comma_to_dot')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer ${
                         isLight
-                          ? 'bg-white border-[#D6CEBE] hover:bg-amber-50 text-stone-900'
-                          : 'bg-[#14110E] border-stone-700 hover:bg-stone-800 text-stone-200'
+                          ? 'bg-white border-[#C2D2C2] hover:bg-amber-50 text-stone-900'
+                          : 'bg-[#0D1513] border-stone-700 hover:bg-stone-800 text-stone-200'
                       }`}
                     >
                       {isFr ? 'Virgule decimale (,) -> Point (.)' : 'Decimal Comma (,) -> Dot (.)'}
@@ -929,8 +929,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                       onClick={() => handleApplySeparatorPreset('decimal_dot_to_comma')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer ${
                         isLight
-                          ? 'bg-white border-[#D6CEBE] hover:bg-amber-50 text-stone-900'
-                          : 'bg-[#14110E] border-stone-700 hover:bg-stone-800 text-stone-200'
+                          ? 'bg-white border-[#C2D2C2] hover:bg-amber-50 text-stone-900'
+                          : 'bg-[#0D1513] border-stone-700 hover:bg-stone-800 text-stone-200'
                       }`}
                     >
                       {isFr ? 'Point decimal (.) -> Virgule (,)' : 'Decimal Dot (.) -> Comma (,)'}
@@ -951,8 +951,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                           placeholder="; ou | ou /"
                           className={`w-full rounded-lg border px-3 py-1.5 font-mono text-xs ${
                             isLight
-                              ? 'bg-white border-[#D6CEBE] text-stone-900'
-                              : 'bg-[#14110E] border-stone-700 text-stone-100'
+                              ? 'bg-white border-[#C2D2C2] text-stone-900'
+                              : 'bg-[#0D1513] border-stone-700 text-stone-100'
                           }`}
                         />
                       </div>
@@ -967,8 +967,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                           placeholder=", ou - ou ;"
                           className={`w-full rounded-lg border px-3 py-1.5 font-mono text-xs ${
                             isLight
-                              ? 'bg-white border-[#D6CEBE] text-stone-900'
-                              : 'bg-[#14110E] border-stone-700 text-stone-100'
+                              ? 'bg-white border-[#C2D2C2] text-stone-900'
+                              : 'bg-[#0D1513] border-stone-700 text-stone-100'
                           }`}
                         />
                       </div>
@@ -1008,7 +1008,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                     </span>
                   </h4>
 
-                  <div className={`flex items-center gap-1 p-1 rounded-lg ${isLight ? 'bg-[#EFE9DF]' : 'bg-stone-900'}`}>
+                  <div className={`flex items-center gap-1 p-1 rounded-lg ${isLight ? 'bg-[#E5EBE3]' : 'bg-stone-900'}`}>
                     {(
                       [
                         { id: 'all', label: isFr ? 'Tout' : 'All' },
@@ -1040,7 +1040,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                 {visibleAnomalies.length === 0 ? (
                   <div
                     className={`p-8 rounded-xl border text-center text-xs flex flex-col items-center gap-2 ${
-                      isLight ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-600' : 'bg-[#1D1814] border-stone-800 text-stone-400'
+                      isLight ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-600' : 'bg-[#131E1C] border-stone-800 text-stone-400'
                     }`}
                   >
                     <ShieldCheck className="w-6 h-6 text-emerald-500" />
@@ -1053,7 +1053,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                 ) : (
                   <div
                     className={`rounded-xl border overflow-hidden ${
-                      isLight ? 'border-[#E2DBD0]' : 'border-stone-800'
+                      isLight ? 'border-[#D4DFD3]' : 'border-stone-800'
                     }`}
                   >
                     <div className="max-h-72 overflow-y-auto">
@@ -1061,8 +1061,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                         <thead
                           className={`sticky top-0 border-b ${
                             isLight
-                              ? 'bg-[#F7F3EC] border-[#E2DBD0] text-stone-700'
-                              : 'bg-[#14110E] border-stone-800 text-stone-400'
+                              ? 'bg-[#F0F6ED] border-[#D4DFD3] text-stone-700'
+                              : 'bg-[#0D1513] border-stone-800 text-stone-400'
                           }`}
                         >
                           <tr>
@@ -1073,7 +1073,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                             <th className="py-2.5 px-3 text-right w-24">{isFr ? 'Action' : 'Action'}</th>
                           </tr>
                         </thead>
-                        <tbody className={`divide-y ${isLight ? 'divide-[#EFE9DF]' : 'divide-stone-800/70'}`}>
+                        <tbody className={`divide-y ${isLight ? 'divide-[#E5EBE3]' : 'divide-stone-800/70'}`}>
                           {visibleAnomalies.slice(0, 150).map((a) => {
                             const draftKey = `${a.featureIndex}::${a.columnName}`;
                             const draftVal =
@@ -1083,7 +1083,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                                 ? ''
                                 : String(a.suggestedValue);
                             return (
-                              <tr key={`${a.featureIndex}-${a.category}`} className={isLight ? 'hover:bg-[#FAF6F0]' : 'hover:bg-stone-900/40'}>
+                              <tr key={`${a.featureIndex}-${a.category}`} className={isLight ? 'hover:bg-[#F4F8F2]' : 'hover:bg-stone-900/40'}>
                                 <td className="py-2 px-3 font-mono tabular-nums text-stone-400">
                                   {a.rowNumber}
                                 </td>
@@ -1109,8 +1109,8 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                                     placeholder="NULL"
                                     className={`w-full rounded border px-2 py-1 font-mono text-xs ${
                                       isLight
-                                        ? 'bg-white border-[#D6CEBE] text-stone-900'
-                                        : 'bg-[#120F0C] border-stone-700 text-emerald-300'
+                                        ? 'bg-white border-[#C2D2C2] text-stone-900'
+                                        : 'bg-[#0C1211] border-stone-700 text-emerald-300'
                                     }`}
                                   />
                                 </td>
@@ -1120,7 +1120,7 @@ export const DataCleaningAuditModal: React.FC<DataCleaningAuditModalProps> = ({
                                     onClick={() => handleApplyCellOverride(a.featureIndex, draftVal, a.suggestedValue)}
                                     className={`px-2.5 py-1 rounded text-[11px] font-medium border transition-colors cursor-pointer ${
                                       isLight
-                                        ? 'bg-white border-[#D6CEBE] hover:bg-emerald-50 text-emerald-800'
+                                        ? 'bg-white border-[#C2D2C2] hover:bg-emerald-50 text-emerald-800'
                                         : 'bg-stone-900 border-stone-700 hover:bg-emerald-950/60 text-emerald-300'
                                     }`}
                                   >

@@ -32,6 +32,7 @@ import { SurfaceUnit } from '../core/spatialAnalytics';
 import { NavTab } from './Header';
 import { useI18n } from '../core/i18n';
 import { useTheme } from '../core/theme';
+import { ContourField } from './ContourField';
 
 interface CraftStudioProps {
   datasets: SpatialDataset[];
@@ -399,166 +400,154 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
   });
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-y-auto bg-[#13110E] p-6 text-[#F5EBE1]">
-      <div className="max-w-6xl mx-auto w-full space-y-7">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-y-auto bg-[var(--og-bg)] p-6 lg:p-8 text-[var(--og-fg)]">
+      <div className="max-w-[1180px] mx-auto w-full space-y-7">
         
         {/* Toast Notification */}
         {toastMsg && (
-          <div className="fixed bottom-6 right-6 z-50 bg-[#1D1714] border border-amber-500/70 text-amber-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-2.5 animate-in slide-in-from-bottom duration-200">
+          <div className="fixed bottom-6 right-6 z-50 bg-[#131E1C] border border-amber-500/70 text-amber-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-2.5 animate-in slide-in-from-bottom duration-200">
             <CheckCircle2 className="w-4 h-4 text-amber-400 flex-shrink-0" />
             <span className="text-xs font-medium font-sans">{toastMsg}</span>
           </div>
         )}
 
-        {/* Hero "What do you want to craft?" Section */}
-        <div className="relative rounded-3xl p-8 bg-gradient-to-br from-[#1C1713] via-[#16120F] to-[#120E0C] border border-amber-600/30 shadow-2xl overflow-hidden">
-          {/* Subtle Ambient Cartographic Grid Lines */}
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#F59E0B_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
+        {/* Hero: survey desk */}
+        <section className="relative overflow-hidden rounded-[22px] border border-[var(--og-line)] bg-[var(--og-surface)] shadow-[var(--og-shadow)]">
+          <div className="grid lg:grid-cols-[1.05fr_0.95fr] items-center gap-2">
+            <div className="relative z-10 p-8 lg:p-10 space-y-5">
+              <span className="og-eyebrow !text-[var(--og-accent)] flex items-center gap-2">
+                <span className="h-px w-6 bg-[var(--og-accent)]" />{t.shell.heroKicker}
+              </span>
+              <h1 className="text-[36px] md:text-[44px] leading-[1.04] font-display font-extrabold tracking-[-0.035em] [text-wrap:balance] text-[var(--og-fg)]">
+                {t.craft.heroTitlePrefix}
+                <span className="font-serif-accent text-[var(--og-accent)]">{t.craft.heroTitleCraft}</span>
+                {t.craft.heroTitleSuffix}
+              </h1>
+              <p className="max-w-md text-[15px] leading-relaxed text-[var(--og-fg-2)]">{t.shell.heroLead}</p>
 
-          <div className="relative z-10 max-w-2xl space-y-4">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-600/40 text-amber-300 text-xs font-mono font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>{t.craft.heroBadge}</span>
-            </div>
+              {datasets.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-[var(--og-fg-3)]">{t.craft.targetDataset}</span>
+                  <select
+                    value={currentDataset?.id || ''}
+                    onChange={(e) => { const ds = datasets.find(d => d.id === e.target.value); if (ds) onSelectDataset(ds); }}
+                    className="rounded-lg border border-[var(--og-line-strong)] bg-[var(--og-surface-2)] px-2.5 py-1.5 font-mono text-xs font-semibold text-[var(--og-fg)] focus:outline-none focus:border-[var(--og-accent)] cursor-pointer"
+                  >
+                    {datasets.map(d => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.geometryType} · {d.featureCount} {t.common.features})</option>
+                    ))}
+                  </select>
+                  <span className="font-mono text-[11px] text-[var(--og-fg-3)]">CRS: {currentDataset?.detectedCRS?.code || 'WGS84'}</span>
+                </div>
+              )}
 
-            <h1 className="text-3xl md:text-4xl font-display font-extrabold text-[#FAF6F0] tracking-tight">
-              {t.craft.heroTitlePrefix}{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-orange-400">
-                {t.craft.heroTitleCraft}
-              </span>{' '}
-              {t.craft.heroTitleSuffix}
-            </h1>
-
-            <p className="text-stone-300 text-sm font-sans leading-relaxed">
-              {t.craft.heroSubtitle}
-            </p>
-
-            {/* Active Dataset Selector Context */}
-            {datasets.length > 0 && (
-              <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="text-stone-400 font-sans">{t.craft.targetDataset}:</span>
-                <select
-                  value={currentDataset?.id || ''}
-                  onChange={(e) => {
-                    const ds = datasets.find(d => d.id === e.target.value);
-                    if (ds) onSelectDataset(ds);
-                  }}
-                  className={`border rounded-xl px-3 py-1.5 text-xs font-mono font-semibold focus:outline-none focus:border-amber-500 cursor-pointer ${
-                    theme === 'light'
-                      ? 'bg-[#FAF7F2] border-[#D6CEBE] text-stone-900'
-                      : 'bg-[#241D18] border-stone-700/80 text-amber-300'
-                  }`}
-                >
-                  {datasets.map(d => (
-                    <option key={d.id} value={d.id} className={theme === 'light' ? 'bg-white text-stone-900' : 'bg-stone-900 text-stone-100'}>
-                      {d.name} ({d.geometryType} · {d.featureCount} {t.common.features})
-                    </option>
-                  ))}
-                </select>
-                <span className={`text-[11px] font-mono ${theme === 'light' ? 'text-stone-500' : 'text-stone-500'}`}>
-                  CRS: {currentDataset?.detectedCRS?.code || 'WGS84'}
-                </span>
+              <div className="relative max-w-md">
+                <Search className="w-4 h-4 absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--og-fg-3)]" />
+                <input
+                  type="text"
+                  placeholder={t.craft.searchPlaceholder}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-[var(--og-line-strong)] bg-[var(--og-bg)] ps-10 pe-4 py-3 text-[13px] text-[var(--og-fg)] placeholder:text-[var(--og-fg-3)] focus:outline-none focus:border-[var(--og-accent)]"
+                />
               </div>
-            )}
+            </div>
+            <div className="relative hidden lg:block pe-6 py-6"><ContourField /></div>
           </div>
 
-          {/* Search Bar */}
-          <div className="relative mt-6 max-w-xl">
-            <Search className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${theme === 'light' ? 'text-stone-400' : 'text-stone-400'}`} />
-            <input
-              type="text"
-              placeholder={t.craft.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full border rounded-2xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/40 shadow-inner ${
-                theme === 'light'
-                  ? 'bg-white border-[#D6CEBE] text-stone-900 placeholder-stone-400'
-                  : 'bg-[#13110E]/90 border-stone-700/80 text-stone-100 placeholder-stone-500'
-              }`}
-            />
-          </div>
+          {/* Pipeline quick-start */}
+          <ol className="grid grid-cols-2 lg:grid-cols-4 border-t border-[var(--og-line)] divide-x divide-[var(--og-line)] rtl:divide-x-reverse">
+            {([
+              { tab: 'workspace', n: '01', title: t.shell.stepImport, desc: t.shell.stepImportDesc, done: datasets.length > 0 },
+              { tab: 'lab', n: '02', title: t.shell.stepConfigure, desc: t.shell.stepConfigureDesc, done: false },
+              { tab: 'map', n: '03', title: t.shell.stepInspect, desc: t.shell.stepInspectDesc, done: false },
+              { tab: 'monitor', n: '04', title: t.shell.stepRun, desc: t.shell.stepRunDesc, done: false },
+            ] as Array<{ tab: NavTab; n: string; title: string; desc: string; done: boolean }>).map((s, i, arr) => {
+              const isNext = !s.done && arr.slice(0, i).every(x => x.done || x.tab !== 'workspace');
+              return (
+                <li key={s.n}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(s.tab)}
+                    className="group flex h-full w-full flex-col gap-1.5 p-4 text-start transition-colors hover:bg-[var(--og-surface-2)]"
+                  >
+                    <span className="flex items-center gap-2 font-mono text-[11px] tracking-widest">
+                      <span className={s.done ? 'text-[var(--og-ok)]' : 'text-[var(--og-accent)]'}>{s.n}</span>
+                      <span className="font-display text-[13px] font-semibold tracking-normal text-[var(--og-fg)]">{s.title}</span>
+                      {s.done && <Check className="h-3.5 w-3.5 text-[var(--og-ok)]" />}
+                      {!s.done && i === 0 && <span className="ms-auto og-kbd">{t.shell.stepNext}</span>}
+                    </span>
+                    <span className="text-xs leading-snug text-[var(--og-fg-3)]">{s.desc}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+
+        {/* Category tabs */}
+        <div role="tablist" className="flex items-center gap-6 overflow-x-auto border-b border-[var(--og-line)] text-[13px]">
+          {categories.map(c => {
+            const active = selectedCategory === c.id;
+            return (
+              <button
+                key={c.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setSelectedCategory(c.id)}
+                className={`relative whitespace-nowrap pb-3 pt-1 font-medium transition-colors ${active ? 'text-[var(--og-fg)]' : 'text-[var(--og-fg-3)] hover:text-[var(--og-fg-2)]'}`}
+              >
+                {c.label}
+                {active && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded bg-[var(--og-accent)]" />}
+              </button>
+            );
+          })}
+          <span className="ms-auto pb-3 og-eyebrow shrink-0">{filteredActions.length} {t.shell.crafts}</span>
         </div>
 
-        {/* Category Filter Chips */}
-        <div className="flex items-center space-x-2 overflow-x-auto pb-1 text-xs">
-          {categories.map(c => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedCategory(c.id)}
-              className={`px-3.5 py-1.5 rounded-xl font-medium transition-all whitespace-nowrap ${
-                selectedCategory === c.id
-                  ? 'bg-amber-600 text-stone-950 font-bold shadow-md shadow-amber-950/20'
-                  : theme === 'light'
-                    ? 'bg-white text-stone-700 hover:text-stone-950 hover:bg-[#F2ECE3] border border-[#E2DBD0] shadow-xs'
-                    : 'bg-[#1C1714] text-stone-400 hover:text-stone-200 hover:bg-[#251E19] border border-stone-800'
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Action Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredActions.map(action => {
+        {/* Recipe plates */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredActions.map((action, idx) => {
             const Icon = action.icon;
             return (
-              <div
-                key={action.id}
-                className="group relative rounded-2xl p-5 bg-[#181411] border border-stone-800/80 hover:border-amber-500/50 hover:bg-[#201A16] transition-all duration-200 flex flex-col justify-between shadow-lg hover:shadow-amber-950/20"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/25 group-hover:scale-105 transition-transform">
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold border ${action.badgeColor}`}>
-                      {action.badge}
-                    </span>
-                  </div>
+              <article key={action.id} className="og-plate">
+                <header className="flex items-center justify-between gap-3">
+                  <span className="og-eyebrow !text-[var(--og-accent)]">{String(idx + 1).padStart(2, '0')} · {action.badge}</span>
+                  <Icon className="h-[18px] w-[18px] shrink-0 text-[var(--og-fg-3)]" />
+                </header>
 
-                  <h3 className="font-display font-bold text-sm text-[#FAF6F0] group-hover:text-amber-200 transition-colors mb-1.5">
-                    {action.title}
-                  </h3>
+                <h3 className="mt-4 font-display text-[16px] font-bold leading-snug tracking-[-0.025em] text-[var(--og-fg)]">{action.title}</h3>
+                <p className="mt-2 text-[13px] leading-relaxed text-[var(--og-fg-2)]">{action.description}</p>
 
-                  <p className="text-xs text-stone-400 font-sans leading-relaxed mb-4">
-                    {action.description}
-                  </p>
-                </div>
-
-                <div className="space-y-3 pt-3 border-t border-stone-800/80">
-                  {/* CLI Command snippet toggle/copy if available */}
+                <footer className="mt-auto pt-5 space-y-3">
                   {action.cliCommand && (
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#110E0C] border border-stone-800 font-mono text-[10px] text-stone-400">
-                      <span className="truncate max-w-[200px]">{action.cliCommand}</span>
+                    <div className="flex items-center justify-between rounded-lg border border-[var(--og-line)] bg-[var(--og-bg)] ps-2.5 pe-1 py-1 font-mono text-[10.5px] text-[var(--og-fg-3)]">
+                      <span className="truncate" dir="ltr">{action.cliCommand}</span>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopyCommand(action.cliCommand!, action.id);
-                        }}
-                        className="ml-1 text-stone-400 hover:text-amber-300 p-1 rounded"
+                        onClick={(e) => { e.stopPropagation(); handleCopyCommand(action.cliCommand!, action.id); }}
+                        className="ms-1 rounded p-1.5 text-[var(--og-fg-3)] hover:text-[var(--og-accent)]"
                         title="Copy command to clipboard"
+                        aria-label="Copy command"
                       >
-                        {copiedCmd === action.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        {copiedCmd === action.id ? <Check className="h-3 w-3 text-[var(--og-ok)]" /> : <Copy className="h-3 w-3" />}
                       </button>
                     </div>
                   )}
-
                   <button
                     onClick={action.onExecute}
-                    className="w-full flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl bg-[#241E19] hover:bg-amber-600 group-hover:bg-amber-600/90 text-stone-200 group-hover:text-stone-950 font-display font-bold text-xs transition-all shadow-sm"
+                    className="og-plate-go flex w-full items-center gap-2 border-t border-[var(--og-line)] pt-3 text-start font-display text-[13px] font-semibold text-[var(--og-fg)]"
                   >
-                    <span>{action.actionLabel}</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    <span className="flex-1">{action.actionLabel}</span>
+                    <ArrowRight className="h-4 w-4 rtl:-scale-x-100" />
                   </button>
-                </div>
-              </div>
+                </footer>
+              </article>
             );
           })}
         </div>
 
         {/* Bottom Section: Quick Command Cheatsheet & Terminal Reference */}
-        <div className="rounded-2xl p-5 bg-[#15120F] border border-stone-800 space-y-3 font-mono text-xs">
+        <div className="rounded-2xl p-5 bg-[#0E1614] border border-stone-800 space-y-3 font-mono text-xs">
           <div className="flex items-center justify-between border-b border-stone-800 pb-2">
             <span className="font-display font-bold text-stone-200 text-xs flex items-center space-x-2">
               <Terminal className="w-4 h-4 text-amber-400" />
@@ -568,19 +557,19 @@ export const CraftStudio: React.FC<CraftStudioProps> = ({
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
-            <div className="p-2.5 rounded-xl bg-[#1A1613] border border-stone-800/80">
+            <div className="p-2.5 rounded-xl bg-[#121B19] border border-stone-800/80">
               <span className="text-amber-400 font-bold block mb-0.5">⌘K / Ctrl+K</span>
               <span className="text-stone-400 font-sans">{t.craft.scPalette}</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#1A1613] border border-stone-800/80">
+            <div className="p-2.5 rounded-xl bg-[#121B19] border border-stone-800/80">
               <span className="text-amber-400 font-bold block mb-0.5">Surface Columns</span>
               <span className="text-stone-400 font-sans">{t.craft.scSurface}</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#1A1613] border border-stone-800/80">
+            <div className="p-2.5 rounded-xl bg-[#121B19] border border-stone-800/80">
               <span className="text-amber-400 font-bold block mb-0.5">Field Aggregations</span>
               <span className="text-stone-400 font-sans">{t.craft.scAgg}</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#1A1613] border border-stone-800/80">
+            <div className="p-2.5 rounded-xl bg-[#121B19] border border-stone-800/80">
               <span className="text-amber-400 font-bold block mb-0.5">Interactive Legend</span>
               <span className="text-stone-400 font-sans">{t.craft.scLegend}</span>
             </div>

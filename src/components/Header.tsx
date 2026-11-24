@@ -116,182 +116,36 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const activePreset = PRESET_PROFILES.find(p => p.id === selectedPresetId);
+  const sh = t.shell;
+  const SECTIONS: Record<NavTab, { step?: string; title: string; hint: string }> = {
+    craft: { title: t.header.craftTab, hint: sh.hintCraft },
+    workspace: { step: '01', title: t.header.workspaceTab, hint: sh.hintWorkspace },
+    lab: { step: '02', title: t.header.labTab, hint: sh.hintLab },
+    map: { step: '03', title: t.header.mapTab, hint: sh.hintMap },
+    monitor: { step: '04', title: t.header.monitorTab, hint: sh.hintMonitor },
+    scripts: { title: t.header.scriptsTab, hint: sh.hintScripts },
+    showcase: { title: t.header.showcaseTab, hint: sh.hintShowcase },
+  };
+  const section = SECTIONS[activeTab];
 
   return (
-    <header className={`h-15 border-b select-none z-30 sticky top-0 flex items-center justify-between gap-4 px-5 backdrop-blur-md transition-colors ${
+    <header className={`h-[60px] shrink-0 border-b select-none z-30 sticky top-0 flex items-center justify-between gap-4 px-5 backdrop-blur-md transition-colors ${
       theme === 'light'
-        ? 'bg-[#FAF8F5]/95 border-[#E2DBD0] text-[#1C1917]'
-        : 'bg-[#13110E]/95 border-white/[0.06] text-stone-100'
+        ? 'bg-[#F7FAF5]/95 border-[#D4DFD3] text-[#141F1D]'
+        : 'bg-[#0D1413]/95 border-white/[0.06] text-stone-100'
     }`}>
-      {/* Left: Refined Brand Identity */}
-      <div className="flex min-w-0 items-center gap-5">
-        <button
-          type="button"
-          className="flex shrink-0 items-center gap-2.5 cursor-pointer group text-left"
-          onClick={() => setActiveTab('craft')}
-          title="OmniGeo by Maodo"
-        >
-          <Logo size={32} className="transition-transform duration-200 group-hover:scale-105" />
-          
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className={`font-display font-bold tracking-tight text-sm transition-colors ${
-                theme === 'light' ? 'text-stone-900 group-hover:text-amber-800' : 'text-stone-100 group-hover:text-white'
-              }`}>
-                OmniGeo
-              </span>
-              <span className={`text-[10px] ${theme === 'light' ? 'text-stone-500' : 'text-stone-500'}`}>by Maodo</span>
-            </div>
-            <div className={`hidden xl:flex items-center gap-1.5 text-[10px] font-sans ${
-              theme === 'light' ? 'text-stone-500' : 'text-stone-500'
-            }`}>
-              <span>{t.header.airGapped}</span>
-              <span className={theme === 'light' ? 'text-stone-400' : 'text-stone-700'}>·</span>
-              <span className={`font-mono font-medium ${theme === 'light' ? 'text-amber-800' : 'text-stone-400'}`}>
-                {settings.targetFormat.toUpperCase()}
-              </span>
-            </div>
-          </div>
+      {/* Left: current section (brand + navigation live in the side rail) */}
+      <div className="flex min-w-0 items-center gap-4">
+        <button type="button" className="md:hidden shrink-0" onClick={() => setActiveTab('craft')} title="OmniGeo by Maodo">
+          <Logo size={30} />
         </button>
-
-        {/* Center-Left Navigation Tabs */}
-        <nav className="hidden md:flex items-center gap-1">
-          {/* Craft Studio Tab */}
-          <button
-            onClick={() => setActiveTab('craft')}
-            title={t.header.craftTab}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
-              activeTab === 'craft'
-                ? theme === 'light'
-                  ? 'bg-[#EAE4DA] text-stone-900 font-bold shadow-xs'
-                  : 'bg-white/[0.08] text-stone-100 font-semibold shadow-xs'
-                : theme === 'light'
-                  ? 'text-stone-600 hover:text-stone-950 hover:bg-[#F2ECE3]'
-                  : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
-            }`}
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'craft' ? (theme === 'light' ? 'text-amber-700' : 'text-amber-300') : ''}`} />
-            <span className="hidden xl:inline">{t.header.craftTab}</span>
-          </button>
-
-          {/* Workspace Tab */}
-          <button
-            onClick={() => setActiveTab('workspace')}
-            title={t.header.workspaceTab}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
-              activeTab === 'workspace'
-                ? theme === 'light'
-                  ? 'bg-[#EAE4DA] text-stone-900 font-bold shadow-xs'
-                  : 'bg-white/[0.08] text-stone-100 font-semibold shadow-xs'
-                : theme === 'light'
-                  ? 'text-stone-600 hover:text-stone-950 hover:bg-[#F2ECE3]'
-                  : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">{t.header.workspaceTab}</span>
-            {datasetCount > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                theme === 'light' ? 'bg-[#D6CEBE] text-stone-800 font-bold' : 'bg-white/[0.08] text-stone-300'
-              }`}>
-                {datasetCount}
-              </span>
-            )}
-          </button>
-
-          {/* Conversion Lab Tab */}
-          <button
-            onClick={() => setActiveTab('lab')}
-            title={t.header.labTab}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
-              activeTab === 'lab'
-                ? theme === 'light'
-                  ? 'bg-[#EAE4DA] text-stone-900 font-bold shadow-xs'
-                  : 'bg-white/[0.08] text-stone-100 font-semibold shadow-xs'
-                : theme === 'light'
-                  ? 'text-stone-600 hover:text-stone-950 hover:bg-[#F2ECE3]'
-                  : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
-            }`}
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">{t.header.labTab}</span>
-          </button>
-
-          {/* Map Preview Tab */}
-          <button
-            onClick={() => setActiveTab('map')}
-            title={t.header.mapTab}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
-              activeTab === 'map'
-                ? theme === 'light'
-                  ? 'bg-[#EAE4DA] text-stone-900 font-bold shadow-xs'
-                  : 'bg-white/[0.08] text-stone-100 font-semibold shadow-xs'
-                : theme === 'light'
-                  ? 'text-stone-600 hover:text-stone-950 hover:bg-[#F2ECE3]'
-                  : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
-            }`}
-          >
-            <MapIcon className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">{t.header.mapTab}</span>
-          </button>
-
-          {/* Job Monitor Tab */}
-          <button
-            onClick={() => setActiveTab('monitor')}
-            title={t.header.monitorTab}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
-              activeTab === 'monitor'
-                ? theme === 'light'
-                  ? 'bg-[#EAE4DA] text-stone-900 font-bold shadow-xs'
-                  : 'bg-white/[0.08] text-stone-100 font-semibold shadow-xs'
-                : theme === 'light'
-                  ? 'text-stone-600 hover:text-stone-950 hover:bg-[#F2ECE3]'
-                  : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">{t.header.monitorTab}</span>
-            {runningJobCount > 0 && (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            )}
-          </button>
-
-          {/* Schema Enrichment Scripts Tab */}
-          <button
-            onClick={() => setActiveTab('scripts')}
-            title={t.header.scriptsTab}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-              activeTab === 'scripts'
-                ? theme === 'light'
-                  ? 'bg-[#EAE4DA] text-stone-900 font-bold shadow-xs'
-                  : 'bg-white/[0.08] text-stone-100 font-semibold shadow-xs'
-                : theme === 'light'
-                  ? 'text-stone-600 hover:text-stone-950 hover:bg-[#F2ECE3]'
-                  : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
-            }`}
-          >
-            <FileCode2 className={`w-3.5 h-3.5 ${activeTab === 'scripts' ? (theme === 'light' ? 'text-amber-700' : 'text-amber-300') : ''}`} />
-            <span className="hidden xl:inline">{t.header.scriptsTab}</span>
-          </button>
-
-          {/* Showcase & Website Tab */}
-          <button
-            onClick={() => setActiveTab('showcase')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${
-              activeTab === 'showcase'
-                ? theme === 'light'
-                  ? 'bg-[#EAE4DA] text-stone-900 font-bold shadow-xs'
-                  : 'bg-white/[0.08] text-stone-100 font-semibold shadow-xs'
-                : theme === 'light'
-                  ? 'text-stone-600 hover:text-stone-950 hover:bg-[#F2ECE3]'
-                  : 'text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]'
-            }`}
-            title={t.header.showcaseTab}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">{t.header.showcaseTab}</span>
-          </button>
-        </nav>
+        <div className="min-w-0 flex items-baseline gap-3">
+          {section.step && (
+            <span className="font-mono text-[11px] font-semibold tracking-[0.18em] text-[var(--og-accent)]">{section.step}</span>
+          )}
+          <h1 className="truncate font-display text-[18px] font-bold tracking-[-0.03em] text-[var(--og-fg)]">{section.title}</h1>
+          <span className="hidden 2xl:inline truncate text-xs text-[var(--og-fg-3)]">{section.hint}</span>
+        </div>
       </div>
 
       {/* Right: Streamlined Clean Controls & Primary CTA */}
@@ -309,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'border-amber-600/50 bg-amber-50 text-amber-900 font-bold'
                   : 'border-amber-500/50 bg-amber-500/10 text-amber-400'
                 : theme === 'light'
-                  ? 'border-[#E2DBD0] bg-white text-stone-800 hover:bg-[#F5EFE6] hover:text-stone-950 shadow-xs'
+                  ? 'border-[#D4DFD3] bg-white text-stone-800 hover:bg-[#EBF3E8] hover:text-stone-950 shadow-xs'
                   : 'border-white/[0.08] bg-white/[0.04] text-stone-300 hover:bg-white/[0.08] hover:text-stone-100'
             }`}
           >
@@ -323,8 +177,8 @@ export const Header: React.FC<HeaderProps> = ({
               role="menu"
               className={`absolute right-0 top-full mt-1.5 w-40 rounded-xl border p-1 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-100 ${
                 theme === 'light'
-                  ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-stone-400/20'
-                  : 'bg-[#181411] border-stone-800 text-stone-200 shadow-stone-950/70'
+                  ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-stone-400/20'
+                  : 'bg-[#101917] border-stone-800 text-stone-200 shadow-stone-950/70'
               }`}
             >
               {[
@@ -345,11 +199,11 @@ export const Header: React.FC<HeaderProps> = ({
                     className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${
                       isActive
                         ? theme === 'light'
-                          ? 'bg-[#FEF3C7] text-[#92400E] font-bold border border-[#FCD34D]'
-                          : 'bg-[#251E19] text-amber-300 font-semibold'
+                          ? 'bg-[#FBE6CA] text-[#8B3315] font-bold border border-[#F3AA56]'
+                          : 'bg-[#182623] text-amber-300 font-semibold'
                         : theme === 'light'
-                          ? 'text-stone-700 hover:bg-[#F5EFE6] hover:text-stone-950'
-                          : 'text-stone-400 hover:bg-[#201A16] hover:text-stone-200'
+                          ? 'text-stone-700 hover:bg-[#EBF3E8] hover:text-stone-950'
+                          : 'text-stone-400 hover:bg-[#15211F] hover:text-stone-200'
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -359,7 +213,7 @@ export const Header: React.FC<HeaderProps> = ({
                             ? 'border-amber-600/40 bg-amber-100 text-amber-800 font-bold'
                             : 'border-amber-600/40 bg-amber-500/10 text-amber-500 font-bold'
                           : theme === 'light'
-                            ? 'border-[#D6CEBE] text-stone-600'
+                            ? 'border-[#C2D2C2] text-stone-600'
                             : 'border-stone-700/50 text-stone-500'
                       }`}>
                         {item.short}
@@ -380,7 +234,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={toggleTheme}
           className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 ${
             theme === 'light'
-              ? 'border-[#E2DBD0] bg-white text-stone-700 hover:bg-[#F5EFE6] hover:text-stone-950 shadow-xs'
+              ? 'border-[#D4DFD3] bg-white text-stone-700 hover:bg-[#EBF3E8] hover:text-stone-950 shadow-xs'
               : 'border-transparent text-stone-400 hover:bg-white/[0.06] hover:text-stone-100'
           }`}
           title={
@@ -396,11 +250,17 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Command Palette Trigger */}
         <button
           onClick={onOpenCommandPalette}
-          className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 ${
-            theme === 'light'
-              ? 'text-stone-600 hover:bg-[#F2ECE3] hover:text-stone-900'
-              : 'text-stone-400 hover:bg-white/[0.06] hover:text-stone-100'
-          }`}
+          className="hidden lg:flex h-9 min-w-[220px] items-center gap-2 rounded-lg border border-[var(--og-line)] bg-[var(--og-surface)] ps-3 pe-2 text-xs text-[var(--og-fg-3)] transition-colors hover:border-[var(--og-line-strong)] hover:text-[var(--og-fg-2)]"
+          title={`${t.header.commands} (${t.header.commandsKbd})`}
+          aria-label={t.header.commands}
+        >
+          <Search className="h-3.5 w-3.5" />
+          <span className="flex-1 text-start">{sh.searchPill}</span>
+          <kbd className="og-kbd">{t.header.commandsKbd}</kbd>
+        </button>
+        <button
+          onClick={onOpenCommandPalette}
+          className="lg:hidden flex h-9 w-9 items-center justify-center rounded-lg text-[var(--og-fg-2)] hover:bg-[var(--og-surface-2)]"
           title={`${t.header.commands} (${t.header.commandsKbd})`}
           aria-label={t.header.commands}
         >
@@ -416,10 +276,10 @@ export const Header: React.FC<HeaderProps> = ({
             className={`flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
               isToolsOpen || hasCertificate
                 ? theme === 'light'
-                  ? 'border-[#D9D0C3] bg-[#EAE4DA] text-stone-900 font-semibold shadow-xs'
+                  ? 'border-[#C6D6C6] bg-[#DFE7DD] text-stone-900 font-semibold shadow-xs'
                   : 'border-white/[0.12] bg-white/[0.06] text-stone-100'
                 : theme === 'light'
-                  ? 'border-[#E2DBD0] bg-white text-stone-800 hover:bg-[#F5EFE6] hover:text-stone-950 shadow-xs'
+                  ? 'border-[#D4DFD3] bg-white text-stone-800 hover:bg-[#EBF3E8] hover:text-stone-950 shadow-xs'
                   : 'border-transparent text-stone-300 hover:bg-white/[0.06]'
             }`}
           >
@@ -435,11 +295,11 @@ export const Header: React.FC<HeaderProps> = ({
           {isToolsOpen && (
             <div className={`absolute right-0 mt-2 w-72 rounded-2xl border p-2 z-50 animate-in fade-in zoom-in-95 duration-100 text-xs font-sans shadow-2xl ${
               theme === 'light'
-                ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-stone-400/25'
-                : 'bg-[#1C1714] border-stone-700/80 text-stone-200 shadow-stone-950/80'
+                ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-stone-400/25'
+                : 'bg-[#131D1B] border-stone-700/80 text-stone-200 shadow-stone-950/80'
             }`}>
               {/* Presets Sub-section */}
-              <div className={`p-2 border-b ${theme === 'light' ? 'border-[#EBE5DC]' : 'border-stone-800'}`}>
+              <div className={`p-2 border-b ${theme === 'light' ? 'border-[#E1E8DF]' : 'border-stone-800'}`}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className={`text-[10px] font-mono uppercase font-semibold tracking-wider flex items-center space-x-1 ${theme === 'light' ? 'text-stone-600' : 'text-stone-400'}`}>
                     <Bookmark className="w-3 h-3 text-amber-500" />
@@ -455,8 +315,8 @@ export const Header: React.FC<HeaderProps> = ({
                   }}
                   className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-amber-500 cursor-pointer border ${
                     theme === 'light'
-                      ? 'bg-[#FAF7F2] border-[#D6CEBE] text-stone-900'
-                      : 'bg-[#120F0D] border-stone-700 text-stone-100'
+                      ? 'bg-[#F5F9F3] border-[#C2D2C2] text-stone-900'
+                      : 'bg-[#0C1312] border-stone-700 text-stone-100'
                   }`}
                 >
                   {PRESET_PROFILES.map((p) => (
@@ -468,7 +328,7 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               {/* Specialized GIS Integrity Tools */}
-              <div className={`py-1.5 space-y-0.5 border-b ${theme === 'light' ? 'border-[#EBE5DC]' : 'border-stone-800'}`}>
+              <div className={`py-1.5 space-y-0.5 border-b ${theme === 'light' ? 'border-[#E1E8DF]' : 'border-stone-800'}`}>
                 <button
                   onClick={() => {
                     setIsToolsOpen(false);
@@ -476,8 +336,8 @@ export const Header: React.FC<HeaderProps> = ({
                   }}
                   className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
                     theme === 'light'
-                      ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
-                      : 'hover:bg-[#28211C] text-stone-200 hover:text-amber-300'
+                      ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
+                      : 'hover:bg-[#1B2926] text-stone-200 hover:text-amber-300'
                   }`}
                 >
                   <Stethoscope className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -495,8 +355,8 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
-                        : 'hover:bg-[#28211C] text-stone-200 hover:text-amber-300'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
+                        : 'hover:bg-[#1B2926] text-stone-200 hover:text-amber-300'
                     }`}
                   >
                     <SlidersHorizontal className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -520,8 +380,8 @@ export const Header: React.FC<HeaderProps> = ({
                   }}
                   className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
                     theme === 'light'
-                      ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-orange-800'
-                      : 'hover:bg-[#28211C] text-stone-200 hover:text-orange-300'
+                      ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-orange-800'
+                      : 'hover:bg-[#1B2926] text-stone-200 hover:text-orange-300'
                   }`}
                 >
                   <TableProperties className="w-4 h-4 text-orange-500 flex-shrink-0" />
@@ -559,8 +419,8 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
-                        : 'hover:bg-[#28211C] text-stone-200 hover:text-amber-300'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
+                        : 'hover:bg-[#1B2926] text-stone-200 hover:text-amber-300'
                     }`}
                   >
                     <Layers className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -579,8 +439,8 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-purple-800'
-                        : 'hover:bg-[#28211C] text-stone-200 hover:text-purple-300'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-purple-800'
+                        : 'hover:bg-[#1B2926] text-stone-200 hover:text-purple-300'
                     }`}
                   >
                     <GitMerge className="w-4 h-4 text-purple-500 flex-shrink-0" />
@@ -603,8 +463,8 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-indigo-800'
-                        : 'hover:bg-[#28211C] text-stone-200 hover:text-indigo-300'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-indigo-800'
+                        : 'hover:bg-[#1B2926] text-stone-200 hover:text-indigo-300'
                     }`}
                   >
                     <Database className="w-4 h-4 text-indigo-500 flex-shrink-0" />
@@ -622,8 +482,8 @@ export const Header: React.FC<HeaderProps> = ({
                   }}
                   className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
                     theme === 'light'
-                      ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
-                      : 'hover:bg-[#28211C] text-stone-200 hover:text-amber-300'
+                      ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
+                      : 'hover:bg-[#1B2926] text-stone-200 hover:text-amber-300'
                   }`}
                 >
                   <FileCode2 className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -647,8 +507,8 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-emerald-800'
-                        : 'hover:bg-[#28211C] text-stone-200 hover:text-emerald-300'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-emerald-800'
+                        : 'hover:bg-[#1B2926] text-stone-200 hover:text-emerald-300'
                     }`}
                   >
                     <KeyRound className="w-4 h-4 text-emerald-500 flex-shrink-0" />
@@ -673,8 +533,8 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
-                        : 'hover:bg-[#28211C] text-stone-200 hover:text-amber-300'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
+                        : 'hover:bg-[#1B2926] text-stone-200 hover:text-amber-300'
                     }`}
                   >
                     <TableProperties className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -696,8 +556,8 @@ export const Header: React.FC<HeaderProps> = ({
                   }}
                   className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors ${
                     theme === 'light'
-                      ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
-                      : 'hover:bg-[#28211C] text-stone-200 hover:text-amber-300'
+                      ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
+                      : 'hover:bg-[#1B2926] text-stone-200 hover:text-amber-300'
                   }`}
                 >
                   <Terminal className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -715,8 +575,8 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-emerald-800'
-                        : 'hover:bg-[#28211C] text-stone-200 hover:text-emerald-300'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-emerald-800'
+                        : 'hover:bg-[#1B2926] text-stone-200 hover:text-emerald-300'
                     }`}
                   >
                     <ShieldCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
@@ -747,11 +607,11 @@ export const Header: React.FC<HeaderProps> = ({
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg border text-xs transition-colors ${
                     settings.isDryRun
                       ? theme === 'light'
-                        ? 'bg-[#FEF3C7] border-[#FCD34D] text-[#92400E] font-bold'
+                        ? 'bg-[#FBE6CA] border-[#F3AA56] text-[#8B3315] font-bold'
                         : 'bg-amber-950/60 border-amber-600/70 text-amber-300 font-semibold'
                       : theme === 'light'
-                        ? 'bg-[#FAF7F2] border-[#E2DBD0] text-stone-700 hover:bg-[#F5EFE6]'
-                        : 'bg-[#15120F] border-stone-800 text-stone-400 hover:text-stone-200'
+                        ? 'bg-[#F5F9F3] border-[#D4DFD3] text-stone-700 hover:bg-[#EBF3E8]'
+                        : 'bg-[#0E1614] border-stone-800 text-stone-400 hover:text-stone-200'
                   }`}
                 >
                   <div className="flex items-center space-x-2">
@@ -773,7 +633,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onStartBatch}
           disabled={datasetCount === 0 || runningJobCount > 0}
-          className="flex items-center space-x-2 rounded-lg bg-[#A87945] px-3.5 py-2 text-xs font-semibold text-stone-950 transition-colors hover:bg-[#B98953] disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex items-center space-x-2 rounded-lg bg-[#A3694A] px-3.5 py-2 text-xs font-semibold text-stone-950 transition-colors hover:bg-[#B47858] disabled:cursor-not-allowed disabled:opacity-40"
           title="Execute Batch Processing Pipeline"
           aria-label={settings.isDryRun ? t.header.dryCheck : t.header.processBatch}
         >

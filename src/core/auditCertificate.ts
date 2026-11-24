@@ -88,7 +88,7 @@ export async function generateQAQCReportData(
  */
 export function buildQAQCHtmlDocument(data: QAQCReportData): string {
   const isPassed = data.summary.complianceStatus === 'VERIFIED_PASSED';
-  const statusColor = isPassed ? '#059669' : data.summary.complianceStatus === 'PASSED_WITH_NOTICES' ? '#d97706' : '#dc2626';
+  const statusColor = isPassed ? '#059669' : data.summary.complianceStatus === 'PASSED_WITH_NOTICES' ? '#CE5311' : '#DC2626';
 
   const inputRows = Object.entries(data.inputSha256Checksums).map(([file, hash]) => `
     <tr>
@@ -112,24 +112,24 @@ export function buildQAQCHtmlDocument(data: QAQCReportData): string {
   <meta charset="UTF-8">
   <title>Geospatial QA/QC Audit Certificate — ${data.reportId}</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 40px; background: #f8fafc; color: #1e293b; }
-    .cert-container { max-width: 900px; margin: 0 auto; background: #ffffff; border: 2px solid #cbd5e1; border-radius: 12px; padding: 48px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-    .cert-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; margin-bottom: 32px; }
-    .title { font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; }
-    .subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 40px; background: #F8FAFC; color: #1E293B; }
+    .cert-container { max-width: 900px; margin: 0 auto; background: #FFFFFF; border: 2px solid #CBD5E1; border-radius: 12px; padding: 48px; box-shadow: 0 10px 25px rgba(0, 0, 0,0.05); }
+    .cert-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #E2E8F0; padding-bottom: 24px; margin-bottom: 32px; }
+    .title { font-size: 24px; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; }
+    .subtitle { font-size: 13px; color: #64748B; margin-top: 4px; }
     .badge { padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; background: ${statusColor}15; color: ${statusColor}; border: 1.5px solid ${statusColor}; }
-    .section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #334155; margin: 28px 0 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; }
+    .section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #334155; margin: 28px 0 12px; border-bottom: 1px solid #F1F5F9; padding-bottom: 6px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
-    th { background: #f8fafc; text-align: left; padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #cbd5e1; }
-    tr:nth-child(even) { background: #fafafa; }
+    th { background: #F8FAFC; text-align: left; padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #CBD5E1; }
+    tr:nth-child(even) { background: #FAFAFA; }
     .grid-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 20px 0; }
-    .metric-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
-    .metric-val { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 4px; font-family: monospace; }
-    .metric-label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 600; }
-    .signature-area { display: flex; justify-content: space-between; margin-top: 48px; padding-top: 24px; border-top: 2px dashed #e2e8f0; }
+    .metric-card { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; text-align: center; }
+    .metric-val { font-size: 22px; font-weight: 800; color: #0F172A; margin-top: 4px; font-family: monospace; }
+    .metric-label { font-size: 11px; text-transform: uppercase; color: #64748B; font-weight: 600; }
+    .signature-area { display: flex; justify-content: space-between; margin-top: 48px; padding-top: 24px; border-top: 2px dashed #E2E8F0; }
     .sig-box { width: 45%; }
-    .sig-line { border-bottom: 1px solid #94a3b8; height: 40px; margin-bottom: 8px; }
-    .print-btn { display: inline-block; background: #0f766e; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; margin-bottom: 24px; cursor: pointer; border: none; }
+    .sig-line { border-bottom: 1px solid #94A3B8; height: 40px; margin-bottom: 8px; }
+    .print-btn { display: inline-block; background: #0F766E; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; margin-bottom: 24px; cursor: pointer; border: none; }
     @media print { .print-btn { display: none; } body { padding: 0; background: white; } .cert-container { box-shadow: none; border: none; padding: 20px; } }
   </style>
 </head>
@@ -157,7 +157,7 @@ export function buildQAQCHtmlDocument(data: QAQCReportData): string {
       </div>
       <div class="metric-card">
         <div class="metric-label">Target CRS</div>
-        <div class="metric-val" style="color: #0284c7;">${data.summary.targetCRS}</div>
+        <div class="metric-val" style="color: #0284C7;">${data.summary.targetCRS}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Reprojection Drift</div>
@@ -177,7 +177,7 @@ export function buildQAQCHtmlDocument(data: QAQCReportData): string {
       </tr>
       <tr>
         <td style="padding: 8px 12px; font-weight: 600;">Target Coordinate Reference</td>
-        <td style="padding: 8px 12px; font-family: monospace; color: #0284c7; font-weight: 700;">${data.transformationChain.targetCRS} (${data.transformationChain.datumName})</td>
+        <td style="padding: 8px 12px; font-family: monospace; color: #0284C7; font-weight: 700;">${data.transformationChain.targetCRS} (${data.transformationChain.datumName})</td>
       </tr>
       <tr>
         <td style="padding: 8px 12px; font-weight: 600;">Transformation Method</td>
@@ -190,7 +190,7 @@ export function buildQAQCHtmlDocument(data: QAQCReportData): string {
     </table>
 
     <div class="section-title">2. Cryptographic Checksum Integrity Matrix (SHA-256)</div>
-    <div style="font-size: 12px; color: #64748b; margin-bottom: 8px;">Source Dataset Inputs:</div>
+    <div style="font-size: 12px; color: #64748B; margin-bottom: 8px;">Source Dataset Inputs:</div>
     <table>
       <tr>
         <th>Source Dataset</th>
@@ -200,7 +200,7 @@ export function buildQAQCHtmlDocument(data: QAQCReportData): string {
       ${inputRows}
     </table>
 
-    <div style="font-size: 12px; color: #64748b; margin-bottom: 8px; margin-top: 16px;">Converted Output Artifacts:</div>
+    <div style="font-size: 12px; color: #64748B; margin-bottom: 8px; margin-top: 16px;">Converted Output Artifacts:</div>
     <table>
       <tr>
         <th>Target Artifact</th>
@@ -220,22 +220,22 @@ export function buildQAQCHtmlDocument(data: QAQCReportData): string {
       <tr>
         <td style="padding: 8px 12px; font-weight: 500;">Unclosed Linear Rings</td>
         <td style="padding: 8px 12px; color: #059669; font-weight: 700;">PASS (0 remaining)</td>
-        <td style="padding: 8px 12px; color: #64748b;">All boundary polygon rings verified closed.</td>
+        <td style="padding: 8px 12px; color: #64748B;">All boundary polygon rings verified closed.</td>
       </tr>
       <tr>
         <td style="padding: 8px 12px; font-weight: 500;">Degenerate & Zero-Length Segments</td>
         <td style="padding: 8px 12px; color: #059669; font-weight: 700;">PASS</td>
-        <td style="padding: 8px 12px; color: #64748b;">Zero duplicated consecutive vertices.</td>
+        <td style="padding: 8px 12px; color: #64748B;">Zero duplicated consecutive vertices.</td>
       </tr>
       <tr>
         <td style="padding: 8px 12px; font-weight: 500;">Non-Finite & NaN Coordinates</td>
         <td style="padding: 8px 12px; color: #059669; font-weight: 700;">PASS (0 NaN)</td>
-        <td style="padding: 8px 12px; color: #64748b;">All vertex coordinates are finite numbers.</td>
+        <td style="padding: 8px 12px; color: #64748B;">All vertex coordinates are finite numbers.</td>
       </tr>
       <tr>
         <td style="padding: 8px 12px; font-weight: 500;">Spatial Bounds Limit Compliance</td>
         <td style="padding: 8px 12px; color: #059669; font-weight: 700;">PASS</td>
-        <td style="padding: 8px 12px; color: #64748b;">Coordinates adhere to legal CRS projection extents.</td>
+        <td style="padding: 8px 12px; color: #64748B;">Coordinates adhere to legal CRS projection extents.</td>
       </tr>
     </table>
 
@@ -243,13 +243,13 @@ export function buildQAQCHtmlDocument(data: QAQCReportData): string {
       <div class="sig-box">
         <div class="sig-line"></div>
         <div style="font-size: 12px; font-weight: 700;">Automated Audit Engine</div>
-        <div style="font-size: 11px; color: #64748b;">OmniGeo by Maodo v1.0.0 • Batch Core</div>
-        <div style="font-size: 11px; font-family: monospace; color: #94a3b8; margin-top: 4px;">ID: ${data.reportId}</div>
+        <div style="font-size: 11px; color: #64748B;">OmniGeo by Maodo v1.0.0 • Batch Core</div>
+        <div style="font-size: 11px; font-family: monospace; color: #94A3B8; margin-top: 4px;">ID: ${data.reportId}</div>
       </div>
       <div class="sig-box">
         <div class="sig-line"></div>
         <div style="font-size: 12px; font-weight: 700;">Lead GIS Engineer / Surveyor Approval</div>
-        <div style="font-size: 11px; color: #64748b;">Issued on: ${new Date(data.generatedAt).toLocaleString()}</div>
+        <div style="font-size: 11px; color: #64748B;">Issued on: ${new Date(data.generatedAt).toLocaleString()}</div>
       </div>
     </div>
   </div>

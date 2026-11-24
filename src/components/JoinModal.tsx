@@ -282,13 +282,13 @@ export const JoinModal: React.FC<JoinModalProps> = ({
       <div 
         className={`w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] transition-colors ${
           theme === 'light'
-            ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-amber-950/20'
-            : 'bg-[#181411] border-stone-800 text-stone-100 shadow-stone-950/90'
+            ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-amber-950/20'
+            : 'bg-[#101917] border-stone-800 text-stone-100 shadow-stone-950/90'
         }`}
       >
         {/* Header */}
         <div className={`p-4 border-b flex items-center justify-between ${
-          theme === 'light' ? 'bg-[#F8F6F1] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+          theme === 'light' ? 'bg-[#F3F8F1] border-[#D4DFD3]' : 'bg-[#0C1412] border-stone-800'
         }`}>
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
@@ -321,7 +321,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
 
         {/* Mode Selector Tabs */}
         <div className={`px-4 pt-3 border-b flex items-center space-x-2 text-xs font-mono ${
-          theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#14100D] border-stone-800'
+          theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0D1413] border-stone-800'
         }`}>
           <button
             type="button"
@@ -357,7 +357,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Target Layer (Left) */}
             <div className={`p-3.5 rounded-xl border space-y-2 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#15110E] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0E1514] border-stone-800'
             }`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -377,7 +377,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                 value={targetDatasetId}
                 onChange={(e) => setTargetDatasetId(e.target.value)}
                 className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-emerald-500 ${
-                  theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                  theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                 }`}
               >
                 {datasets.map(d => (
@@ -395,7 +395,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
 
             {/* Source Layer (Right) */}
             <div className={`p-3.5 rounded-xl border space-y-2 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#15110E] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0E1514] border-stone-800'
             }`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -415,7 +415,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                 value={sourceDatasetId}
                 onChange={(e) => setSourceDatasetId(e.target.value)}
                 className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 ${
-                  theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                  theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                 }`}
               >
                 {datasets.map(d => (
@@ -436,7 +436,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
           {joinMode === 'attribute' ? (
             /* Attribute Join Parameters */
             <div className={`p-4 rounded-xl border space-y-3 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#15110E] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0E1514] border-stone-800'
             }`}>
               <span className="font-display font-bold text-xs text-amber-600 dark:text-amber-400 block uppercase font-mono tracking-wider">
                 {lang === 'fr' ? 'Configuration des clés d\'association :' : 'Key Matching Fields :'}
@@ -452,7 +452,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                     value={targetKeyField}
                     onChange={(e) => setTargetKeyField(e.target.value)}
                     className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 ${
-                      theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                      theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                     }`}
                   >
                     {targetDataset?.fields.map(f => (
@@ -472,7 +472,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                     value={sourceKeyField}
                     onChange={(e) => setSourceKeyField(e.target.value)}
                     className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 ${
-                      theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                      theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                     }`}
                   >
                     {sourceDataset?.fields.map(f => (
@@ -528,7 +528,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
           ) : (
             /* Spatial Join Parameters */
             <div className={`p-4 rounded-xl border space-y-3 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#15110E] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0E1514] border-stone-800'
             }`}>
               <span className="font-display font-bold text-xs text-amber-600 dark:text-amber-400 block uppercase font-mono tracking-wider">
                 {lang === 'fr' ? 'Prédicat géographique & relation spatiale :' : 'Spatial Relationship Predicate :'}
@@ -549,7 +549,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                         ? 'bg-amber-500 text-stone-950 font-bold border-amber-600 shadow-xs'
                         : theme === 'light'
                           ? 'bg-white border-stone-300 text-stone-700 hover:bg-stone-100'
-                          : 'bg-[#120F0D] border-stone-800 text-stone-300 hover:bg-stone-800'
+                          : 'bg-[#0C1312] border-stone-800 text-stone-300 hover:bg-stone-800'
                     }`}
                   >
                     <div className="text-xs font-semibold">{pred.label}</div>
@@ -589,7 +589,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
           {/* ATTRIBUTE ENRICHMENT & PREFIX CONFIGURATION */}
           {sourceDataset && (
             <div className={`p-4 rounded-xl border space-y-3 ${
-              theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#15110E] border-stone-800'
+              theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0E1514] border-stone-800'
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-stone-200 dark:border-stone-800">
                 <div>
@@ -657,7 +657,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                     onChange={(e) => setFieldPrefix(e.target.value)}
                     placeholder="e.g. join_ or src_"
                     className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 ${
-                      theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                      theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                     }`}
                   />
                 </div>
@@ -672,7 +672,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                     onChange={(e) => setOutputName(e.target.value)}
                     placeholder="e.g. parcels_enriched"
                     className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none focus:border-amber-500 ${
-                      theme === 'light' ? 'bg-white border-[#D6CEBE]' : 'bg-[#120F0D] border-stone-700'
+                      theme === 'light' ? 'bg-white border-[#C2D2C2]' : 'bg-[#0C1312] border-stone-700'
                     }`}
                   />
                 </div>
@@ -683,7 +683,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
           {/* LIVE MATCH STATISTICS & PREVIEW */}
           {previewSummary && (
             <div className={`p-4 rounded-xl border space-y-3 ${
-              theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#120F0D] border-stone-800'
+              theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0C1312] border-stone-800'
             }`}>
               <div className="flex items-center justify-between">
                 <span className="font-display font-bold text-xs flex items-center space-x-1.5">
@@ -704,10 +704,10 @@ export const JoinModal: React.FC<JoinModalProps> = ({
 
               {/* Sample Table */}
               <div className={`rounded-xl border overflow-x-auto ${
-                theme === 'light' ? 'border-[#E2DBD0]' : 'border-stone-800/80'
+                theme === 'light' ? 'border-[#D4DFD3]' : 'border-stone-800/80'
               }`}>
                 <table className="w-full text-left text-[11px] font-mono border-collapse">
-                  <thead className={theme === 'light' ? 'bg-[#F2EFEA]' : 'bg-[#181411]'}>
+                  <thead className={theme === 'light' ? 'bg-[#ECF3E9]' : 'bg-[#101917]'}>
                     <tr>
                       <th className="p-2 text-stone-400 font-medium border-b border-stone-200 dark:border-stone-800">#</th>
                       {previewSummary.dataset.fields.slice(0, 5).map(f => (
@@ -744,7 +744,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
 
         {/* Footer */}
         <div className={`p-4 border-t flex items-center justify-between ${
-          theme === 'light' ? 'bg-[#F8F6F1] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+          theme === 'light' ? 'bg-[#F3F8F1] border-[#D4DFD3]' : 'bg-[#0C1412] border-stone-800'
         }`}>
           <div className="text-xs font-mono text-stone-500">
             {previewSummary ? (

@@ -87,16 +87,16 @@ export const SchemaHarmonizerModal: React.FC<SchemaHarmonizerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-      <div className="bg-[#181411] border border-stone-700/80 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-[#101917] border border-stone-700/80 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#110E0C]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#0B1210]">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-orange-500/15 rounded-xl text-orange-400 border border-orange-500/30">
               <TableProperties className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="font-display font-bold text-[#FAF6F0] text-base">Visual Batch Schema Harmonizer</h3>
+                <h3 className="font-display font-bold text-[#F4F8F2] text-base">Visual Batch Schema Harmonizer</h3>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-orange-950 text-orange-300 border border-orange-700/50">
                   Cross-Dataset Normalizer
                 </span>
@@ -120,7 +120,7 @@ export const SchemaHarmonizerModal: React.FC<SchemaHarmonizerModalProps> = ({
                 type="checkbox"
                 checked={config.enabled}
                 onChange={(e) => setConfig(prev => ({ ...prev, enabled: e.target.checked }))}
-                className="rounded border-stone-700 bg-[#13110E] text-amber-500 focus:ring-0"
+                className="rounded border-stone-700 bg-[#0D1413] text-amber-500 focus:ring-0"
               />
               <span className="font-bold text-stone-200">Enable Schema Harmonization on Export</span>
             </label>
@@ -131,7 +131,7 @@ export const SchemaHarmonizerModal: React.FC<SchemaHarmonizerModalProps> = ({
               <select
                 value={config.casingMode}
                 onChange={(e) => setConfig(prev => ({ ...prev, casingMode: e.target.value as any }))}
-                className="bg-[#13110E] border border-stone-700 rounded-lg px-2 py-1 text-stone-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+                className="bg-[#0D1413] border border-stone-700 rounded-lg px-2 py-1 text-stone-200 focus:outline-none focus:border-amber-500 cursor-pointer"
               >
                 <option value="none">Preserve Original</option>
                 <option value="lowercase">lowercase</option>
@@ -163,7 +163,7 @@ export const SchemaHarmonizerModal: React.FC<SchemaHarmonizerModalProps> = ({
         <div className="flex-1 overflow-auto p-6">
           {config.rules.length > 0 ? (
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-[#110E0C] border-b border-stone-800 text-stone-400 font-semibold uppercase tracking-wider text-[11px] z-10">
+              <thead className="sticky top-0 bg-[#0B1210] border-b border-stone-800 text-stone-400 font-semibold uppercase tracking-wider text-[11px] z-10">
                 <tr>
                   <th className="py-2.5 px-3 w-48">Unified Target Field</th>
                   <th className="py-2.5 px-3 w-28">Data Type</th>
@@ -185,7 +185,7 @@ export const SchemaHarmonizerModal: React.FC<SchemaHarmonizerModalProps> = ({
                         type="text"
                         value={rule.targetField}
                         onChange={(e) => handleUpdateRuleTarget(idx, e.target.value)}
-                        className="w-full bg-[#13110E] border border-stone-700 rounded-lg px-2.5 py-1 text-stone-100 font-mono text-xs focus:border-amber-500 focus:outline-none"
+                        className="w-full bg-[#0D1413] border border-stone-700 rounded-lg px-2.5 py-1 text-stone-100 font-mono text-xs focus:border-amber-500 focus:outline-none"
                       />
                     </td>
 
@@ -194,7 +194,7 @@ export const SchemaHarmonizerModal: React.FC<SchemaHarmonizerModalProps> = ({
                       <select
                         value={rule.targetType}
                         onChange={(e) => handleUpdateRuleType(idx, e.target.value as any)}
-                        className="w-full bg-[#13110E] border border-stone-700 rounded-lg px-2 py-1 text-stone-200 text-xs focus:border-amber-500 focus:outline-none font-sans cursor-pointer"
+                        className="w-full bg-[#0D1413] border border-stone-700 rounded-lg px-2 py-1 text-stone-200 text-xs focus:border-amber-500 focus:outline-none font-sans cursor-pointer"
                       >
                         <option value="string">string</option>
                         <option value="number">number</option>
@@ -214,7 +214,7 @@ export const SchemaHarmonizerModal: React.FC<SchemaHarmonizerModalProps> = ({
                             className={`w-full border rounded-lg px-2 py-1 text-xs focus:outline-none transition-colors cursor-pointer ${
                               currentVal
                                 ? 'bg-amber-950/60 border-amber-500/50 text-amber-300 font-semibold'
-                                : 'bg-[#13110E] border-stone-800 text-stone-500'
+                                : 'bg-[#0D1413] border-stone-800 text-stone-500'
                             }`}
                           >
                             <option value="">(None / Null)</option>
@@ -257,7 +257,7 @@ export const SchemaHarmonizerModal: React.FC<SchemaHarmonizerModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-stone-800 bg-[#110E0C] flex items-center justify-between text-xs text-stone-400">
+        <div className="px-6 py-3 border-t border-stone-800 bg-[#0B1210] flex items-center justify-between text-xs text-stone-400">
           <span>Active Rules: {config.rules.length} columns standardized across {datasets.length} datasets</span>
           <button
             onClick={onClose}

@@ -289,9 +289,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-start justify-center pt-20 bg-black/85 backdrop-blur-md p-4">
-      <div className="bg-[#181411] border border-stone-700/80 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="bg-[#101917] border border-stone-700/80 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col">
         {/* Search Input */}
-        <div className="flex items-center px-4 py-3 border-b border-stone-800 bg-[#110E0C]">
+        <div className="flex items-center px-4 py-3 border-b border-stone-800 bg-[#0B1210]">
           <Search className="w-4 h-4 text-stone-400 mr-3" />
           <input
             type="text"
@@ -320,7 +320,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                     {cmd.icon}
                   </div>
                   <div>
-                    <span className="font-semibold text-[#FAF6F0]">{cmd.title}</span>
+                    <span className="font-semibold text-[#F4F8F2]">{cmd.title}</span>
                     <span className="ml-2 text-[10px] text-stone-400 font-mono uppercase">{cmd.category}</span>
                   </div>
                 </div>
@@ -339,7 +339,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2 bg-[#110E0C] border-t border-stone-800 text-[11px] text-stone-500 flex justify-between font-mono">
+        <div className="px-4 py-2 bg-[#0B1210] border-t border-stone-800 text-[11px] text-stone-500 flex justify-between font-mono">
           <span>Navigate with <b>↑</b> <b>↓</b>, select with <b>Enter</b></span>
           <span><b>ESC</b> to close</span>
         </div>

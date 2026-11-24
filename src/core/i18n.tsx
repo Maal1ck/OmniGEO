@@ -33,6 +33,50 @@ export interface Translations {
     exportCsv: string;
     actions: string;
   };
+  shell: {
+    pipeline: string;
+    toolkit: string;
+    collapse: string;
+    expand: string;
+    dropToBegin: string;
+    files: string;
+    ready: string;
+    running: string;
+    idle: string;
+    completed: string;
+    failed: string;
+    noSelection: string;
+    searchPill: string;
+    offlineReady: string;
+    mode: string;
+    reproject: string;
+    assign: string;
+    dryRun: string;
+    workers: string;
+    hintCraft: string;
+    hintWorkspace: string;
+    hintLab: string;
+    hintMap: string;
+    hintMonitor: string;
+    hintScripts: string;
+    hintShowcase: string;
+    heroKicker: string;
+    heroLead: string;
+    heroHint: string;
+    stepImport: string;
+    stepConfigure: string;
+    stepInspect: string;
+    stepRun: string;
+    stepImportDesc: string;
+    stepConfigureDesc: string;
+    stepInspectDesc: string;
+    stepRunDesc: string;
+    stepDone: string;
+    stepNext: string;
+    crafts: string;
+    openCraft: string;
+    cursor: string;
+  };
   header: {
     brandSubtitle: string;
     airGapped: string;
@@ -346,6 +390,50 @@ export const translations: Record<Language, Translations> = {
       exportCsv: 'Export CSV',
       actions: 'Actions',
     },
+    shell: {
+      pipeline: 'Pipeline',
+      toolkit: 'Toolkit',
+      collapse: 'Collapse sidebar',
+      expand: 'Expand sidebar',
+      dropToBegin: 'Drop files to begin',
+      files: 'files',
+      ready: 'ready',
+      running: 'running',
+      idle: 'Idle',
+      completed: 'completed',
+      failed: 'failed',
+      noSelection: 'No layer selected',
+      searchPill: 'Search or run a command',
+      offlineReady: 'Local-first · offline ready',
+      mode: 'Mode',
+      reproject: 'Reproject',
+      assign: 'Assign CRS',
+      dryRun: 'Dry-run',
+      workers: 'workers',
+      hintCraft: 'Launchpad for every spatial recipe',
+      hintWorkspace: 'Import, inspect and validate files',
+      hintLab: 'Target format, CRS and naming',
+      hintMap: 'Preview source against output',
+      hintMonitor: 'Run the batch, read the log, export',
+      hintScripts: 'Generate ArcPy and SQL enrichment',
+      hintShowcase: 'Walkthroughs and reference',
+      heroKicker: 'Survey desk',
+      heroLead: 'Every conversion starts as a question about a coordinate. Pick a recipe, or follow the pipeline from import to certified output.',
+      heroHint: 'Move across the map to read coordinates',
+      stepImport: 'Import',
+      stepConfigure: 'Configure',
+      stepInspect: 'Inspect',
+      stepRun: 'Run',
+      stepImportDesc: 'Drop GeoPackage, Shapefile, GeoJSON, KML, CSV or GDB.',
+      stepConfigureDesc: 'Choose the target format, CRS and naming rules.',
+      stepInspectDesc: 'Compare source and output on the map.',
+      stepRunDesc: 'Process the batch and export the audit manifest.',
+      stepDone: 'Done',
+      stepNext: 'Next',
+      crafts: 'recipes',
+      openCraft: 'Open',
+      cursor: 'Cursor',
+    },
     header: {
       brandSubtitle: 'Cartographic Batch Studio',
       airGapped: 'Air-Gapped WASM',
@@ -657,6 +745,50 @@ export const translations: Record<Language, Translations> = {
       exportCsv: 'Exporter en CSV',
       actions: 'Actions',
     },
+    shell: {
+      pipeline: 'Chaîne de traitement',
+      toolkit: 'Boîte à outils',
+      collapse: 'Réduire le menu',
+      expand: 'Déplier le menu',
+      dropToBegin: 'Déposez des fichiers pour commencer',
+      files: 'fichiers',
+      ready: 'prêts',
+      running: 'en cours',
+      idle: 'Au repos',
+      completed: 'terminés',
+      failed: 'en échec',
+      noSelection: 'Aucune couche sélectionnée',
+      searchPill: 'Rechercher ou lancer une commande',
+      offlineReady: 'Local d’abord · prêt hors ligne',
+      mode: 'Mode',
+      reproject: 'Reprojeter',
+      assign: 'Assigner le SCR',
+      dryRun: 'Simulation',
+      workers: 'processus',
+      hintCraft: 'Point de départ de chaque recette spatiale',
+      hintWorkspace: 'Importer, inspecter et valider les fichiers',
+      hintLab: 'Format cible, SCR et nommage',
+      hintMap: 'Comparer la source et la sortie',
+      hintMonitor: 'Lancer le lot, lire le journal, exporter',
+      hintScripts: 'Générer des enrichissements ArcPy et SQL',
+      hintShowcase: 'Pas à pas et référence',
+      heroKicker: 'Bureau d’étude',
+      heroLead: 'Chaque conversion commence par une question sur une coordonnée. Choisissez une recette, ou suivez la chaîne de l’import à la sortie certifiée.',
+      heroHint: 'Survolez la carte pour lire les coordonnées',
+      stepImport: 'Importer',
+      stepConfigure: 'Configurer',
+      stepInspect: 'Inspecter',
+      stepRun: 'Exécuter',
+      stepImportDesc: 'Déposez GeoPackage, Shapefile, GeoJSON, KML, CSV ou GDB.',
+      stepConfigureDesc: 'Choisissez le format cible, le SCR et le nommage.',
+      stepInspectDesc: 'Comparez la source et la sortie sur la carte.',
+      stepRunDesc: 'Traitez le lot et exportez le manifeste d’audit.',
+      stepDone: 'Fait',
+      stepNext: 'Suivant',
+      crafts: 'recettes',
+      openCraft: 'Ouvrir',
+      cursor: 'Curseur',
+    },
     header: {
       brandSubtitle: 'Atelier Cartographique & Traitement Spatial',
       airGapped: 'WASM Local Isolé',
@@ -967,6 +1099,50 @@ export const translations: Record<Language, Translations> = {
       copy: 'نسخ',
       exportCsv: 'تصدير CSV',
       actions: 'إجراءات',
+    },
+    shell: {
+      pipeline: 'مسار المعالجة',
+      toolkit: 'الأدوات',
+      collapse: 'طيّ القائمة',
+      expand: 'توسيع القائمة',
+      dropToBegin: 'أفلت الملفات للبدء',
+      files: 'ملفات',
+      ready: 'جاهزة',
+      running: 'قيد التنفيذ',
+      idle: 'في الانتظار',
+      completed: 'مكتملة',
+      failed: 'فاشلة',
+      noSelection: 'لا توجد طبقة محددة',
+      searchPill: 'ابحث أو نفّذ أمرًا',
+      offlineReady: 'محلي أولًا · يعمل دون اتصال',
+      mode: 'الوضع',
+      reproject: 'إعادة إسقاط',
+      assign: 'تعيين نظام الإحداثيات',
+      dryRun: 'محاكاة',
+      workers: 'عمليات',
+      hintCraft: 'نقطة انطلاق كل وصفة مكانية',
+      hintWorkspace: 'استيراد الملفات وفحصها والتحقق منها',
+      hintLab: 'الصيغة الهدف ونظام الإحداثيات والتسمية',
+      hintMap: 'مقارنة المصدر بالمخرجات',
+      hintMonitor: 'شغّل الدفعة واقرأ السجل ثم صدّر',
+      hintScripts: 'توليد إثراء ArcPy وSQL',
+      hintShowcase: 'شروحات ومرجع',
+      heroKicker: 'مكتب المسح',
+      heroLead: 'كل تحويل يبدأ بسؤال عن إحداثية. اختر وصفة، أو اتبع المسار من الاستيراد إلى المخرجات الموثّقة.',
+      heroHint: 'حرّك المؤشر فوق الخريطة لقراءة الإحداثيات',
+      stepImport: 'استيراد',
+      stepConfigure: 'إعداد',
+      stepInspect: 'فحص',
+      stepRun: 'تنفيذ',
+      stepImportDesc: 'أفلت GeoPackage أو Shapefile أو GeoJSON أو KML أو CSV أو GDB.',
+      stepConfigureDesc: 'اختر الصيغة الهدف ونظام الإحداثيات وقواعد التسمية.',
+      stepInspectDesc: 'قارن المصدر بالمخرجات على الخريطة.',
+      stepRunDesc: 'عالج الدفعة وصدّر بيان التدقيق.',
+      stepDone: 'تم',
+      stepNext: 'التالي',
+      crafts: 'وصفات',
+      openCraft: 'فتح',
+      cursor: 'المؤشر',
     },
     header: {
       brandSubtitle: 'استوديو المعالجة المكانية ورسم الخرائط',

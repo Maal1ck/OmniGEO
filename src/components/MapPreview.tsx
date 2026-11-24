@@ -51,11 +51,11 @@ interface MapPreviewProps {
 }
 
 export const LAYER_PALETTE = [
-  { name: 'Amber Gold', hex: '#F59E0B' },
-  { name: 'Sunset Terracotta', hex: '#EA580C' },
-  { name: 'Deep Rust', hex: '#C2410C' },
-  { name: 'Sunburst Ochre', hex: '#D97706' },
-  { name: 'Lemon Lime', hex: '#EAB308' },
+  { name: 'Amber Gold', hex: '#E96A17' },
+  { name: 'Sunset Terracotta', hex: '#DF4517' },
+  { name: 'Deep Rust', hex: '#B93515' },
+  { name: 'Sunburst Ochre', hex: '#CE5311' },
+  { name: 'Lemon Lime', hex: '#DF7E13' },
   { name: 'Chartreuse', hex: '#84CC16' },
   { name: 'Emerald Green', hex: '#10B981' },
   { name: 'Sage Mint', hex: '#14B8A6' },
@@ -152,7 +152,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
   // Active layer color & opacity shorthand based on inspected dataset
   const activeLayerColor = dataset && layerStyles[dataset.id]?.color 
     ? layerStyles[dataset.id].color 
-    : '#F59E0B';
+    : '#E96A17';
   const activeLayerOpacity = dataset && layerStyles[dataset.id]?.opacity !== undefined 
     ? layerStyles[dataset.id].opacity 
     : 0.85;
@@ -192,7 +192,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
     setLayerStyles(prev => ({
       ...prev,
       [layerId]: {
-        ...(prev[layerId] || { color: '#F59E0B' }),
+        ...(prev[layerId] || { color: '#E96A17' }),
         opacity,
       },
     }));
@@ -219,7 +219,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
   // Cartographic Legend & Symbology States (Rendered outside the map frame to eliminate glitches)
   const [isLegendOpen, setIsLegendOpen] = useState(true);
-  const [layerColor, setLayerColor] = useState<string>('#F59E0B');
+  const [layerColor, setLayerColor] = useState<string>('#E96A17');
   const [layerOpacity, setLayerOpacity] = useState<number>(0.85);
   const [isLayerVisible, setIsLayerVisible] = useState<boolean>(true);
   const [isSurfaceMenuOpen, setIsSurfaceMenuOpen] = useState(false);
@@ -342,17 +342,17 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
         tile.height = 256;
         const ctx = tile.getContext('2d');
         if (ctx) {
-          ctx.fillStyle = '#14110E';
+          ctx.fillStyle = '#0D1513';
           ctx.fillRect(0, 0, 256, 256);
-          ctx.strokeStyle = '#29221C';
+          ctx.strokeStyle = '#1B2A27';
           ctx.lineWidth = 1;
           ctx.strokeRect(0, 0, 256, 256);
-          ctx.strokeStyle = '#1F1A16';
+          ctx.strokeStyle = '#15201E';
           ctx.beginPath();
           ctx.moveTo(128, 0); ctx.lineTo(128, 256);
           ctx.moveTo(0, 128); ctx.lineTo(256, 128);
           ctx.stroke();
-          ctx.fillStyle = '#F59E0B';
+          ctx.fillStyle = '#E96A17';
           ctx.font = '10px JetBrains Mono, monospace';
           ctx.fillText(`Z${coords.z} [${coords.x}, ${coords.y}]`, 8, 18);
         }
@@ -435,7 +435,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             return L.circleMarker(latlng, {
               radius: d.id === dataset?.id ? 7 : 5,
               fillColor: style.color,
-              color: '#1C1917',
+              color: '#141F1D',
               weight: 2,
               opacity: style.opacity,
               fillOpacity: style.opacity * 0.9,
@@ -489,17 +489,17 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
         const outLayer = L.geoJSON(reprojection.geojson, {
           style: () => ({
-            color: '#EA580C',
+            color: '#DF4517',
             weight: 2,
             dashArray: '5, 5',
-            fillColor: '#EA580C',
+            fillColor: '#DF4517',
             fillOpacity: 0.25,
           }),
           pointToLayer: (feature, latlng) => {
             return L.circleMarker(latlng, {
               radius: 6,
-              fillColor: '#EA580C',
-              color: '#1C1917',
+              fillColor: '#DF4517',
+              color: '#141F1D',
               weight: 2,
               opacity: 1,
               fillOpacity: 0.9,
@@ -607,15 +607,15 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
       const tempLayer = L.geoJSON(geo, {
         style: {
-          color: '#F59E0B',
+          color: '#E96A17',
           weight: 4,
-          fillColor: '#F59E0B',
+          fillColor: '#E96A17',
           fillOpacity: 0.6,
         },
         pointToLayer: (_f, latlng) => {
           return L.circleMarker(latlng, {
             radius: 10,
-            fillColor: '#F59E0B',
+            fillColor: '#E96A17',
             color: '#FFFFFF',
             weight: 3,
             fillOpacity: 0.95,
@@ -648,20 +648,20 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
         const propKeys = Object.keys(feature.properties || {}).slice(0, 4);
         const propRows = propKeys.map(k => `
           <div style="display:flex; justify-content:space-between; gap:10px; font-size:11px; padding:1px 0;">
-            <span style="color:#78716c; font-family:sans-serif;">${k}:</span>
-            <span style="font-family:monospace; font-weight:600; color:#1c1917;">${String(feature.properties[k])}</span>
+            <span style="color:#62827C; font-family:'Sora',sans-serif;">${k}:</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; color:#141F1D;">${String(feature.properties[k])}</span>
           </div>
         `).join('');
 
         L.popup({ autoClose: true, closeOnClick: true, offset: [0, -8] })
           .setLatLng(center)
           .setContent(`
-            <div style="font-family: sans-serif; font-size: 11px; padding: 4px; min-width: 150px; color: #1c1917;">
-              <div style="font-weight: bold; font-family: monospace; border-bottom: 1px solid #e7e5e4; padding-bottom: 3px; margin-bottom: 4px; color: #d97706; display:flex; justify-content:space-between;">
+            <div style="font-family: 'Sora', sans-serif; font-size: 11px; padding: 4px; min-width: 150px; color: #141F1D;">
+              <div style="font-weight: 700; font-family: 'IBM Plex Mono', monospace; border-bottom: 1px solid #E3EAE1; padding-bottom: 3px; margin-bottom: 4px; color: #CE5311; display:flex; justify-content:space-between;">
                 <span>Feature #${rowIdx + 1}</span>
-                <span style="font-size:10px; color:#78716c;">${geo.geometry?.type || 'Geometry'}</span>
+                <span style="font-size:10px; color:#62827C;">${geo.geometry?.type || 'Geometry'}</span>
               </div>
-              ${propRows || '<div style="color:#a8a29e; font-style:italic;">No attributes</div>'}
+              ${propRows || '<div style="color:#94B2A1; font-style:italic;">No attributes</div>'}
             </div>
           `)
           .openOn(map);
@@ -695,12 +695,12 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
   };
 
   return (
-    <div className={`flex-1 flex flex-col h-[calc(100vh-3.75rem)] overflow-hidden transition-colors ${
-      theme === 'light' ? 'bg-[#FAF8F5] text-stone-900' : 'bg-[#13110E] text-[#F5EBE1]'
+    <div className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden transition-colors ${
+      theme === 'light' ? 'bg-[#F7FAF5] text-stone-900' : 'bg-[#0D1413] text-[#EAEEE8]'
     }`}>
       {/* Top Map Control Bar */}
       <div className={`h-12 border-b px-4 flex items-center justify-between text-xs flex-shrink-0 transition-colors ${
-        theme === 'light' ? 'border-[#E2DBD0] bg-[#FAF8F5]' : 'border-stone-800 bg-[#181411]'
+        theme === 'light' ? 'border-[#D4DFD3] bg-[#F7FAF5]' : 'border-stone-800 bg-[#101917]'
       }`}>
         <div className="flex items-center space-x-3">
           {/* Toggle Legend Sidebar Outside Map Frame */}
@@ -712,7 +712,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     ? 'bg-amber-100/80 border-amber-400 text-amber-900 font-bold shadow-xs'
                     : 'bg-amber-950/80 border-amber-500/80 text-amber-300 font-semibold shadow-sm')
                 : (theme === 'light'
-                    ? 'bg-white border-[#D6CEBE] text-stone-700 hover:bg-[#F2ECE3]'
+                    ? 'bg-white border-[#C2D2C2] text-stone-700 hover:bg-[#E9EEE7]'
                     : 'bg-stone-850 border-stone-700 text-stone-300 hover:bg-stone-800')
             }`}
             title="Toggle Cartographic Legend Sidebar (Outside Map Frame)"
@@ -747,8 +747,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
           {datasets.length > 1 && (
             <div className={`hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border font-mono text-[11px] ${
               theme === 'light'
-                ? 'bg-white border-[#E2DBD0] text-stone-700'
-                : 'bg-[#201A16] border-stone-800 text-stone-300'
+                ? 'bg-white border-[#D4DFD3] text-stone-700'
+                : 'bg-[#15211F] border-stone-800 text-stone-300'
             }`}>
               <span>
                 <strong className={theme === 'light' ? 'text-amber-700' : 'text-amber-400'}>{visibleLayerIds.size}</strong>/{datasets.length} visible
@@ -765,7 +765,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
             onClick={fitCurrentBounds}
             className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg transition-colors border text-xs ${
               theme === 'light'
-                ? 'bg-white hover:bg-stone-100 text-stone-800 border-[#D6CEBE]'
+                ? 'bg-white hover:bg-stone-100 text-stone-800 border-[#C2D2C2]'
                 : 'bg-stone-850 hover:bg-stone-800 text-stone-200 border-stone-700'
             }`}
             title="Zoom to layer extent"
@@ -790,8 +790,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               {isSurfaceMenuOpen && (
                 <div className={`absolute right-0 mt-1.5 w-48 rounded-xl border p-1 z-40 text-xs shadow-2xl ${
                   theme === 'light'
-                    ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-stone-400/25'
-                    : 'bg-[#1C1714] border-stone-700 text-stone-200 shadow-stone-950/80'
+                    ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-stone-400/25'
+                    : 'bg-[#131D1B] border-stone-700 text-stone-200 shadow-stone-950/80'
                 }`}>
                   <div className={`px-2.5 py-1 text-[10px] font-mono uppercase font-semibold ${
                     theme === 'light' ? 'text-stone-500' : 'text-stone-400'
@@ -805,7 +805,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     }}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
                         : 'hover:bg-stone-800 text-stone-200 hover:text-amber-300'
                     }`}
                   >
@@ -819,7 +819,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     }}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
                         : 'hover:bg-stone-800 text-stone-200 hover:text-amber-300'
                     }`}
                   >
@@ -833,7 +833,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     }}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
                         : 'hover:bg-stone-800 text-stone-200 hover:text-amber-300'
                     }`}
                   >
@@ -847,7 +847,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     }}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors ${
                       theme === 'light'
-                        ? 'hover:bg-[#F5EFE6] text-stone-800 hover:text-amber-800'
+                        ? 'hover:bg-[#EBF3E8] text-stone-800 hover:text-amber-800'
                         : 'hover:bg-stone-800 text-stone-200 hover:text-amber-300'
                     }`}
                   >
@@ -866,7 +866,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all shadow-sm ${
                 theme === 'light'
                   ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
-                  : 'bg-[#241E19] hover:bg-[#2C241E] text-orange-300 border-orange-600/50'
+                  : 'bg-[#182523] hover:bg-[#1D2D2A] text-orange-300 border-orange-600/50'
               }`}
               title="Aggregate fields by category & append summary columns"
             >
@@ -887,7 +887,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 isSwipeMode
                   ? 'bg-amber-500 text-stone-950 font-bold border-amber-400 shadow-md'
                   : (theme === 'light'
-                      ? 'bg-white border-[#D6CEBE] text-amber-800 hover:bg-stone-100'
+                      ? 'bg-white border-[#C2D2C2] text-amber-800 hover:bg-stone-100'
                       : 'bg-stone-850 border-stone-700 text-amber-300 hover:bg-stone-800')
               }`}
               title="Interactive side-by-side swipe comparison curtain"
@@ -905,8 +905,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               onChange={(e) => setBasemap(e.target.value as any)}
               className={`rounded-lg px-2.5 py-1.5 text-xs font-medium border focus:border-amber-500 focus:outline-none cursor-pointer transition-colors ${
                 theme === 'light'
-                  ? 'bg-white border-[#D6CEBE] text-stone-900 hover:border-amber-600'
-                  : 'bg-[#181310] border-stone-700 text-stone-100 hover:border-amber-500'
+                  ? 'bg-white border-[#C2D2C2] text-stone-900 hover:border-amber-600'
+                  : 'bg-[#101817] border-stone-700 text-stone-100 hover:border-amber-500'
               }`}
               title="Sélectionner le fond cartographique"
             >
@@ -926,12 +926,12 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
         {isLegendOpen && (
           <aside className={`w-80 lg:w-88 flex-shrink-0 border-r flex flex-col h-full z-10 shadow-xl overflow-y-auto transition-colors ${
             theme === 'light'
-              ? 'border-[#E2DBD0] bg-[#FAF8F5] text-stone-900'
-              : 'border-stone-800 bg-[#16120F] text-[#F5EBE1]'
+              ? 'border-[#D4DFD3] bg-[#F7FAF5] text-stone-900'
+              : 'border-stone-800 bg-[#0E1715] text-[#EAEEE8]'
           }`}>
             {/* Sidebar Header */}
             <div className={`p-3.5 border-b flex items-center justify-between transition-colors ${
-              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3]' : 'border-stone-800 bg-[#130F0D]'
+              theme === 'light' ? 'border-[#D4DFD3] bg-[#E9EEE7]' : 'border-stone-800 bg-[#0C1412]'
             }`}>
               <div className="flex items-center space-x-2">
                 <Layers className="w-4 h-4 text-amber-500" />
@@ -963,7 +963,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
             {/* Sidebar Navigation Tabs: All Layers vs Active Symbology */}
             <div className={`flex border-b text-xs font-mono transition-colors ${
-              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3]' : 'border-stone-800 bg-[#130F0D]'
+              theme === 'light' ? 'border-[#D4DFD3] bg-[#E9EEE7]' : 'border-stone-800 bg-[#0C1412]'
             }`}>
               <button
                 onClick={() => setLegendTab('layers')}
@@ -971,7 +971,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   legendTab === 'layers'
                     ? (theme === 'light'
                         ? 'border-amber-600 text-amber-800 font-bold bg-white'
-                        : 'border-amber-500 text-amber-300 font-bold bg-[#1C1714]')
+                        : 'border-amber-500 text-amber-300 font-bold bg-[#131D1B]')
                     : (theme === 'light'
                         ? 'border-transparent text-stone-600 hover:text-stone-950'
                         : 'border-transparent text-stone-400 hover:text-stone-200')
@@ -986,7 +986,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   legendTab === 'style'
                     ? (theme === 'light'
                         ? 'border-amber-600 text-amber-800 font-bold bg-white'
-                        : 'border-amber-500 text-amber-300 font-bold bg-[#1C1714]')
+                        : 'border-amber-500 text-amber-300 font-bold bg-[#131D1B]')
                     : (theme === 'light'
                         ? 'border-transparent text-stone-600 hover:text-stone-950'
                         : 'border-transparent text-stone-400 hover:text-stone-200')
@@ -1010,7 +1010,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                       className={`px-2 py-1 rounded-md border transition-colors ${
                         theme === 'light'
                           ? 'bg-white hover:bg-stone-100 text-stone-800 border-stone-300'
-                          : 'bg-[#241E19] hover:bg-[#2F2620] text-amber-300 border-stone-700/80'
+                          : 'bg-[#182523] hover:bg-[#1F302D] text-amber-300 border-stone-700/80'
                       }`}
                       title="Make all layers visible simultaneously"
                     >
@@ -1021,7 +1021,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                       className={`px-2 py-1 rounded-md border transition-colors ${
                         theme === 'light'
                           ? 'bg-white hover:bg-stone-100 text-stone-600 border-stone-300'
-                          : 'bg-[#241E19] hover:bg-[#2F2620] text-stone-400 hover:text-stone-200 border-stone-700/80'
+                          : 'bg-[#182523] hover:bg-[#1F302D] text-stone-400 hover:text-stone-200 border-stone-700/80'
                       }`}
                       title="Hide all layers"
                     >
@@ -1068,10 +1068,10 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                             isSelected
                               ? (theme === 'light'
                                   ? 'bg-amber-50/80 border-amber-400 shadow-xs ring-1 ring-amber-400/40 text-stone-900'
-                                  : 'bg-[#221A15] border-amber-600/70 shadow-sm ring-1 ring-amber-500/30 text-[#FAF6F0]')
+                                  : 'bg-[#15221F] border-amber-600/70 shadow-sm ring-1 ring-amber-500/30 text-[#F4F8F2]')
                               : (theme === 'light'
-                                  ? 'bg-white border-[#E2DBD0] hover:border-amber-300 text-stone-800'
-                                  : 'bg-[#181411] border-stone-800/90 hover:border-stone-700 text-stone-300')
+                                  ? 'bg-white border-[#D4DFD3] hover:border-amber-300 text-stone-800'
+                                  : 'bg-[#101917] border-stone-800/90 hover:border-stone-700 text-stone-300')
                           }`}
                         >
                           {/* Row 1: Checkbox, Swatch, Name & Actions */}
@@ -1216,8 +1216,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 {/* Active Layer Details */}
                 <div className={`p-3.5 rounded-2xl border space-y-3 transition-colors ${
                   theme === 'light'
-                    ? 'bg-white border-[#E2DBD0] shadow-xs text-stone-900'
-                    : 'bg-[#1D1714] border-stone-800 shadow-inner text-[#FAF6F0]'
+                    ? 'bg-white border-[#D4DFD3] shadow-xs text-stone-900'
+                    : 'bg-[#131E1C] border-stone-800 shadow-inner text-[#F4F8F2]'
                 }`}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-2.5">
@@ -1350,7 +1350,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   <div className={`p-3.5 rounded-2xl border space-y-2 ${
                     theme === 'light'
                       ? 'bg-amber-50/70 border-amber-300 text-stone-900'
-                      : 'bg-orange-950/30 border-orange-700/50 text-[#FAF6F0]'
+                      : 'bg-orange-950/30 border-orange-700/50 text-[#F4F8F2]'
                   }`}>
                     <div className="flex items-center space-x-2">
                       <div className="w-5 h-3.5 rounded border-2 border-dashed border-orange-500 bg-orange-500/30" />
@@ -1388,8 +1388,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                       onClick={() => onCalculateSurfaces('ha')}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-colors ${
                         theme === 'light'
-                          ? 'bg-white hover:bg-stone-50 text-stone-800 hover:text-amber-800 border-[#D6CEBE]'
-                          : 'bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border-stone-800'
+                          ? 'bg-white hover:bg-stone-50 text-stone-800 hover:text-amber-800 border-[#C2D2C2]'
+                          : 'bg-[#15211F] hover:bg-[#1B2A27] text-stone-200 hover:text-amber-300 border-stone-800'
                       }`}
                     >
                       <span className="flex items-center space-x-2">
@@ -1405,8 +1405,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                       onClick={onOpenAggregationModal}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border transition-colors ${
                         theme === 'light'
-                          ? 'bg-white hover:bg-stone-50 text-stone-800 hover:text-orange-800 border-[#D6CEBE]'
-                          : 'bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-orange-300 border-stone-800'
+                          ? 'bg-white hover:bg-stone-50 text-stone-800 hover:text-orange-800 border-[#C2D2C2]'
+                          : 'bg-[#15211F] hover:bg-[#1B2A27] text-stone-200 hover:text-orange-300 border-stone-800'
                       }`}
                     >
                       <span className="flex items-center space-x-2">
@@ -1421,8 +1421,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     onClick={fitCurrentBounds}
                     className={`w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-xl border transition-colors ${
                       theme === 'light'
-                        ? 'bg-white hover:bg-stone-50 text-stone-800 hover:text-amber-800 border-[#D6CEBE]'
-                        : 'bg-[#201A16] hover:bg-[#29221C] text-stone-200 hover:text-amber-300 border-stone-800'
+                        ? 'bg-white hover:bg-stone-50 text-stone-800 hover:text-amber-800 border-[#C2D2C2]'
+                        : 'bg-[#15211F] hover:bg-[#1B2A27] text-stone-200 hover:text-amber-300 border-stone-800'
                     }`}
                   >
                     <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
@@ -1470,7 +1470,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
               <>
                 <div
                   style={{ left: `${swipePosition}%` }}
-                  className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-20 pointer-events-none shadow-[0_0_15px_rgba(245,158,11,0.8)]"
+                  className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-20 pointer-events-none shadow-[0_0_15px_rgba(233, 106, 23,0.8)]"
                 >
                   <div
                     onMouseDown={(e) => {
@@ -1484,12 +1484,12 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                 </div>
 
                 {/* Side Indicators */}
-                <div className="absolute top-3 left-4 z-20 pointer-events-none bg-[#161310]/90 backdrop-blur-md border border-amber-600/50 px-3 py-1 rounded-lg text-[10px] text-amber-300 font-mono shadow-xl flex items-center space-x-1.5">
+                <div className="absolute top-3 left-4 z-20 pointer-events-none bg-[#0F1716]/90 backdrop-blur-md border border-amber-600/50 px-3 py-1 rounded-lg text-[10px] text-amber-300 font-mono shadow-xl flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-400" />
                   <span>SOURCE: {dataset?.detectedCRS?.code || 'EPSG:4326'} (LEFT)</span>
                 </div>
 
-                <div className="absolute top-3 right-4 z-20 pointer-events-none bg-[#161310]/90 backdrop-blur-md border border-orange-500/50 px-3 py-1 rounded-lg text-[10px] text-orange-300 font-mono shadow-xl flex items-center space-x-1.5">
+                <div className="absolute top-3 right-4 z-20 pointer-events-none bg-[#0F1716]/90 backdrop-blur-md border border-orange-500/50 px-3 py-1 rounded-lg text-[10px] text-orange-300 font-mono shadow-xl flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full bg-orange-400" />
                   <span>REPROJECTED: {processedJob.targetCRS} (RIGHT)</span>
                 </div>
@@ -1498,9 +1498,9 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
             {/* Clicked Feature Popup Overlay */}
             {selectedFeatureProps && (
-              <div className="absolute top-4 right-4 z-20 bg-[#1A1613]/95 border border-stone-700 p-3.5 rounded-2xl shadow-2xl max-w-sm w-full backdrop-blur-md">
+              <div className="absolute top-4 right-4 z-20 bg-[#121B19]/95 border border-stone-700 p-3.5 rounded-2xl shadow-2xl max-w-sm w-full backdrop-blur-md">
                 <div className="flex items-center justify-between pb-2 border-b border-stone-800">
-                  <span className="font-display font-bold text-xs text-[#FAF6F0] flex items-center space-x-1.5">
+                  <span className="font-display font-bold text-xs text-[#F4F8F2] flex items-center space-x-1.5">
                     <span className="w-2 h-2 rounded-full bg-amber-400" />
                     <span>Feature Attributes</span>
                   </span>
@@ -1526,11 +1526,11 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
           {/* Bottom Drawer: Attribute Table, Metadata & Validation */}
           <div className={`h-64 border-t flex flex-col flex-shrink-0 transition-colors ${
-            theme === 'light' ? 'border-[#E2DBD0] bg-[#FAF8F5]' : 'border-stone-800 bg-[#161310]'
+            theme === 'light' ? 'border-[#D4DFD3] bg-[#F7FAF5]' : 'border-stone-800 bg-[#0F1716]'
           }`}>
             {/* Tabs header */}
             <div className={`flex items-center justify-between px-4 h-10 border-b transition-colors ${
-              theme === 'light' ? 'border-[#E2DBD0] bg-[#F2ECE3]' : 'border-stone-800 bg-[#110E0C]'
+              theme === 'light' ? 'border-[#D4DFD3] bg-[#E9EEE7]' : 'border-stone-800 bg-[#0B1210]'
             }`}>
               <div className="flex items-center space-x-1">
                 <button
@@ -1608,8 +1608,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                       onChange={(e) => setAttributeSearch(e.target.value)}
                       className={`border rounded-md px-2 pl-7 py-0.5 text-xs focus:outline-none focus:border-amber-500 ${
                         theme === 'light'
-                          ? 'bg-white border-[#D6CEBE] text-stone-900 placeholder-stone-400'
-                          : 'bg-[#13110E] border-stone-700 text-stone-100 placeholder-stone-500'
+                          ? 'bg-white border-[#C2D2C2] text-stone-900 placeholder-stone-400'
+                          : 'bg-[#0D1413] border-stone-700 text-stone-100 placeholder-stone-500'
                       }`}
                     />
                   </div>
@@ -1625,8 +1625,8 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className={`sticky top-0 border-b font-mono text-[11px] ${
                         theme === 'light'
-                          ? 'bg-[#EAE4DA] border-stone-300 text-stone-700'
-                          : 'bg-[#110E0C] border-stone-800 text-stone-400'
+                          ? 'bg-[#DFE7DD] border-stone-300 text-stone-700'
+                          : 'bg-[#0B1210] border-stone-800 text-stone-400'
                       }`}>
                         <tr>
                           <th className="py-2.5 px-3 w-12 text-stone-500">#</th>
@@ -1712,7 +1712,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   </div>
                   <div className="p-3 bg-stone-900/60 rounded-xl border border-stone-800">
                     <span className="text-stone-500 block mb-1">Geometry Type</span>
-                    <span className="text-[#FAF6F0] font-bold text-sm">{dataset.geometryType}</span>
+                    <span className="text-[#F4F8F2] font-bold text-sm">{dataset.geometryType}</span>
                     <p className="text-[10px] text-stone-400 mt-0.5">{dataset.featureCount} spatial records</p>
                   </div>
                   <div className="p-3 bg-stone-900/60 rounded-xl border border-stone-800">

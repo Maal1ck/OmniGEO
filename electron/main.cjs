@@ -76,7 +76,7 @@ async function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: appName,
-    backgroundColor: '#13110E',
+    backgroundColor: '#0D1413',
     autoHideMenuBar: true,
     webPreferences: {
       preload: preloadPath,

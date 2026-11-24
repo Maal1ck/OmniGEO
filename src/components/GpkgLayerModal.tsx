@@ -115,13 +115,13 @@ export const GpkgLayerModal: React.FC<GpkgLayerModalProps> = ({
       <div 
         className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-colors ${
           theme === 'light'
-            ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-amber-950/20'
-            : 'bg-[#181411] border-stone-800 text-stone-100 shadow-stone-950/90'
+            ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-amber-950/20'
+            : 'bg-[#101917] border-stone-800 text-stone-100 shadow-stone-950/90'
         }`}
       >
         {/* Header */}
         <div className={`p-4 border-b flex items-center justify-between ${
-          theme === 'light' ? 'bg-[#F8F6F1] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+          theme === 'light' ? 'bg-[#F3F8F1] border-[#D4DFD3]' : 'bg-[#0C1412] border-stone-800'
         }`}>
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
@@ -154,7 +154,7 @@ export const GpkgLayerModal: React.FC<GpkgLayerModalProps> = ({
 
         {/* File Info & Guidance */}
         <div className={`p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
-          theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#15110E] border-stone-800'
+          theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0E1514] border-stone-800'
         }`}>
           <div className="space-y-0.5 min-w-0">
             <div className="font-mono font-semibold truncate text-stone-800 dark:text-stone-200">
@@ -196,7 +196,7 @@ export const GpkgLayerModal: React.FC<GpkgLayerModalProps> = ({
         {/* Filter Input if > 3 layers */}
         {pendingGpkg.layers.length > 3 && (
           <div className={`px-4 py-2.5 border-b ${
-            theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+            theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#0C1412] border-stone-800'
           }`}>
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -207,8 +207,8 @@ export const GpkgLayerModal: React.FC<GpkgLayerModalProps> = ({
                 placeholder={lang === 'fr' ? 'Filtrer les couches par nom ou géométrie...' : 'Filter layers by name or geometry...'}
                 className={`w-full pl-8 pr-4 py-1.5 text-xs font-mono rounded-xl border focus:outline-none focus:ring-1 focus:ring-amber-500 ${
                   theme === 'light'
-                    ? 'bg-stone-50 border-[#D6CEBE] text-stone-900 placeholder:text-stone-400'
-                    : 'bg-[#181411] border-stone-700 text-stone-100 placeholder:text-stone-500'
+                    ? 'bg-stone-50 border-[#C2D2C2] text-stone-900 placeholder:text-stone-400'
+                    : 'bg-[#101917] border-stone-700 text-stone-100 placeholder:text-stone-500'
                 }`}
               />
             </div>
@@ -229,8 +229,8 @@ export const GpkgLayerModal: React.FC<GpkgLayerModalProps> = ({
                         ? 'bg-amber-50/80 border-amber-400 text-stone-900 shadow-xs'
                         : 'bg-amber-950/40 border-amber-600/70 text-stone-100')
                     : (theme === 'light'
-                        ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-600 hover:bg-stone-50'
-                        : 'bg-[#14100D] border-stone-800/80 text-stone-400 hover:bg-[#1A1512]')
+                        ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-600 hover:bg-stone-50'
+                        : 'bg-[#0D1413] border-stone-800/80 text-stone-400 hover:bg-[#111B19]')
                 }`}
               >
                 {/* Left: Checkbox & Layer details */}
@@ -302,7 +302,7 @@ export const GpkgLayerModal: React.FC<GpkgLayerModalProps> = ({
 
         {/* Footer */}
         <div className={`p-4 border-t flex items-center justify-between ${
-          theme === 'light' ? 'bg-[#F8F6F1] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+          theme === 'light' ? 'bg-[#F3F8F1] border-[#D4DFD3]' : 'bg-[#0C1412] border-stone-800'
         }`}>
           <div className="text-xs font-mono text-stone-500">
             <span className="font-bold text-amber-600 dark:text-amber-400">

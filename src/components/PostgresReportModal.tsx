@@ -24,7 +24,8 @@ import {
   FileSpreadsheet,
   FileText,
   Archive,
-  RotateCcw
+  RotateCcw,
+  SlidersHorizontal
 } from 'lucide-react';
 import { SpatialDataset, DefinedRelationship } from '../types/gis';
 import { 
@@ -45,10 +46,37 @@ import {
   generateProfileSheetExcelZip,
   generateProfileSheetCsv,
   isBusinessTable,
-  classifyTableFamily
+  classifyTableFamily,
+  HtmlReportConfig,
+  HTML_REPORT_FONTS,
+  createDefaultHtmlReportConfig
 } from '../core/postgresReportEngine';
+import { DataDictionaryCustomizer } from './DataDictionaryCustomizer';
 import { useTheme } from '../core/theme';
 import { useI18n } from '../core/i18n';
+
+const HTML_DICT_CONFIG_STORAGE_KEY = 'omnigeo_html_dict_config_v1';
+
+function loadSavedHtmlConfig(): HtmlReportConfig {
+  const defaults = createDefaultHtmlReportConfig();
+  try {
+    const raw = localStorage.getItem(HTML_DICT_CONFIG_STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    return {
+      ...defaults,
+      ...parsed,
+      header: { ...defaults.header, ...(parsed?.header || {}) },
+      sections: { ...defaults.sections, ...(parsed?.sections || {}) },
+      profileRubriques: { ...defaults.profileRubriques, ...(parsed?.profileRubriques || {}) },
+      physicalColumns: { ...defaults.physicalColumns, ...(parsed?.physicalColumns || {}) },
+      customProfileRubriques: Array.isArray(parsed?.customProfileRubriques) ? parsed.customProfileRubriques : [],
+      customSections: Array.isArray(parsed?.customSections) ? parsed.customSections : [],
+    };
+  } catch {
+    return defaults;
+  }
+}
 
 interface PostgresReportModalProps {
   isOpen: boolean;
@@ -71,8 +99,28 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
   // Report language switcher: 'fr' or 'en'
   const [reportLang, setReportLang] = useState<'fr' | 'en'>(() => (appLang === 'en' ? 'en' : 'fr'));
 
-  // Active view tab in modal: dictionary | mpd | sources | code
-  const [activeTab, setActiveTab] = useState<'preview' | 'mpd' | 'sources' | 'code'>('preview');
+  // Active view tab in modal: dictionary | customize | mpd | sources | code
+  const [activeTab, setActiveTab] = useState<'preview' | 'customize' | 'mpd' | 'sources' | 'code'>('preview');
+
+  // HTML Data Dictionary customization config (rubriques, header, logos, typography)
+  const [htmlConfig, setHtmlConfig] = useState<HtmlReportConfig>(() => loadSavedHtmlConfig());
+
+  const handleUpdateHtmlConfig = (next: HtmlReportConfig) => {
+    setHtmlConfig(next);
+    try {
+      localStorage.setItem(HTML_DICT_CONFIG_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // If embedded logos exceed localStorage quota, persist without logos so other settings remain saved
+      try {
+        localStorage.setItem(
+          HTML_DICT_CONFIG_STORAGE_KEY,
+          JSON.stringify({ ...next, header: { ...next.header, logoLeft: '', logoRight: '' } })
+        );
+      } catch {
+        // Ignore storage errors
+      }
+    }
+  };
 
   // Active database schema being reported
   const [schema, setSchema] = useState<PostgresDatabaseSchema>(() => {
@@ -129,10 +177,10 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  // Generate HTML Data Dictionary report string in chosen language
+  // Generate HTML Data Dictionary report string in chosen language & customization config
   const standaloneDataDictHtml = useMemo(() => {
-    return generateStandaloneHtmlReport(schema, reportLang);
-  }, [schema, reportLang]);
+    return generateStandaloneHtmlReport(schema, reportLang, htmlConfig);
+  }, [schema, reportLang, htmlConfig]);
 
   // Generate HTML Physical Data Model (MPD / MCD) report string in chosen language
   const standaloneMpdHtml = useMemo(() => {
@@ -512,13 +560,13 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in-0 duration-200">
       <div className={`relative flex flex-col w-full max-w-6xl max-h-[95vh] rounded-2xl border shadow-2xl overflow-hidden transition-colors ${
         theme === 'light' 
-          ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-900 shadow-stone-400/30' 
-          : 'bg-[#14100D] border-stone-800 text-stone-100 shadow-stone-950/90'
+          ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-900 shadow-stone-400/30' 
+          : 'bg-[#0D1413] border-stone-800 text-stone-100 shadow-stone-950/90'
       }`}>
         
         {/* Modal Top Bar */}
         <div className={`px-6 py-3.5 border-b flex flex-wrap items-center justify-between gap-4 ${
-          theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#191410] border-stone-800'
+          theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101917] border-stone-800'
         }`}>
           <div className="flex items-center space-x-3.5">
             <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30 shrink-0">
@@ -544,7 +592,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
             
             {/* Language Switcher Button (FR / EN) */}
             <div className={`flex items-center p-0.5 rounded-xl border text-xs font-semibold ${
-              theme === 'light' ? 'bg-[#F5EFE6] border-[#D6CEBE]' : 'bg-stone-900 border-stone-700'
+              theme === 'light' ? 'bg-[#EBF3E8] border-[#C2D2C2]' : 'bg-stone-900 border-stone-700'
             }`}>
               <button
                 onClick={() => setReportLang('fr')}
@@ -574,7 +622,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               onClick={() => handlePrint(activeTab === 'mpd' ? 'mpd' : 'dict')}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                 theme === 'light'
-                  ? 'bg-white hover:bg-stone-100 text-stone-800 border-[#D6CEBE]'
+                  ? 'bg-white hover:bg-stone-100 text-stone-800 border-[#C2D2C2]'
                   : 'bg-stone-900 hover:bg-stone-800 text-stone-200 border-stone-700'
               }`}
               title="Print report or save as PDF"
@@ -599,7 +647,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               onClick={handleDownloadProfileCsv}
               className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all active:scale-95 cursor-pointer ${
                 theme === 'light'
-                  ? 'bg-white hover:bg-stone-100 text-stone-800 border-[#D6CEBE]'
+                  ? 'bg-white hover:bg-stone-100 text-stone-800 border-[#C2D2C2]'
                   : 'bg-stone-900 hover:bg-stone-800 text-stone-200 border-stone-700'
               }`}
               title={isFr ? "Exporter le dictionnaire sous forme de fiches au format CSV (.csv)" : "Export data dictionary profile sheets to CSV (.csv)"}
@@ -639,7 +687,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
         {/* View Switcher Tabs */}
         <div className={`px-6 border-b flex items-center justify-between text-xs font-medium ${
-          theme === 'light' ? 'bg-[#F5EFE6] border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+          theme === 'light' ? 'bg-[#EBF3E8] border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
         }`}>
           <div className="flex items-center space-x-1 py-1.5">
             <button
@@ -656,6 +704,23 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               <span>{isFr ? 'Dictionnaire de Données' : 'Data Dictionary'}</span>
               <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-600 font-bold">
                 {(schema.tables || []).length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('customize')}
+              className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                activeTab === 'customize'
+                  ? theme === 'light'
+                    ? 'bg-white text-stone-900 shadow-xs'
+                    : 'bg-white/[0.1] text-white shadow-xs'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-500" />
+              <span>{isFr ? 'Personnaliser HTML' : 'Customize HTML'}</span>
+              <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 font-bold">
+                {(HTML_REPORT_FONTS.find(f => f.key === htmlConfig.fontFamily)?.label || 'Font').split(' ')[0]}
               </span>
             </button>
 
@@ -721,7 +786,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               {/* Summary KPIs */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div className={`p-4 rounded-xl border ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
                 }`}>
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Tables Métier' : 'Total Tables'}
@@ -733,7 +798,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </div>
 
                 <div className={`p-4 rounded-xl border ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
                 }`}>
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Couches PostGIS' : 'PostGIS Layers'}
@@ -745,7 +810,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </div>
 
                 <div className={`p-4 rounded-xl border ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
                 }`}>
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Enregistrements' : 'Data Records'}
@@ -757,7 +822,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </div>
 
                 <div className={`p-4 rounded-xl border ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
                 }`}>
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Total Champs' : 'Total Fields'}
@@ -769,7 +834,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </div>
 
                 <div className={`p-4 rounded-xl border ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
                 }`}>
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Relations (FK)' : 'Foreign Keys'}
@@ -783,7 +848,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
               {/* Data Types Distribution */}
               <div className={`p-3.5 rounded-xl border flex flex-wrap items-center gap-2 text-xs ${
-                theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+                theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
               }`}>
                 <span className="font-mono text-[11px] font-bold text-stone-500 uppercase mr-2">
                   {isFr ? 'Distribution des Types Canoniques :' : 'Canonical Types Distribution:'}
@@ -807,10 +872,10 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               {/* Foreign Keys & Relationships Matrix Card */}
               {(schema.relationships || []).length > 0 && (
                 <div className={`rounded-xl border overflow-hidden ${
-                  theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+                  theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
                 }`}>
                   <div className={`px-5 py-3 border-b flex items-center justify-between ${
-                    theme === 'light' ? 'bg-[#FDFBF8] border-[#E2DBD0]' : 'bg-[#201A16] border-stone-800'
+                    theme === 'light' ? 'bg-[#FAFCF9] border-[#D4DFD3]' : 'bg-[#15211F] border-stone-800'
                   }`}>
                     <div className="flex items-center space-x-2">
                       <Share2 className="w-4 h-4 text-purple-400" />
@@ -825,7 +890,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs font-mono">
                       <thead className={`text-[10px] uppercase font-bold border-b ${
-                        theme === 'light' ? 'bg-[#FAF8F5] text-stone-600 border-[#E2DBD0]' : 'bg-stone-900/60 text-stone-400 border-stone-800'
+                        theme === 'light' ? 'bg-[#F7FAF5] text-stone-600 border-[#D4DFD3]' : 'bg-stone-900/60 text-stone-400 border-stone-800'
                       }`}>
                         <tr>
                           <th className="py-2.5 px-4">{isFr ? 'Contrainte FK' : 'FK Constraint'}</th>
@@ -835,7 +900,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                           <th className="py-2.5 px-4">{isFr ? "Règle d'Intégrité" : 'Integrity Rule'}</th>
                         </tr>
                       </thead>
-                      <tbody className={`divide-y ${theme === 'light' ? 'divide-[#F0ECE4]' : 'divide-stone-800/60'}`}>
+                      <tbody className={`divide-y ${theme === 'light' ? 'divide-[#E8EDE7]' : 'divide-stone-800/60'}`}>
                         {(schema.relationships || []).map((rel, idx) => (
                           <tr key={`rel-row-${rel.id || ''}-${rel.constraintName || ''}-${rel.sourceTable}-${rel.sourceColumn}-${rel.targetTable}-${idx}`} className="hover:bg-amber-500/5 transition-colors">
                             <td className="py-2 px-4 text-stone-500 text-[11px]">{rel.constraintName}</td>
@@ -871,7 +936,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
               {/* Advanced Search & Multi-Criteria Filter Panel */}
               <div className={`p-4 rounded-xl border space-y-3 ${
-                theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+                theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
               }`}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="relative flex-1 min-w-[260px]">
@@ -883,8 +948,8 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       placeholder={isFr ? 'Rechercher une table, un champ, un type PostgreSQL, commentaire ou FK...' : 'Search table, field, PostgreSQL type, comment or FK...'}
                       className={`w-full rounded-xl pl-9 pr-3 py-2 text-xs border outline-none focus:ring-2 focus:ring-amber-500/30 transition-all ${
                         theme === 'light'
-                          ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900 placeholder-stone-400'
-                          : 'bg-[#120E0C] border-stone-800 text-stone-100 placeholder-stone-500'
+                          ? 'bg-[#F7FAF5] border-[#C2D2C2] text-stone-900 placeholder-stone-400'
+                          : 'bg-[#0C1211] border-stone-800 text-stone-100 placeholder-stone-500'
                       }`}
                     />
                   </div>
@@ -896,7 +961,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
                     {/* View Mode Switcher: Fiche par table vs Tableau Standard */}
                     <div className={`flex items-center p-0.5 rounded-xl border text-xs font-semibold ${
-                      theme === 'light' ? 'bg-[#F5EFE6] border-[#D6CEBE]' : 'bg-stone-900 border-stone-800'
+                      theme === 'light' ? 'bg-[#EBF3E8] border-[#C2D2C2]' : 'bg-stone-900 border-stone-800'
                     }`}>
                       <button
                         type="button"
@@ -923,6 +988,20 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         <span>{isFr ? 'Tableau Standard' : 'Standard View'}</span>
                       </button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('customize')}
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                        theme === 'light'
+                          ? 'bg-amber-50 hover:bg-amber-100 border-amber-400/70 text-amber-900'
+                          : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/40 text-amber-400'
+                      }`}
+                      title={isFr ? 'Configurer les rubriques, logos, en-tête et police (dont Times New Roman) du fichier HTML' : 'Customize HTML sections, logos, header, and font family (including Times New Roman)'}
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      <span>{isFr ? 'Personnaliser HTML' : 'Customize HTML'}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -934,7 +1013,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       value={selectedSchemaFilter}
                       onChange={(e) => setSelectedSchemaFilter(e.target.value)}
                       className={`w-full rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none cursor-pointer ${
-                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                        theme === 'light' ? 'bg-[#F7FAF5] border-[#C2D2C2] text-stone-900' : 'bg-[#0C1211] border-stone-800 text-stone-200'
                       }`}
                     >
                       <option value="all">{isFr ? `Tous (${uniqueSchemas.length})` : `All (${uniqueSchemas.length})`}</option>
@@ -950,7 +1029,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       value={selectedFamilyFilter}
                       onChange={(e) => setSelectedFamilyFilter(e.target.value)}
                       className={`w-full rounded-lg px-2.5 py-1.5 text-xs border focus:outline-none cursor-pointer ${
-                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                        theme === 'light' ? 'bg-[#F7FAF5] border-[#C2D2C2] text-stone-900' : 'bg-[#0C1211] border-stone-800 text-stone-200'
                       }`}
                     >
                       <option value="all">{isFr ? `Toutes (${uniqueFamilies.length})` : `All (${uniqueFamilies.length})`}</option>
@@ -966,7 +1045,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       value={selectedScopeFilter}
                       onChange={(e) => setSelectedScopeFilter(e.target.value as any)}
                       className={`w-full rounded-lg px-2.5 py-1.5 text-xs border focus:outline-none cursor-pointer ${
-                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                        theme === 'light' ? 'bg-[#F7FAF5] border-[#C2D2C2] text-stone-900' : 'bg-[#0C1211] border-stone-800 text-stone-200'
                       }`}
                     >
                       <option value="all">{isFr ? 'Toutes les tables' : 'All Tables'}</option>
@@ -983,7 +1062,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       value={selectedColTypeFilter}
                       onChange={(e) => setSelectedColTypeFilter(e.target.value)}
                       className={`w-full rounded-lg px-2.5 py-1.5 text-xs border focus:outline-none cursor-pointer ${
-                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                        theme === 'light' ? 'bg-[#F7FAF5] border-[#C2D2C2] text-stone-900' : 'bg-[#0C1211] border-stone-800 text-stone-200'
                       }`}
                     >
                       <option value="all">{isFr ? 'Tous les types' : 'All Types'}</option>
@@ -1002,7 +1081,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       value={selectedConstraintFilter}
                       onChange={(e) => setSelectedConstraintFilter(e.target.value as any)}
                       className={`w-full rounded-lg px-2.5 py-1.5 text-xs border focus:outline-none cursor-pointer ${
-                        theme === 'light' ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900' : 'bg-[#120E0C] border-stone-800 text-stone-200'
+                        theme === 'light' ? 'bg-[#F7FAF5] border-[#C2D2C2] text-stone-900' : 'bg-[#0C1211] border-stone-800 text-stone-200'
                       }`}
                     >
                       <option value="all">{isFr ? 'Toutes' : 'All'}</option>
@@ -1047,14 +1126,14 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                     <div 
                       key={`tbl-card-${table.schema}.${table.name}-${tIdx}`}
                       className={`rounded-xl border overflow-hidden transition-all ${
-                        theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+                        theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
                       }`}
                     >
                       {/* Table Header Row */}
                       <div 
                         onClick={() => toggleTableExpand(table.name)}
                         className={`px-5 py-3.5 border-b flex items-center justify-between cursor-pointer select-none transition-colors ${
-                          theme === 'light' ? 'bg-[#FDFBF8] hover:bg-stone-50 border-[#E2DBD0]' : 'bg-[#1F1915] hover:bg-[#251E19] border-stone-800'
+                          theme === 'light' ? 'bg-[#FAFCF9] hover:bg-stone-50 border-[#D4DFD3]' : 'bg-[#14201D] hover:bg-[#182623] border-stone-800'
                         }`}
                       >
                         <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
@@ -1103,8 +1182,23 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       {/* Columns Table & Profile Sheet */}
                       {!isCollapsed && (
                         <div>
-                          {dictionaryViewMode === 'profile' && (() => {
+                          {dictionaryViewMode === 'profile' && htmlConfig.sections.tableProfile && (() => {
                             const profile = computeTableProfile(table, schema, reportLang);
+                            const builtInRows = [
+                              { key: 'service' as const, label: isFr ? 'Service' : 'Service', value: profile.service, cls: 'font-sans' },
+                              { key: 'tableName' as const, label: isFr ? 'Table' : 'Table', value: profile.tableName, cls: theme === 'light' ? 'font-bold text-stone-900' : 'font-bold text-amber-400' },
+                              { key: 'nature' as const, label: isFr ? 'Nature' : 'Nature', value: profile.nature, cls: 'font-sans' },
+                              { key: 'identifiantMetier' as const, label: isFr ? 'Identifiant métier' : 'Business Identifier', value: profile.identifiantMetier, cls: theme === 'light' ? 'font-bold text-amber-800' : 'font-bold text-amber-300' },
+                              { key: 'rattachement' as const, label: isFr ? 'Rattachement' : 'Foreign Key Links', value: profile.rattachement, cls: '' },
+                              { key: 'champsTemporels' as const, label: isFr ? 'Champs temporels' : 'Temporal Fields', value: profile.champsTemporels, cls: '' },
+                              { key: 'champsQuantitatifs' as const, label: isFr ? 'Champs quantitatifs' : 'Quantitative Fields', value: profile.champsQuantitatifs, cls: '' },
+                              { key: 'nombreEnregistrements' as const, label: isFr ? "Nombre d'enregistrements" : 'Record Count', value: profile.nombreEnregistrements, cls: theme === 'light' ? 'font-bold text-stone-900' : 'font-bold text-stone-200' },
+                              { key: 'controles' as const, label: isFr ? 'Contrôles' : 'Integrity Controls', value: profile.controles, cls: 'font-sans' },
+                              { key: 'etatValidation' as const, label: isFr ? 'État de validation' : 'Validation Status', value: profile.etatValidation, cls: 'font-sans' },
+                            ].filter(r => htmlConfig.profileRubriques[r.key]);
+                            const customRows = htmlConfig.customProfileRubriques.filter(r => r.enabled && r.label.trim());
+                            if (builtInRows.length === 0 && customRows.length === 0) return null;
+
                             return (
                               <div className="p-5 border-b border-stone-800/80 space-y-3">
                                 <div className={`text-xs font-display font-bold uppercase tracking-wider flex items-center space-x-2 ${
@@ -1114,58 +1208,30 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                                   <span>1- {isFr ? `Fiche descriptive : ${table.name}` : `Table Profile: ${table.name}`}</span>
                                 </div>
                                 <div className={`rounded-xl border overflow-hidden ${
-                                  theme === 'light' ? 'border-[#E2DBD0] bg-white' : 'border-stone-800 bg-[#120E0C]'
+                                  theme === 'light' ? 'border-[#D4DFD3] bg-white' : 'border-stone-800 bg-[#0C1211]'
                                 }`}>
                                   <table className="w-full text-xs font-mono border-collapse table-fixed">
                                     <thead className={`text-[10px] uppercase font-mono font-bold border-b ${
-                                      theme === 'light' ? 'bg-[#F5EFE6] text-stone-600 border-[#E2DBD0]' : 'bg-stone-900/70 text-stone-400 border-stone-800'
+                                      theme === 'light' ? 'bg-[#EBF3E8] text-stone-600 border-[#D4DFD3]' : 'bg-stone-900/70 text-stone-400 border-stone-800'
                                     }`}>
                                       <tr>
                                         <th className="w-52 sm:w-64 px-4 py-2 text-left border-r border-stone-800/40">{isFr ? 'Rubrique' : 'Property'}</th>
                                         <th className="px-4 py-2 text-left">{isFr ? 'Spécification / Valeur' : 'Specification / Value'}</th>
                                       </tr>
                                     </thead>
-                                    <tbody className={`divide-y ${theme === 'light' ? 'divide-[#EBE5DC]' : 'divide-stone-800/80'}`}>
-                                      <tr>
-                                        <td className={`w-52 sm:w-64 px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Service' : 'Service'}</td>
-                                        <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.service}</td>
-                                      </tr>
-                                      <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Table' : 'Table'}</td>
-                                        <td className={`px-4 py-2.5 font-bold ${theme === 'light' ? 'text-stone-900' : 'text-amber-400'}`}>{profile.tableName}</td>
-                                      </tr>
-                                      <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Nature' : 'Nature'}</td>
-                                        <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.nature}</td>
-                                      </tr>
-                                      <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Identifiant métier' : 'Business Identifier'}</td>
-                                        <td className={`px-4 py-2.5 font-bold ${theme === 'light' ? 'text-amber-800' : 'text-amber-300'}`}>{profile.identifiantMetier}</td>
-                                      </tr>
-                                      <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Rattachement' : 'Foreign Key Links'}</td>
-                                        <td className={`px-4 py-2.5 ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.rattachement}</td>
-                                      </tr>
-                                      <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Champs temporels' : 'Temporal Fields'}</td>
-                                        <td className={`px-4 py-2.5 ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.champsTemporels}</td>
-                                      </tr>
-                                      <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Champs quantitatifs' : 'Quantitative Fields'}</td>
-                                        <td className={`px-4 py-2.5 ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.champsQuantitatifs}</td>
-                                      </tr>
-                                      <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? "Nombre d'enregistrements" : 'Record Count'}</td>
-                                        <td className={`px-4 py-2.5 font-bold ${theme === 'light' ? 'text-stone-900' : 'text-stone-200'}`}>{profile.nombreEnregistrements}</td>
-                                      </tr>
-                                      <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'Contrôles' : 'Integrity Controls'}</td>
-                                        <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.controles}</td>
-                                      </tr>
-                                      <tr>
-                                        <td className={`px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#FAF8F5] text-stone-900 border-[#EBE5DC]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800/80'}`}>{isFr ? 'État de validation' : 'Validation Status'}</td>
-                                        <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{profile.etatValidation}</td>
-                                      </tr>
+                                    <tbody className={`divide-y ${theme === 'light' ? 'divide-[#E1E8DF]' : 'divide-stone-800/80'}`}>
+                                      {builtInRows.map(row => (
+                                        <tr key={row.key}>
+                                          <td className={`w-52 sm:w-64 px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#F7FAF5] text-stone-900 border-[#E1E8DF]' : 'bg-[#101817] text-[#F4F8F2] border-stone-800/80'}`}>{row.label}</td>
+                                          <td className={`px-4 py-2.5 ${row.cls || (theme === 'light' ? 'text-stone-700' : 'text-stone-300')}`}>{row.value}</td>
+                                        </tr>
+                                      ))}
+                                      {customRows.map(cr => (
+                                        <tr key={cr.id}>
+                                          <td className={`w-52 sm:w-64 px-4 py-2.5 font-sans font-bold border-r ${theme === 'light' ? 'bg-[#F7FAF5] text-stone-900 border-[#E1E8DF]' : 'bg-[#101817] text-[#F4F8F2] border-stone-800/80'}`}>{cr.label}</td>
+                                          <td className={`px-4 py-2.5 font-sans ${theme === 'light' ? 'text-stone-700' : 'text-stone-300'}`}>{cr.value || '—'}</td>
+                                        </tr>
+                                      ))}
                                     </tbody>
                                   </table>
                                 </div>
@@ -1175,7 +1241,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
                           {dictionaryViewMode === 'profile' && (
                             <div className={`px-5 py-2.5 font-display font-bold text-xs uppercase tracking-wider border-b ${
-                              theme === 'light' ? 'bg-[#FDFBF8] text-stone-900 border-[#E2DBD0]' : 'bg-[#181310] text-[#FAF6F0] border-stone-800'
+                              theme === 'light' ? 'bg-[#FAFCF9] text-stone-900 border-[#D4DFD3]' : 'bg-[#101817] text-[#F4F8F2] border-stone-800'
                             }`}>
                               2- {isFr ? `Structure physique des champs : ${table.name}` : `Physical Fields Structure: ${table.name}`}
                             </div>
@@ -1259,7 +1325,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
                 {filteredTables.length === 0 && (
                   <div className={`p-8 rounded-xl border border-dashed text-center space-y-3 ${
-                    theme === 'light' ? 'bg-white border-[#D6CEBE] text-stone-600' : 'bg-[#181310] border-stone-800 text-stone-400'
+                    theme === 'light' ? 'bg-white border-[#C2D2C2] text-stone-600' : 'bg-[#101817] border-stone-800 text-stone-400'
                   }`}>
                     <p className="text-sm font-semibold">
                       {isFr ? 'Aucune table ou colonne ne correspond aux filtres sélectionnés.' : 'No tables or columns match the selected filters.'}
@@ -1276,6 +1342,20 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 )}
               </div>
             </div>
+          )}
+
+          {/* TAB 1B: CUSTOMIZE STANDALONE HTML DATA DICTIONARY */}
+          {activeTab === 'customize' && (
+            <DataDictionaryCustomizer
+              config={htmlConfig}
+              onChange={handleUpdateHtmlConfig}
+              htmlPreview={standaloneDataDictHtml}
+              databaseName={schema.databaseName}
+              lang={reportLang}
+              theme={theme}
+              onDownloadHtml={handleDownloadDataDictHtml}
+              onPrintHtml={() => handlePrint('dict')}
+            />
           )}
 
           {/* TAB 2: PHYSICAL DATA MODEL (MPD / ERD SCHEMATIC VIEW) */}
@@ -1791,7 +1871,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         <span>{copiedKey === 'extractor_sql' ? (isFr ? 'Copié !' : 'Copied!') : (isFr ? 'Copier le SQL' : 'Copy SQL')}</span>
                       </button>
                     </div>
-                    <pre className="p-4 bg-[#0F0C0A] border border-stone-800 rounded-b-xl text-xs font-mono text-amber-300 max-h-48 overflow-y-auto">
+                    <pre className="p-4 bg-[#0A0F0E] border border-stone-800 rounded-b-xl text-xs font-mono text-amber-300 max-h-48 overflow-y-auto">
                       {POSTGRES_EXTRACTOR_SQL}
                     </pre>
                   </div>
@@ -1964,7 +2044,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       {copiedKey === 'python_script' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{copiedKey === 'python_script' ? (isFr ? 'Copié !' : 'Copied!') : (isFr ? 'Copier' : 'Copy')}</span>
                     </button>
-                    <pre className="p-4 bg-[#0F0C0A] border border-stone-800 rounded-xl text-xs font-mono text-emerald-300 max-h-56 overflow-y-auto">
+                    <pre className="p-4 bg-[#0A0F0E] border border-stone-800 rounded-xl text-xs font-mono text-emerald-300 max-h-56 overflow-y-auto">
                       {generatePythonReportScript()}
                     </pre>
                   </div>
@@ -2053,7 +2133,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 <textarea
                   readOnly
                   value={(standaloneDataDictHtml || '').slice(0, 4000) + '\n\n/* ... (contenu complet généré prêt au téléchargement) ... */'}
-                  className="w-full h-56 p-4 bg-[#0D0A08] border border-stone-800 rounded-xl text-xs font-mono text-stone-400 outline-none"
+                  className="w-full h-56 p-4 bg-[#080D0C] border border-stone-800 rounded-xl text-xs font-mono text-stone-400 outline-none"
                 />
               </div>
             </div>
@@ -2062,7 +2142,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
 
         {/* Modal Footer */}
         <div className={`px-6 py-3 border-t flex items-center justify-between text-xs font-mono ${
-          theme === 'light' ? 'bg-[#FDFBF8] border-[#E2DBD0] text-stone-500' : 'bg-[#181310] border-stone-800 text-stone-400'
+          theme === 'light' ? 'bg-[#FAFCF9] border-[#D4DFD3] text-stone-500' : 'bg-[#101817] border-stone-800 text-stone-400'
         }`}>
           <div className="flex items-center space-x-2">
             <span>Format: <strong>HTML5 Standalone</strong></span>

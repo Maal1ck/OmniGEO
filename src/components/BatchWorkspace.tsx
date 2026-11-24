@@ -797,7 +797,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden bg-[#13110E]">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden bg-[#0D1413]">
       {/* Hidden inputs for file and directory selection */}
       <input
         ref={fileInputRef}
@@ -829,20 +829,20 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
       {/* Workspace Header Toolbar */}
       <div className={`relative z-40 px-6 py-3.5 border-b backdrop-blur-md flex flex-wrap items-center justify-between gap-4 ${
-        theme === 'light' ? 'border-[#E2DBD0] bg-white/90' : 'border-stone-800/80 bg-[#181411]/90'
+        theme === 'light' ? 'border-[#D4DFD3] bg-white/90' : 'border-stone-800/80 bg-[#101917]/90'
       }`}>
         {/* Left: Summary Metrics */}
         <div className="flex items-center space-x-4">
           <div>
             <div className="flex items-center space-x-2">
               <h1 className={`text-sm font-display font-bold tracking-tight flex items-center space-x-2 ${
-                theme === 'light' ? 'text-stone-900' : 'text-[#FAF6F0]'
+                theme === 'light' ? 'text-stone-900' : 'text-[#F4F8F2]'
               }`}>
                 <Database className="w-4 h-4 text-amber-500" />
                 <span>{t.workspace.queueTitle}</span>
               </h1>
               <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-md border ${
-                theme === 'light' ? 'bg-[#FEF3C7] text-amber-900 border-amber-300' : 'bg-amber-950/70 text-amber-300 border border-amber-700/50'
+                theme === 'light' ? 'bg-[#FBE6CA] text-amber-900 border-amber-300' : 'bg-amber-950/70 text-amber-300 border border-amber-700/50'
               }`}>
                 {datasets.length} {t.workspace.filesCount}
               </span>
@@ -913,17 +913,17 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
                 isFilterMenuOpen || activeTypesCount < 9 || !includeSubfolders
                   ? theme === 'light'
-                    ? 'bg-[#FEF3C7] border-[#FCD34D] text-[#92400E] font-bold shadow-xs'
+                    ? 'bg-[#FBE6CA] border-[#F3AA56] text-[#8B3315] font-bold shadow-xs'
                     : 'bg-amber-950/50 border-amber-600/60 text-amber-300 font-semibold'
                   : theme === 'light'
-                    ? 'bg-white border-[#E2DBD0] text-stone-800 hover:bg-[#F5EFE6] hover:text-stone-950 shadow-xs'
-                    : 'bg-[#1C1713] border-stone-800 text-stone-300 hover:bg-[#251E19]'
+                    ? 'bg-white border-[#D4DFD3] text-stone-800 hover:bg-[#EBF3E8] hover:text-stone-950 shadow-xs'
+                    : 'bg-[#121D1B] border-stone-800 text-stone-300 hover:bg-[#182623]'
               }`}
             >
               <Sliders className={`w-3.5 h-3.5 ${theme === 'light' ? 'text-amber-700' : 'text-amber-400'}`} />
               <span>{t.workspace.filterDataTypes}</span>
               <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                theme === 'light' ? 'bg-[#EDE7DC] text-stone-800 font-bold' : 'bg-stone-800/90 text-stone-300'
+                theme === 'light' ? 'bg-[#E2E9E0] text-stone-800 font-bold' : 'bg-stone-800/90 text-stone-300'
               }`}>
                 {activeTypesCount}/9
               </span>
@@ -933,11 +933,11 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               <div
                 className={`absolute right-0 top-full mt-2 w-72 rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-100 ${
                   theme === 'light'
-                    ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-stone-400/25'
-                    : 'bg-[#181411] border-stone-800 text-stone-200 shadow-stone-950/80'
+                    ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-stone-400/25'
+                    : 'bg-[#101917] border-stone-800 text-stone-200 shadow-stone-950/80'
                 }`}
               >
-                <div className={`flex items-center justify-between pb-2 border-b ${theme === 'light' ? 'border-[#EBE5DC]' : 'border-stone-800/80'}`}>
+                <div className={`flex items-center justify-between pb-2 border-b ${theme === 'light' ? 'border-[#E1E8DF]' : 'border-stone-800/80'}`}>
                   <span className={`font-display font-bold text-xs flex items-center space-x-1.5 ${theme === 'light' ? 'text-amber-800' : 'text-amber-400'}`}>
                     <Sliders className="w-3.5 h-3.5" />
                     <span>{t.workspace.filterDataTypes}</span>
@@ -975,7 +975,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                     <label
                       key={item.key}
                       className={`flex items-start space-x-2.5 cursor-pointer p-1.5 rounded-lg transition-colors ${
-                        theme === 'light' ? 'hover:bg-[#F5EFE6]' : 'hover:bg-stone-800/40'
+                        theme === 'light' ? 'hover:bg-[#EBF3E8]' : 'hover:bg-stone-800/40'
                       }`}
                     >
                       <input
@@ -983,7 +983,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                         checked={dataTypes[item.key]}
                         onChange={() => toggleDataType(item.key)}
                         className={`mt-0.5 rounded text-amber-600 focus:ring-amber-500/40 cursor-pointer ${
-                          theme === 'light' ? 'border-[#A89F91] bg-white' : 'border-stone-700 bg-[#120F0D]'
+                          theme === 'light' ? 'border-[#8DAC9D] bg-white' : 'border-stone-700 bg-[#0C1312]'
                         }`}
                       />
                       <div className="text-left">
@@ -995,9 +995,9 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 </div>
 
                 {/* Subfolder Toggle */}
-                <div className={`pt-2 border-t ${theme === 'light' ? 'border-[#EBE5DC]' : 'border-stone-800/80'}`}>
+                <div className={`pt-2 border-t ${theme === 'light' ? 'border-[#E1E8DF]' : 'border-stone-800/80'}`}>
                   <label className={`flex items-center justify-between cursor-pointer p-1.5 rounded-lg transition-colors ${
-                    theme === 'light' ? 'hover:bg-[#F5EFE6]' : 'hover:bg-stone-800/40'
+                    theme === 'light' ? 'hover:bg-[#EBF3E8]' : 'hover:bg-stone-800/40'
                   }`}>
                     <div className="text-left">
                       <div className={`text-xs font-semibold flex items-center space-x-1.5 ${theme === 'light' ? 'text-stone-900' : 'text-stone-200'}`}>
@@ -1013,7 +1013,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       checked={includeSubfolders}
                       onChange={(e) => setIncludeSubfolders(e.target.checked)}
                       className={`rounded text-amber-600 focus:ring-amber-500/40 cursor-pointer ${
-                        theme === 'light' ? 'border-[#A89F91] bg-white' : 'border-stone-700 bg-[#120F0D]'
+                        theme === 'light' ? 'border-[#8DAC9D] bg-white' : 'border-stone-700 bg-[#0C1312]'
                       }`}
                     />
                   </label>
@@ -1094,7 +1094,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                   onClick={() => onOpenScriptStudio(selectedIds.size === 1 ? Array.from(selectedIds)[0] : selectedDatasetId || undefined)}
                   className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                     theme === 'light'
-                      ? 'bg-[#FAF6EE] hover:bg-[#F3EBD8] text-amber-950 border-[#D6CEBE]'
+                      ? 'bg-[#F3F7F1] hover:bg-[#E3EAE1] text-amber-950 border-[#C2D2C2]'
                       : 'bg-amber-950/35 hover:bg-amber-900/45 text-amber-200 border-amber-700/45'
                   }`}
                   title={
@@ -1301,8 +1301,8 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             isDragging
               ? 'border-amber-400 bg-amber-950/40 glow-amber'
               : theme === 'light'
-                ? 'border-[#D6CEBE] hover:border-amber-600 bg-white/70 hover:bg-[#FDFBF7]'
-                : 'border-stone-800/90 hover:border-amber-600/50 bg-[#191512]/60 hover:bg-[#1E1915]/70'
+                ? 'border-[#C2D2C2] hover:border-amber-600 bg-white/70 hover:bg-[#FDFAF7]'
+                : 'border-stone-800/90 hover:border-amber-600/50 bg-[#111A18]/60 hover:bg-[#141F1D]/70'
           }`}
         >
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-5xl mx-auto">
@@ -1314,14 +1314,14 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             >
               <div className={`p-3 rounded-xl border shadow-inner shrink-0 transition-transform group-hover:scale-105 ${
                 theme === 'light'
-                  ? 'bg-[#FEF3C7] text-amber-800 border-amber-300'
+                  ? 'bg-[#FBE6CA] text-amber-800 border-amber-300'
                   : 'bg-amber-950/70 text-amber-400 border-amber-700/50'
               }`}>
                 <UploadCloud className="w-6 h-6" />
               </div>
               <div>
                 <p className={`text-sm font-display font-semibold transition-colors ${
-                  theme === 'light' ? 'text-stone-900 group-hover:text-amber-800' : 'text-[#FAF6F0] group-hover:text-amber-300'
+                  theme === 'light' ? 'text-stone-900 group-hover:text-amber-800' : 'text-[#F4F8F2] group-hover:text-amber-300'
                 }`}>
                   {t.workspace.dropzoneTitle}
                 </p>
@@ -1343,8 +1343,8 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 title={t.workspace.selectFiles}
                 className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-display font-bold border transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer ${
                   theme === 'light'
-                    ? 'bg-white hover:bg-[#F5EFE6] text-stone-900 border-[#D6CEBE]'
-                    : 'bg-[#2A221C] hover:bg-[#342A23] text-stone-200 hover:text-white border-stone-700/80'
+                    ? 'bg-white hover:bg-[#EBF3E8] text-stone-900 border-[#C2D2C2]'
+                    : 'bg-[#1B2B28] hover:bg-[#223531] text-stone-200 hover:text-white border-stone-700/80'
                 }`}
               >
                 {isProcessingFiles ? (
@@ -1384,7 +1384,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       : 'bg-emerald-950/60 text-emerald-300 border-emerald-600/50 font-semibold'
                     : theme === 'light'
                       ? 'bg-stone-100 text-stone-700 border-stone-300'
-                      : 'bg-[#2A221C] text-stone-400 border-stone-700'
+                      : 'bg-[#1B2B28] text-stone-400 border-stone-700'
                 }`}
               >
                 <FolderTree className="w-3.5 h-3.5 shrink-0" />
@@ -1455,7 +1455,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         {/* Filter and Search Bar */}
         {datasets.length > 0 && (
           <div className={`flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-xl border transition-all ${
-            theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-stone-900/80 border-stone-800'
+            theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-stone-900/80 border-stone-800'
           }`}>
             {/* Search */}
             <div className="relative min-w-[260px]">
@@ -1469,8 +1469,8 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full rounded-lg pl-9 pr-3 py-1.5 text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/40 border ${
                   theme === 'light'
-                    ? 'bg-white border-[#D5CDBD] text-stone-900 placeholder-stone-500 focus:border-amber-600'
-                    : 'bg-[#13110E] border-stone-800 text-stone-100 placeholder-stone-500 focus:border-amber-500'
+                    ? 'bg-white border-[#C0D2C1] text-stone-900 placeholder-stone-500 focus:border-amber-600'
+                    : 'bg-[#0D1413] border-stone-800 text-stone-100 placeholder-stone-500 focus:border-amber-500'
                 }`}
               />
             </div>
@@ -1489,7 +1489,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                       filterFormat === fmt
                         ? 'bg-amber-600 text-white font-bold shadow-xs'
                         : theme === 'light'
-                        ? 'text-stone-700 hover:text-stone-950 hover:bg-[#EFE8DD]'
+                        ? 'text-stone-700 hover:text-stone-950 hover:bg-[#E4EAE2]'
                         : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
                     }`}
                   >
@@ -1498,7 +1498,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 ))}
               </div>
 
-              <div className={`h-4 w-px ${theme === 'light' ? 'bg-[#DDD5C7]' : 'bg-stone-800'}`} />
+              <div className={`h-4 w-px ${theme === 'light' ? 'bg-[#CCD9CB]' : 'bg-stone-800'}`} />
 
               <div className="flex items-center space-x-1.5">
                 <span className="text-[11px] font-mono text-stone-500 uppercase">Status:</span>
@@ -1512,7 +1512,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                           ? 'bg-amber-100 text-amber-900 font-bold border border-amber-300'
                           : 'bg-stone-750 text-amber-300 font-semibold border border-stone-700'
                         : theme === 'light'
-                        ? 'text-stone-700 hover:text-stone-950 hover:bg-[#EFE8DD]'
+                        ? 'text-stone-700 hover:text-stone-950 hover:bg-[#E4EAE2]'
                         : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
                     }`}
                   >
@@ -1527,15 +1527,15 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         {/* Datasets Table */}
         <div className={`flex-1 overflow-y-auto rounded-2xl border transition-all ${
           theme === 'light'
-            ? 'border-[#E2DBD0] bg-white shadow-xs'
+            ? 'border-[#D4DFD3] bg-white shadow-xs'
             : 'border-stone-800/90 bg-stone-900/30 backdrop-blur-sm'
         }`}>
           {filteredDatasets.length > 0 ? (
             <table className="w-full text-left text-xs border-collapse">
               <thead className={`sticky top-0 z-10 font-semibold uppercase tracking-wider text-[11px] border-b ${
                 theme === 'light'
-                  ? 'bg-[#F7F3EC] border-[#E2DBD0] text-stone-700'
-                  : 'bg-[#181411] border-stone-800 text-stone-400'
+                  ? 'bg-[#F0F6ED] border-[#D4DFD3] text-stone-700'
+                  : 'bg-[#101917] border-stone-800 text-stone-400'
               }`}>
                 <tr>
                   <th className="py-3 px-3.5 w-8">
@@ -1557,7 +1557,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                   <th className="py-3 px-3.5 text-right">{t.workspace.colActions}</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y ${theme === 'light' ? 'divide-[#EFE9DF]' : 'divide-stone-800/70'}`}>
+              <tbody className={`divide-y ${theme === 'light' ? 'divide-[#E5EBE3]' : 'divide-stone-800/70'}`}>
                 {filteredDatasets.map((d) => {
                   const isSelected = selectedIds.has(d.id);
                   const isTarget = selectedDatasetId === d.id;
@@ -1572,7 +1572,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                             ? 'bg-amber-100/70 text-stone-900 font-medium'
                             : 'bg-amber-950/30 text-amber-200'
                           : theme === 'light'
-                          ? 'hover:bg-[#FAF6F0] text-stone-800'
+                          ? 'hover:bg-[#F4F8F2] text-stone-800'
                           : 'hover:bg-stone-800/40 text-stone-300'
                       }`}
                     >
@@ -1595,7 +1595,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                           <Package className="w-4 h-4 text-amber-500 shrink-0" />
                           <div className="min-w-0">
                             <span className={`block truncate max-w-[280px] font-medium ${
-                              theme === 'light' ? 'text-stone-900' : 'text-[#FAF6F0]'
+                              theme === 'light' ? 'text-stone-900' : 'text-[#F4F8F2]'
                             }`} title={d.name}>
                               {d.name}
                             </span>
@@ -1619,7 +1619,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                                 ? 'bg-sky-50 text-sky-900 border-sky-300'
                                 : 'bg-sky-950/60 text-sky-300 border-sky-700/60'
                               : theme === 'light'
-                              ? 'bg-[#EFE8DC] text-stone-800 border-[#DDD3C2]'
+                              ? 'bg-[#E3EAE1] text-stone-800 border-[#C8D7C8]'
                               : 'bg-stone-800 text-stone-200 border-stone-700'
                           }`}>
                             {d.format === 'filegdb' ? 'FGDB' : d.format}
@@ -1871,7 +1871,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             </table>
           ) : (
             <div className="h-64 flex flex-col items-center justify-center text-center p-6 text-stone-500">
-              <div className={`p-3 rounded-2xl mb-3 ${theme === 'light' ? 'bg-[#EAE4DA] text-stone-600' : 'bg-stone-900/80 text-stone-500'}`}>
+              <div className={`p-3 rounded-2xl mb-3 ${theme === 'light' ? 'bg-[#DFE7DD] text-stone-600' : 'bg-stone-900/80 text-stone-500'}`}>
                 <Database className="w-8 h-8" />
               </div>
               <p className={`text-sm font-display font-semibold ${theme === 'light' ? 'text-stone-800' : 'text-stone-300'}`}>
@@ -1969,8 +1969,8 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in-0 duration-200">
           <div className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden p-6 space-y-5 ${
             theme === 'light' 
-              ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-amber-950/20' 
-              : 'bg-[#181411] border-stone-800 text-stone-100 shadow-stone-950/90'
+              ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-amber-950/20' 
+              : 'bg-[#101917] border-stone-800 text-stone-100 shadow-stone-950/90'
           }`}>
             <div className="flex items-start justify-between">
               <div className="flex items-center space-x-3">
@@ -2002,7 +2002,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             {/* Comparison cards */}
             <div className="grid grid-cols-2 gap-3 font-mono text-xs">
               <div className={`p-3 rounded-xl border ${
-                theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+                theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0C1412] border-stone-800'
               }`}>
                 <span className="text-[10px] text-stone-400 block uppercase tracking-wider">Root Level</span>
                 <span className="text-base font-bold text-amber-400 block mt-0.5">
@@ -2011,7 +2011,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 <span className="text-[10px] text-stone-500 block mt-0.5">files in top folder</span>
               </div>
               <div className={`p-3 rounded-xl border ${
-                theme === 'light' ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#130F0D] border-stone-800'
+                theme === 'light' ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0C1412] border-stone-800'
               }`}>
                 <span className="text-[10px] text-stone-400 block uppercase tracking-wider">Subfolders</span>
                 <span className="text-base font-bold text-emerald-400 block mt-0.5">
@@ -2059,8 +2059,8 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 }}
                 className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
                   theme === 'light'
-                    ? 'bg-white border-[#D6CEBE] text-stone-800 hover:bg-stone-50'
-                    : 'bg-[#1E1915] border-stone-700 text-stone-200 hover:bg-[#27201B]'
+                    ? 'bg-white border-[#C2D2C2] text-stone-800 hover:bg-stone-50'
+                    : 'bg-[#141F1D] border-stone-700 text-stone-200 hover:bg-[#1A2825]'
                 }`}
               >
                 <div className="flex items-center space-x-3">

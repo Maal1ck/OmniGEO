@@ -358,12 +358,12 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in-0 duration-150">
       <div className={`relative flex flex-col w-full max-w-6xl max-h-[94vh] rounded-2xl border shadow-2xl overflow-hidden ${
         theme === 'light'
-          ? 'bg-[#FAF8F5] border-[#E2DBD0] text-stone-900'
-          : 'bg-[#14100D] border-stone-800 text-stone-100'
+          ? 'bg-[#F7FAF5] border-[#D4DFD3] text-stone-900'
+          : 'bg-[#0D1413] border-stone-800 text-stone-100'
       }`}>
         {/* Top Bar */}
         <div className={`px-6 py-3.5 border-b flex flex-wrap items-center justify-between gap-3 ${
-          theme === 'light' ? 'bg-white border-[#E2DBD0]' : 'bg-[#191410] border-stone-800'
+          theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101917] border-stone-800'
         }`}>
           <div className="flex items-center space-x-3">
             <div className="p-2 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30">
@@ -391,7 +391,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                 onChange={(e) => setActiveDatasetId(e.target.value)}
                 className={`rounded-lg px-2.5 py-1.5 text-xs font-mono border focus:outline-none cursor-pointer ${
                   theme === 'light'
-                    ? 'bg-[#FAF8F5] border-[#D6CEBE] text-stone-900'
+                    ? 'bg-[#F7FAF5] border-[#C2D2C2] text-stone-900'
                     : 'bg-stone-900 border-stone-700 text-stone-200'
                 }`}
               >
@@ -446,7 +446,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
 
         {/* Sub-Tabs */}
         <div className={`px-6 py-2 border-b flex items-center space-x-2 text-xs font-semibold ${
-          theme === 'light' ? 'bg-[#F5EFE6] border-[#E2DBD0]' : 'bg-[#181310] border-stone-800'
+          theme === 'light' ? 'bg-[#EBF3E8] border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
         }`}>
           <button
             type="button"
@@ -505,7 +505,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     placeholder={isFr ? 'Filtrer les lignes...' : 'Filter rows...'}
                     className={`w-full rounded-lg pl-8 pr-3 py-1.5 text-xs border focus:outline-none ${
                       theme === 'light'
-                        ? 'bg-white border-[#D6CEBE] text-stone-900'
+                        ? 'bg-white border-[#C2D2C2] text-stone-900'
                         : 'bg-stone-900 border-stone-800 text-stone-100'
                     }`}
                   />
@@ -723,7 +723,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     value={newColName}
                     onChange={(e) => setNewColName(e.target.value)}
                     placeholder="code_secteur"
-                    className="rounded-lg px-3 py-1.5 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                    className="rounded-lg px-3 py-1.5 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                   />
                 </div>
                 <div>
@@ -733,7 +733,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                   <select
                     value={newColType}
                     onChange={(e) => setNewColType(e.target.value as any)}
-                    className="rounded-lg px-3 py-1.5 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                    className="rounded-lg px-3 py-1.5 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                   >
                     <option value="string">string (varchar)</option>
                     <option value="number">number (numeric / int)</option>
@@ -749,7 +749,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     type="text"
                     value={newColDefault}
                     onChange={(e) => setNewColDefault(e.target.value)}
-                    className="rounded-lg px-3 py-1.5 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                    className="rounded-lg px-3 py-1.5 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                   />
                 </div>
                 <button
@@ -838,7 +838,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     type="text"
                     value={draftName}
                     onChange={(e) => setDraftName(e.target.value)}
-                    className="w-full rounded-lg px-3 py-2 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                    className="w-full rounded-lg px-3 py-2 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                   />
                 </div>
 
@@ -852,7 +852,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                       value={draftSchema}
                       onChange={(e) => setDraftSchema(e.target.value)}
                       placeholder="public"
-                      className="w-full rounded-lg px-3 py-2 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                      className="w-full rounded-lg px-3 py-2 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                     />
                   </div>
                   <div>
@@ -862,7 +862,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     <select
                       value={draftPk}
                       onChange={(e) => setDraftPk(e.target.value)}
-                      className="w-full rounded-lg px-3 py-2 bg-[#14100D] border border-stone-700 text-stone-100 font-mono"
+                      className="w-full rounded-lg px-3 py-2 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                     >
                       {draftFields.map((f) => (
                         <option key={f.name} value={f.name}>{f.name}</option>
@@ -882,7 +882,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     value={draftComment}
                     onChange={(e) => setDraftComment(e.target.value)}
                     placeholder="Service : Gestion et Développement des Ressources en Eau"
-                    className="w-full rounded-lg px-3 py-2 bg-[#14100D] border border-stone-700 text-stone-100 font-sans"
+                    className="w-full rounded-lg px-3 py-2 bg-[#0D1413] border border-stone-700 text-stone-100 font-sans"
                   />
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {[

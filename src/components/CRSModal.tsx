@@ -50,12 +50,12 @@ export const CRSModal: React.FC<CRSModalProps> = ({
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in-0 duration-200">
       <div className={`border rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden transition-all ${
         isLight
-          ? 'bg-white border-[#E2DBD0] text-stone-900 shadow-stone-400/20'
-          : 'bg-[#181411] border-stone-700/80 text-stone-100 shadow-stone-950/90'
+          ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-stone-400/20'
+          : 'bg-[#101917] border-stone-700/80 text-stone-100 shadow-stone-950/90'
       }`}>
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 border-b ${
-          isLight ? 'bg-[#FAF8F5] border-[#E8E2D8]' : 'bg-[#110E0C] border-stone-800'
+          isLight ? 'bg-[#F7FAF5] border-[#DDE5DB]' : 'bg-[#0B1210] border-stone-800'
         }`}>
           <div className="flex items-center space-x-2.5">
             <div className={`p-2 rounded-xl border ${
@@ -66,7 +66,7 @@ export const CRSModal: React.FC<CRSModalProps> = ({
               <Globe className="w-5 h-5" />
             </div>
             <div>
-              <h3 className={`font-display font-bold text-base ${isLight ? 'text-stone-900' : 'text-[#FAF6F0]'}`}>
+              <h3 className={`font-display font-bold text-base ${isLight ? 'text-stone-900' : 'text-[#F4F8F2]'}`}>
                 Coordinate Reference System (CRS) Registry
               </h3>
               <p className={`text-xs ${isLight ? 'text-stone-600' : 'text-stone-400'}`}>
@@ -85,7 +85,7 @@ export const CRSModal: React.FC<CRSModalProps> = ({
         </div>
 
         {/* Search */}
-        <div className={`p-4 border-b ${isLight ? 'bg-[#F5F1EA] border-[#E8E2D8]' : 'bg-[#13110E] border-stone-800'}`}>
+        <div className={`p-4 border-b ${isLight ? 'bg-[#EDF4EB] border-[#DDE5DB]' : 'bg-[#0D1413] border-stone-800'}`}>
           <div className="relative">
             <Search className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${isLight ? 'text-stone-500' : 'text-stone-400'}`} />
             <input
@@ -95,8 +95,8 @@ export const CRSModal: React.FC<CRSModalProps> = ({
               onChange={(e) => setQuery(e.target.value)}
               className={`w-full rounded-xl pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/50 ${
                 isLight
-                  ? 'bg-white border border-[#D5CDBD] text-stone-900 placeholder-stone-500 focus:border-amber-600'
-                  : 'bg-[#181411] border border-stone-700 text-stone-100 placeholder-stone-500 focus:border-amber-500'
+                  ? 'bg-white border border-[#C0D2C1] text-stone-900 placeholder-stone-500 focus:border-amber-600'
+                  : 'bg-[#101917] border border-stone-700 text-stone-100 placeholder-stone-500 focus:border-amber-500'
               }`}
               autoFocus
             />
@@ -110,7 +110,7 @@ export const CRSModal: React.FC<CRSModalProps> = ({
 
         {/* Quick Suggestion Pills */}
         <div className={`px-4 py-2 border-b flex items-center space-x-1.5 overflow-x-auto text-[11px] font-mono ${
-          isLight ? 'bg-[#FAF8F5] border-[#E8E2D8]' : 'bg-[#120F0D] border-stone-800'
+          isLight ? 'bg-[#F7FAF5] border-[#DDE5DB]' : 'bg-[#0C1312] border-stone-800'
         }`}>
           <span className={`text-[10px] font-sans uppercase font-bold shrink-0 ${isLight ? 'text-stone-500' : 'text-stone-500'}`}>
             Quick Pick:
@@ -131,7 +131,7 @@ export const CRSModal: React.FC<CRSModalProps> = ({
                 query === p.code
                   ? 'bg-amber-600 text-white border-amber-600 font-bold'
                   : isLight
-                  ? 'bg-white border-[#E0D7C9] text-stone-700 hover:bg-stone-100 hover:border-amber-500'
+                  ? 'bg-white border-[#CFDBCE] text-stone-700 hover:bg-stone-100 hover:border-amber-500'
                   : 'bg-stone-800/80 border-stone-700 text-stone-300 hover:bg-stone-700 hover:border-amber-500'
               }`}
             >
@@ -158,7 +158,7 @@ export const CRSModal: React.FC<CRSModalProps> = ({
                         ? 'border-amber-600 bg-amber-50 text-stone-900 ring-2 ring-amber-500/30 shadow-sm'
                         : 'border-amber-500 bg-amber-950/40 text-white ring-1 ring-amber-500/40 shadow-sm'
                       : isLight
-                      ? 'border-[#E5DDD0] bg-[#FAF8F5] hover:border-amber-400 hover:bg-white text-stone-800'
+                      ? 'border-[#D6E0D5] bg-[#F7FAF5] hover:border-amber-400 hover:bg-white text-stone-800'
                       : 'border-stone-800 bg-stone-900/40 hover:border-stone-700 hover:bg-stone-900/80 text-stone-300'
                   }`}
                 >
@@ -166,12 +166,12 @@ export const CRSModal: React.FC<CRSModalProps> = ({
                     <div className="flex items-center space-x-2">
                       <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded-md border ${
                         isLight
-                          ? 'bg-[#EFE8DD] text-amber-900 border-[#DDD3C2]'
+                          ? 'bg-[#E4EAE2] text-amber-900 border-[#C8D7C8]'
                           : 'bg-stone-800 text-amber-400 border-stone-700'
                       }`}>
                         {crs.code}
                       </span>
-                      <span className={`font-display font-bold text-sm ${isLight ? 'text-stone-900' : 'text-[#FAF6F0]'}`}>
+                      <span className={`font-display font-bold text-sm ${isLight ? 'text-stone-900' : 'text-[#F4F8F2]'}`}>
                         {crs.name}
                       </span>
                     </div>
@@ -202,7 +202,7 @@ export const CRSModal: React.FC<CRSModalProps> = ({
           )}
 
           {/* Custom Proj4 input section */}
-          <div className={`mt-6 pt-4 border-t ${isLight ? 'border-[#E8E2D8]' : 'border-stone-800'}`}>
+          <div className={`mt-6 pt-4 border-t ${isLight ? 'border-[#DDE5DB]' : 'border-stone-800'}`}>
             <div className={`flex items-center space-x-2 mb-2 text-xs font-bold uppercase tracking-wider ${
               isLight ? 'text-stone-800' : 'text-stone-300'
             }`}>
@@ -210,7 +210,7 @@ export const CRSModal: React.FC<CRSModalProps> = ({
               <span>Define Custom CRS (PROJ string)</span>
             </div>
             <form onSubmit={handleCustomSubmit} className={`space-y-3 p-3 rounded-xl border ${
-              isLight ? 'bg-[#FAF8F5] border-[#E2DBD0]' : 'bg-[#110E0C] border-stone-800'
+              isLight ? 'bg-[#F7FAF5] border-[#D4DFD3]' : 'bg-[#0B1210] border-stone-800'
             }`}>
               <div className="grid grid-cols-3 gap-2">
                 <input
@@ -220,8 +220,8 @@ export const CRSModal: React.FC<CRSModalProps> = ({
                   onChange={(e) => setCustomCode(e.target.value)}
                   className={`rounded-lg px-3 py-1.5 text-xs font-mono focus:border-amber-500 focus:outline-none border ${
                     isLight
-                      ? 'bg-white border-[#D5CDBD] text-stone-900 placeholder-stone-500'
-                      : 'bg-[#181411] border-stone-700 text-stone-100 placeholder-stone-500'
+                      ? 'bg-white border-[#C0D2C1] text-stone-900 placeholder-stone-500'
+                      : 'bg-[#101917] border-stone-700 text-stone-100 placeholder-stone-500'
                   }`}
                 />
                 <input
@@ -231,8 +231,8 @@ export const CRSModal: React.FC<CRSModalProps> = ({
                   onChange={(e) => setCustomProj4(e.target.value)}
                   className={`col-span-2 rounded-lg px-3 py-1.5 text-xs font-mono focus:border-amber-500 focus:outline-none border ${
                     isLight
-                      ? 'bg-white border-[#D5CDBD] text-stone-900 placeholder-stone-500'
-                      : 'bg-[#181411] border-stone-700 text-stone-100 placeholder-stone-500'
+                      ? 'bg-white border-[#C0D2C1] text-stone-900 placeholder-stone-500'
+                      : 'bg-[#101917] border-stone-700 text-stone-100 placeholder-stone-500'
                   }`}
                 />
               </div>
@@ -251,7 +251,7 @@ export const CRSModal: React.FC<CRSModalProps> = ({
 
         {/* Footer */}
         <div className={`px-6 py-3 border-t flex items-center justify-between text-xs ${
-          isLight ? 'bg-[#FAF8F5] border-[#E8E2D8] text-stone-600' : 'bg-[#110E0C] border-stone-800 text-stone-400'
+          isLight ? 'bg-[#F7FAF5] border-[#DDE5DB] text-stone-600' : 'bg-[#0B1210] border-stone-800 text-stone-400'
         }`}>
           <span>PROJ 9.3+ geodetic &amp; OGC EPSG registry (6,980+ entries)</span>
           <button
