@@ -61,7 +61,7 @@ function escapeSqlLiteral(val: any): string {
     return val ? 'TRUE' : 'FALSE';
   }
   if (val instanceof Date) {
-    return `'${val.toISOString()}'`;
+    return Number.isNaN(val.getTime()) ? 'NULL' : `'${val.toISOString()}'`;
   }
   if (typeof val === 'object') {
     const jsonStr = JSON.stringify(val).replace(/'/g, "''");

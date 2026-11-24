@@ -2240,7 +2240,7 @@ export function generateStandaloneHtmlReport(
   const uniqueSchemas = Array.from(new Set(allTables.map(t => t.schema || 'public'))).sort();
   const uniqueFamilies = Array.from(new Set(allTables.map(t => classifyTableFamily(t, allTables, lang)))).sort();
 
-  const spatialTableCount = allTables.filter(t => isSpatialTable(t)).length;
+  const spatialTableCount = allTables.filter(t => isTableSpatial(t)).length;
 
   const i18n = {
     brand: cfg.header.brandBadgeText.trim() || (isFr ? 'OmniGeo • Dictionnaire PostgreSQL' : 'OmniGeo • PostgreSQL Data Dictionary'),
@@ -2316,7 +2316,7 @@ export function generateStandaloneHtmlReport(
   const tablesHtml = allTables.map(table => {
     const tableFamily = classifyTableFamily(table, allTables, lang);
     const isBiz = isBusinessTable(table);
-    const spatialEngine = detectSpatialEngine(table);
+    const spatialEngine = detectSpatialProvider(table);
     const tableIsSpatial = spatialEngine !== null;
 
     const columnsHtml = (table.columns || []).map(col => {
