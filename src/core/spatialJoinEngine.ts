@@ -22,6 +22,8 @@ export interface AttributeJoinOptions {
   prefix?: string;
   outputName: string;
   caseSensitive?: boolean;
+  fuzzyMatching?: boolean;
+  fuzzyThreshold?: number;
 }
 
 export interface SpatialJoinOptions {
@@ -38,6 +40,7 @@ export interface JoinExecutionSummary {
   dataset: SpatialDataset;
   targetCount: number;
   matchedCount: number;
+  fuzzyMatchedCount: number;
   unmatchedCount: number;
   matchPercentage: number;
   addedFieldCount: number;
@@ -56,6 +59,85 @@ function normalizeKeyValue(val: any, caseSensitive: boolean = false): string {
   return str;
 }
 
+function normalizeFuzzyValue(value: string, caseSensitive = false): string {
+  const normalized = value
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+  return caseSensitive ? normalized : normalized.toLowerCase();
+}
+
+function getBigrams(value: string): Set<string> {
+  const bigrams = new Set<string>();
+  for (let i = 0; i < value.length - 1; i++) {
+    bigrams.add(value.slice(i, i + 2));
+  }
+  return bigrams;
+}
+
+function levenshteinDistanceAtMost(left: string, right: string, maxDistance: number): number | null {
+  if (Math.abs(left.length - right.length) > maxDistance) return null;
+
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= left.length; i++) {
+    const current = [i];
+    let rowMinimum = i;
+    for (let j = 1; j <= right.length; j++) {
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      current[j] = Math.min(
+        current[j - 1] + 1,
+        previous[j] + 1,
+        previous[j - 1] + cost
+      );
+      rowMinimum = Math.min(rowMinimum, current[j]);
+    }
+    if (rowMinimum > maxDistance) return null;
+    previous = current;
+  }
+
+  return previous[right.length] <= maxDistance ? previous[right.length] : null;
+}
+
+function normalizeComparableValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? '' : value.toISOString();
+  }
+  if (typeof value === 'object') return JSON.stringify(value) || '';
+  return String(value).trim().toLowerCase();
+}
+
+function countSharedValueMatches(
+  targetProperties: Record<string, any>,
+  sourceProperties: Record<string, any>,
+  targetKeyField: string,
+  sourceKeyField: string
+): number {
+  const excludedNames = new Set([
+    normalizeFuzzyValue(targetKeyField).replace(/\s/g, ''),
+    normalizeFuzzyValue(sourceKeyField).replace(/\s/g, ''),
+  ]);
+  const sourceValues = new Map<string, unknown>();
+  for (const [name, value] of Object.entries(sourceProperties)) {
+    const normalizedName = normalizeFuzzyValue(name).replace(/\s/g, '');
+    if (normalizedName && !excludedNames.has(normalizedName)) {
+      sourceValues.set(normalizedName, value);
+    }
+  }
+
+  let matches = 0;
+  for (const [name, value] of Object.entries(targetProperties)) {
+    const normalizedName = normalizeFuzzyValue(name).replace(/\s/g, '');
+    if (!normalizedName || excludedNames.has(normalizedName) || !sourceValues.has(normalizedName)) continue;
+    const targetValue = normalizeComparableValue(value);
+    const sourceValue = normalizeComparableValue(sourceValues.get(normalizedName));
+    if (targetValue && sourceValue && targetValue === sourceValue) matches++;
+  }
+  return matches;
+}
+
 /**
  * Executes an Attribute (tabular) join between two spatial datasets.
  */
@@ -70,13 +152,19 @@ export function executeAttributeJoin(options: AttributeJoinOptions): JoinExecuti
     prefix = '',
     outputName,
     caseSensitive = false,
+    fuzzyMatching = false,
+    fuzzyThreshold = 0.85,
   } = options;
 
   const targetFeatures = targetDataset.geojson?.features || [];
   const sourceFeatures = sourceDataset.geojson?.features || [];
+  const targetKeyIsText = targetDataset.fields.find(field => field.name === targetKeyField)?.type === 'string';
+  const sourceKeyIsText = sourceDataset.fields.find(field => field.name === sourceKeyField)?.type === 'string';
 
   // Index the source features by the sourceKeyField for O(1) lookups
   const sourceIndex = new Map<string, Record<string, any>>();
+  const fuzzyRowsByKey = new Map<string, Record<string, any>[]>();
+  const fuzzyKeyIndex = new Map<string, Set<string>>();
   for (const sf of sourceFeatures) {
     if (!sf.properties) continue;
     const rawVal = sf.properties[sourceKeyField];
@@ -84,10 +172,31 @@ export function executeAttributeJoin(options: AttributeJoinOptions): JoinExecuti
     if (key && !sourceIndex.has(key)) {
       sourceIndex.set(key, sf.properties);
     }
+
+    if (fuzzyMatching && targetKeyIsText && sourceKeyIsText && typeof rawVal === 'string') {
+      const fuzzyKey = normalizeFuzzyValue(rawVal, caseSensitive);
+      if (!fuzzyKey) continue;
+
+      const rows = fuzzyRowsByKey.get(fuzzyKey) || [];
+      rows.push(sf.properties);
+      fuzzyRowsByKey.set(fuzzyKey, rows);
+
+      if (rows.length === 1) {
+        for (const bigram of getBigrams(fuzzyKey)) {
+          const keys = fuzzyKeyIndex.get(bigram) || new Set<string>();
+          keys.add(fuzzyKey);
+          fuzzyKeyIndex.set(bigram, keys);
+        }
+      }
+    }
   }
 
+  const threshold = Number.isFinite(fuzzyThreshold)
+    ? Math.max(0.6, Math.min(1, fuzzyThreshold))
+    : 0.85;
   const joinedFeatures: any[] = [];
   let matchedCount = 0;
+  let fuzzyMatchedCount = 0;
 
   for (let i = 0; i < targetFeatures.length; i++) {
     const tf = targetFeatures[i];
@@ -95,10 +204,69 @@ export function executeAttributeJoin(options: AttributeJoinOptions): JoinExecuti
     const rawTargetKey = targetProps[targetKeyField];
     const key = normalizeKeyValue(rawTargetKey, caseSensitive);
 
-    const matchingSourceProps = key ? sourceIndex.get(key) : undefined;
+    let matchingSourceProps = key ? sourceIndex.get(key) : undefined;
+    let fuzzyMatched = false;
+
+    if (
+      !matchingSourceProps &&
+      fuzzyMatching &&
+      targetKeyIsText &&
+      sourceKeyIsText &&
+      typeof rawTargetKey === 'string'
+    ) {
+      const fuzzyTargetKey = normalizeFuzzyValue(rawTargetKey, caseSensitive);
+      const candidates = new Set<string>();
+      for (const bigram of getBigrams(fuzzyTargetKey)) {
+        for (const candidateKey of fuzzyKeyIndex.get(bigram) || []) {
+          candidates.add(candidateKey);
+        }
+      }
+
+      const bestCandidates: { key: string; score: number }[] = [];
+      let bestScore = -1;
+      const candidateKeys = fuzzyTargetKey.length < 5 ? fuzzyRowsByKey.keys() : candidates;
+      for (const candidateKey of candidateKeys) {
+        const maxLength = Math.max(fuzzyTargetKey.length, candidateKey.length);
+        if (maxLength === 0) continue;
+        const maxDistance = Math.floor((1 - threshold) * maxLength + 1e-9);
+        const distance = levenshteinDistanceAtMost(fuzzyTargetKey, candidateKey, maxDistance);
+        if (distance === null) continue;
+        const score = 1 - distance / maxLength;
+        if (score > bestScore) {
+          bestScore = score;
+          bestCandidates.length = 0;
+          bestCandidates.push({ key: candidateKey, score });
+        } else if (score === bestScore) {
+          bestCandidates.push({ key: candidateKey, score });
+        }
+      }
+
+      const bestRows = bestCandidates.flatMap(candidate => fuzzyRowsByKey.get(candidate.key) || []);
+      if (bestRows.length === 1) {
+        matchingSourceProps = bestRows[0];
+      } else if (bestRows.length > 1) {
+        const rankedRows = bestRows.map(properties => ({
+          properties,
+          sharedValueMatches: countSharedValueMatches(
+            targetProps,
+            properties,
+            targetKeyField,
+            sourceKeyField
+          ),
+        }));
+        const highestSharedMatches = Math.max(...rankedRows.map(row => row.sharedValueMatches));
+        const bestRowsByContext = rankedRows.filter(row => row.sharedValueMatches === highestSharedMatches);
+        if (highestSharedMatches > 0 && bestRowsByContext.length === 1) {
+          matchingSourceProps = bestRowsByContext[0].properties;
+        }
+      }
+
+      fuzzyMatched = matchingSourceProps !== undefined;
+    }
 
     if (matchingSourceProps) {
       matchedCount++;
+      if (fuzzyMatched) fuzzyMatchedCount++;
       // Attach selected source fields
       for (const field of selectedSourceFields) {
         const outFieldName = prefix ? `${prefix}${field}` : field;
@@ -172,6 +340,7 @@ export function executeAttributeJoin(options: AttributeJoinOptions): JoinExecuti
     dataset: newDataset,
     targetCount,
     matchedCount,
+    fuzzyMatchedCount,
     unmatchedCount,
     matchPercentage,
     addedFieldCount: selectedSourceFields.length,
@@ -447,6 +616,7 @@ export function executeSpatialJoin(options: SpatialJoinOptions): JoinExecutionSu
     dataset: newDataset,
     targetCount,
     matchedCount,
+    fuzzyMatchedCount: 0,
     unmatchedCount,
     matchPercentage,
     addedFieldCount: selectedSourceFields.length,

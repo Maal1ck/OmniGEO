@@ -403,11 +403,8 @@ export function matchEsriProjectionName(prjText: string): CRSInfo | null {
     return getCRSByCode('EPSG:31370');
   }
 
-  // 2. Comprehensive Catalog Search across extracted names
-  const catalogMatch = matchFromCatalogByNames(extractedNames);
-  if (catalogMatch) return catalogMatch;
-
-  // 3. Geographic Fallbacks (ONLY if NOT projected!)
+  // Resolve well-known geographic datums before fuzzy catalog matching to avoid
+  // choosing a projected CRS whose name happens to share generic WGS/NAD tokens.
   if (isGeographic) {
     if (upper.includes('GCS_WGS_1984') || upper.includes('WGS_1984') || upper.includes('WGS 84') || upper.includes('WORLD GEODETIC SYSTEM 1984')) {
       return getCRSByCode('EPSG:4326');
@@ -428,6 +425,10 @@ export function matchEsriProjectionName(prjText: string): CRSInfo | null {
       return getCRSByCode('EPSG:4277');
     }
   }
+
+  // 3. Comprehensive Catalog Search across extracted names
+  const catalogMatch = matchFromCatalogByNames(extractedNames);
+  if (catalogMatch) return catalogMatch;
 
   return null;
 }

@@ -82,6 +82,18 @@ export function extractSRID(dataset: SpatialDataset): number {
   return 4326;
 }
 
+function isSpatialDataset(dataset: SpatialDataset): boolean {
+  return !dataset.isNonSpatial && dataset.geometryType !== 'Unknown';
+}
+
+function pythonString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function indentPython(code: string): string {
+  return code.split('\n').map(line => `    ${line}`).join('\n');
+}
+
 /**
  * Generates complete PostGIS SQL script with DDL, spatial constraints, and batched inserts
  */
@@ -97,7 +109,7 @@ export function generatePostgisSql(
   const createIndex = options.createSpatialIndex ?? true;
   const batchSize = Math.max(1, Math.min(500, options.batchSize || 100));
 
-  const isNonSpatial = Boolean(dataset.isNonSpatial);
+  const isNonSpatial = !isSpatialDataset(dataset);
   const features = dataset.geojson?.features || (dataset.geojson?.type === 'Feature' ? [dataset.geojson] : []);
   const geomType = dataset.geometryType === 'Unknown' ? 'Geometry' : dataset.geometryType;
 
@@ -216,7 +228,8 @@ export function generatePsqlCommand(options: PostgisExportOptions, sqlFileName: 
 export function generateOgr2ogrCommand(
   datasetName: string,
   options: PostgisExportOptions,
-  sourceGeojsonFile: string
+  sourceGeojsonFile: string,
+  isSpatial = true
 ): string {
   const host = options.host || 'localhost';
   const port = options.port || 5432;
@@ -227,7 +240,10 @@ export function generateOgr2ogrCommand(
   const table = sanitizeSqlIdentifier(options.tableName || datasetName);
   const geomCol = sanitizeSqlIdentifier(options.geomColumnName || 'geom');
 
-  return `ogr2ogr -f "PostgreSQL" PG:"host=${host} port=${port} dbname=${db} user=${user} password=${pass} active_schema=${schema}" "${sourceGeojsonFile}" -nln "${table}" -overwrite -lco GEOMETRY_NAME=${geomCol} -lco SPATIAL_INDEX=GIST`;
+  const spatialOptions = isSpatial
+    ? ` -lco GEOMETRY_NAME=${geomCol} -lco SPATIAL_INDEX=GIST`
+    : '';
+  return `ogr2ogr -f "PostgreSQL" PG:"host=${host} port=${port} dbname=${db} user=${user} password=${pass} active_schema=${schema}" "${sourceGeojsonFile}" -nln "${table}" -overwrite${spatialOptions}`;
 }
 
 /**
@@ -242,24 +258,184 @@ export function generatePythonScript(dataset: SpatialDataset, options: PostgisEx
   const schema = sanitizeSqlIdentifier(options.schemaName || 'public');
   const table = sanitizeSqlIdentifier(options.tableName || dataset.name);
 
+  if (!isSpatialDataset(dataset)) {
+    const sourceFile = pythonString(dataset.originalFileName);
+    const loadStatement = dataset.format === 'excel'
+      ? `data = pd.read_excel(${sourceFile})`
+      : `data = pd.read_csv(${sourceFile})`;
+
+    return `import pandas as pd
+from sqlalchemy import create_engine
+
+# Load the non-spatial source table
+${loadStatement}
+
+# Connect to PostgreSQL and write a regular table (no geometry column)
+connection_url = "postgresql://${user}:${pass}@${host}:${port}/${db}"
+engine = create_engine(connection_url)
+data.to_sql(
+    name=${pythonString(table)},
+    con=engine,
+    schema=${pythonString(schema)},
+    if_exists="replace",
+    index=False
+)
+print("Successfully ingested ${dataset.name} (${dataset.featureCount} records) into ${schema}.${table}")
+`;
+  }
+
   return `import geopandas as gpd
 from sqlalchemy import create_engine
 
 # 1. Load exported dataset
-gdf = gpd.read_file("${dataset.originalFileName}")
+gdf = gpd.read_file(${pythonString(dataset.originalFileName)})
 
 # 2. Establish PostgreSQL / PostGIS Engine
 connection_url = "postgresql://${user}:${pass}@${host}:${port}/${db}"
 engine = create_engine(connection_url)
 
-# 3. Export to PostGIS with spatial index
+# 3. Export the spatial layer to PostGIS with a spatial index
 gdf.to_postgis(
-    name="${table}",
+    name=${pythonString(table)},
     con=engine,
-    schema="${schema}",
+    schema=${pythonString(schema)},
     if_exists="replace",
     index=False
 )
 print("Successfully ingested ${dataset.name} (${dataset.featureCount} features) into PostGIS table: ${schema}.${table}")
+`;
+}
+
+/**
+ * Generates an ArcPy script that exports the input as a feature class or table.
+ */
+export function generateArcPyScript(dataset: SpatialDataset, options: PostgisExportOptions): string {
+  const schema = sanitizeSqlIdentifier(options.schemaName || 'public');
+  const table = sanitizeSqlIdentifier(options.tableName || dataset.name);
+  const spatial = isSpatialDataset(dataset);
+  const inputPath = pythonString(dataset.originalFileName);
+  const instance = `${options.host || 'localhost'},${options.port || 5432}`;
+  const database = options.database || 'gisdb';
+  const username = options.username || 'postgres';
+  const srid = options.srid || extractSRID(dataset);
+  const exportStatement = spatial
+    ? `arcpy.env.outputCoordinateSystem = arcpy.SpatialReference(${srid})
+source_layer = input_path
+if input_path.lower().endswith((".json", ".geojson")):
+    source_layer = arcpy.conversion.JSONToFeatures(
+        input_path,
+        os.path.join("in_memory", table_name)
+    ).getOutput(0)
+arcpy.conversion.FeatureClassToFeatureClass(
+    source_layer,
+    connection_path,
+    output_name
+)`
+    : `arcpy.conversion.TableToTable(
+    input_path,
+    connection_path,
+    output_name
+)`;
+
+  return `import os
+import tempfile
+import arcpy
+
+arcpy.env.overwriteOutput = True
+input_path = ${inputPath}
+host_instance = ${pythonString(instance)}
+database = ${pythonString(database)}
+username = ${pythonString(username)}
+password = os.environ.get("PGPASSWORD") or ${pythonString(options.password || 'YOUR_PASSWORD')}
+if password == "YOUR_PASSWORD":
+    raise RuntimeError("Set PGPASSWORD or replace the password placeholder before running this script.")
+
+schema_name = ${pythonString(schema)}
+table_name = ${pythonString(table)}
+output_name = "{}.{}".format(schema_name, table_name)
+with tempfile.TemporaryDirectory(prefix="omnigeo_postgres_") as connection_folder:
+    connection_name = ${pythonString(`${table}_postgres.sde`)}
+    connection_path = os.path.join(connection_folder, connection_name)
+    arcpy.management.CreateDatabaseConnection(
+        out_folder_path=connection_folder,
+        out_name=connection_name,
+        database_platform="POSTGRESQL",
+        instance=host_instance,
+        account_authentication="DATABASE_AUTH",
+        username=username,
+        password=password,
+        save_user_pass="SAVE_USERNAME",
+        database=database
+    )
+${indentPython(exportStatement)}
+print("Exported ${spatial ? 'spatial feature class' : 'non-spatial table'} to PostgreSQL schema {}.{}.".format(schema_name, table_name))
+`;
+}
+
+/**
+ * Generates a PyQGIS script that exports the input as a spatial layer or table.
+ */
+export function generatePyQgisScript(dataset: SpatialDataset, options: PostgisExportOptions): string {
+  const schema = sanitizeSqlIdentifier(options.schemaName || 'public');
+  const table = sanitizeSqlIdentifier(options.tableName || dataset.name);
+  const spatial = isSpatialDataset(dataset);
+  const sourceSrid = extractSRID(dataset);
+  const targetSrid = options.srid || sourceSrid;
+
+  return `import os
+from qgis.core import (
+    QgsCoordinateReferenceSystem,
+    QgsCoordinateTransform,
+    QgsDataSourceUri,
+    QgsProject,
+    QgsVectorFileWriter,
+    QgsVectorLayer,
+)
+
+# Run inside the QGIS Python Console or an initialized PyQGIS environment.
+source_path = ${pythonString(dataset.originalFileName)}
+layer_name = ${pythonString(dataset.name)}
+host = ${pythonString(options.host || 'localhost')}
+port = ${pythonString(String(options.port || 5432))}
+database = ${pythonString(options.database || 'gisdb')}
+username = ${pythonString(options.username || 'postgres')}
+password = os.environ.get("PGPASSWORD") or ${pythonString(options.password || 'YOUR_PASSWORD')}
+if password == "YOUR_PASSWORD":
+    raise RuntimeError("Set PGPASSWORD or replace the password placeholder before running this script.")
+
+schema_name = ${pythonString(schema)}
+table_name = ${pythonString(table)}
+layer = QgsVectorLayer(source_path, layer_name, "ogr")
+if not layer.isValid():
+    raise RuntimeError("Could not open source dataset: " + source_path)
+
+uri = QgsDataSourceUri()
+uri.setConnection(host, port, database, username, password)
+options = QgsVectorFileWriter.SaveVectorOptions()
+options.driverName = "PostgreSQL"
+options.layerName = table_name
+options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+options.layerOptions = [${pythonString(`SCHEMA=${schema}`)}]
+${spatial ? `source_crs = QgsCoordinateReferenceSystem("EPSG:${sourceSrid}")
+if not layer.crs().isValid():
+    layer.setCrs(source_crs)
+target_crs = QgsCoordinateReferenceSystem("EPSG:${targetSrid}")
+if not target_crs.isValid():
+    raise RuntimeError("Invalid target CRS: EPSG:${targetSrid}")
+options.ct = QgsCoordinateTransform(layer.crs(), target_crs, QgsProject.instance())
+options.layerOptions.extend([
+    ${pythonString(`GEOMETRY_NAME=${sanitizeSqlIdentifier(options.geomColumnName || 'geom')}`)},
+    "SPATIAL_INDEX=GIST",
+])` : ''}
+
+error, error_message, _, _ = QgsVectorFileWriter.writeAsVectorFormatV3(
+    layer,
+    uri.uri(False),
+    QgsProject.instance().transformContext(),
+    options
+)
+if error != QgsVectorFileWriter.NoError:
+    raise RuntimeError("PostgreSQL export failed: " + error_message)
+print("Exported ${spatial ? 'spatial layer' : 'non-spatial table'} to PostgreSQL schema {}.{}.".format(schema_name, table_name))
 `;
 }

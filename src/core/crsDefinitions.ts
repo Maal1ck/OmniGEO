@@ -7,6 +7,7 @@ interface EPSGDefinition {
   kind: string;
   name: string;
   proj4: string | null;
+  wkt?: string | null;
   unit: string | null;
   area: string | null;
 }
@@ -210,6 +211,7 @@ const epsgCRSList: CRSInfo[] = Object.values(epsgIndex as Record<string, EPSGDef
       name: entry.name,
       area: entry.area || 'Area not specified',
       proj4: entry.proj4.replace(/\s+\+(?:nadgrids|geoidgrids)=[^\s]+/g, ''),
+      wkt: entry.wkt || undefined,
       transformationWarning: gridFiles.length > 0
         ? `Datum grid file(s) ${[...new Set(gridFiles)].join(', ')} are not bundled; transformations use the available ellipsoid parameters and may be less accurate.`
         : undefined,

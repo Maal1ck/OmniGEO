@@ -577,26 +577,28 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
             if (cpgFile) zip.file(`${baseName}.cpg`, await cpgFile.text());
 
             const zipBuf = await zip.generateAsync({ type: 'arraybuffer' });
-            const dataset = await parseShapefileZipOrBuffers(zipBuf, displayName, file.size);
+            const datasets = await parseShapefileZipOrBuffers(zipBuf, displayName, file.size);
 
-            dataset.sidecars = [
-              { name: `${baseName}.shp`, extension: '.shp', size: shpFile.size, present: true, required: true },
-              { name: `${baseName}.shx`, extension: '.shx', size: shxFile?.size || 0, present: !!shxFile, required: true },
-              { name: `${baseName}.dbf`, extension: '.dbf', size: dbfFile?.size || 0, present: !!dbfFile, required: true },
-              { name: `${baseName}.prj`, extension: '.prj', size: prjFile?.size || 0, present: !!prjFile, required: false },
-              { name: `${baseName}.cpg`, extension: '.cpg', size: cpgFile?.size || 0, present: !!cpgFile, required: false },
-            ];
+            datasets.forEach(dataset => {
+              dataset.sidecars = [
+                { name: `${baseName}.shp`, extension: '.shp', size: shpFile.size, present: true, required: true },
+                { name: `${baseName}.shx`, extension: '.shx', size: shxFile?.size || 0, present: !!shxFile, required: true },
+                { name: `${baseName}.dbf`, extension: '.dbf', size: dbfFile?.size || 0, present: !!dbfFile, required: true },
+                { name: `${baseName}.prj`, extension: '.prj', size: prjFile?.size || 0, present: !!prjFile, required: false },
+                { name: `${baseName}.cpg`, extension: '.cpg', size: cpgFile?.size || 0, present: !!cpgFile, required: false },
+              ];
 
-            if (!shxFile || !dbfFile) {
-              dataset.validationIssues.push({
-                severity: 'warning',
-                code: 'MISSING_SIDECAR',
-                message: `Incomplete Shapefile bundle: Missing ${!shxFile ? '.shx index ' : ''}${!dbfFile ? '.dbf attributes' : ''}.`,
-              });
-              dataset.status = 'warning';
-            }
+              if (!shxFile || !dbfFile) {
+                dataset.validationIssues.push({
+                  severity: 'warning',
+                  code: 'MISSING_SIDECAR',
+                  message: `Incomplete Shapefile bundle: Missing ${!shxFile ? '.shx index ' : ''}${!dbfFile ? '.dbf attributes' : ''}.`,
+                });
+                dataset.status = 'warning';
+              }
 
-            newDatasets.push(dataset);
+              newDatasets.push(dataset);
+            });
           } else if (ext === '.zip' || lowerName.endsWith('.gdb.zip')) {
             if (dataTypes.filegdb && (lowerName.endsWith('.gdb.zip') || (await isFileGdbZipArchive(file)))) {
               const zipBundles = await splitFileGdbZipBundles(file);
@@ -619,8 +621,8 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
               }
             } else if (dataTypes.shapefile && ext === '.zip') {
               const buf = await file.arrayBuffer();
-              const dataset = await parseShapefileZipOrBuffers(buf, displayName, file.size);
-              newDatasets.push(dataset);
+              const datasets = await parseShapefileZipOrBuffers(buf, displayName, file.size);
+              newDatasets.push(...datasets);
             }
           } else if (ext === '.geojson' || ext === '.json') {
             const text = await file.text();

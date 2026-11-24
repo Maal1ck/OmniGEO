@@ -61,6 +61,8 @@ export const JoinModal: React.FC<JoinModalProps> = ({
   const [sourceKeyField, setSourceKeyField] = useState<string>('');
   const [attributeJoinType, setAttributeJoinType] = useState<AttributeJoinType>('left');
   const [caseSensitive, setCaseSensitive] = useState<boolean>(false);
+  const [fuzzyMatching, setFuzzyMatching] = useState<boolean>(true);
+  const [fuzzyThreshold, setFuzzyThreshold] = useState<number>(0.85);
 
   // Spatial Join settings
   const [spatialPredicate, setSpatialPredicate] = useState<SpatialPredicate>('intersects');
@@ -93,6 +95,9 @@ export const JoinModal: React.FC<JoinModalProps> = ({
 
   const targetDataset = useMemo(() => datasets.find(d => d.id === targetDatasetId), [datasets, targetDatasetId]);
   const sourceDataset = useMemo(() => datasets.find(d => d.id === sourceDatasetId), [datasets, sourceDatasetId]);
+  const canUseFuzzyMatching =
+    targetDataset?.fields.find(field => field.name === targetKeyField)?.type === 'string' &&
+    sourceDataset?.fields.find(field => field.name === sourceKeyField)?.type === 'string';
 
   // Set default output name and preselect fields when datasets change
   useEffect(() => {
@@ -166,6 +171,8 @@ export const JoinModal: React.FC<JoinModalProps> = ({
           prefix: fieldPrefix,
           outputName: outputName || 'preview_join',
           caseSensitive,
+          fuzzyMatching: fuzzyMatching && canUseFuzzyMatching,
+          fuzzyThreshold,
         });
       } else {
         return executeSpatialJoin({
@@ -189,6 +196,9 @@ export const JoinModal: React.FC<JoinModalProps> = ({
     sourceKeyField, 
     attributeJoinType, 
     caseSensitive, 
+    fuzzyMatching,
+    fuzzyThreshold,
+    canUseFuzzyMatching,
     spatialPredicate, 
     spatialJoinType, 
     selectedSourceFields, 
@@ -254,6 +264,8 @@ export const JoinModal: React.FC<JoinModalProps> = ({
             prefix: fieldPrefix,
             outputName: outputName.trim() || `${targetDataset.name}_joined_${sourceDataset.name}`,
             caseSensitive,
+            fuzzyMatching: fuzzyMatching && canUseFuzzyMatching,
+            fuzzyThreshold,
           });
         } else {
           result = executeSpatialJoin({
@@ -523,6 +535,40 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                     {lang === 'fr' ? 'Sensible à la casse' : 'Case sensitive'}
                   </span>
                 </label>
+
+                {canUseFuzzyMatching && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <label className="flex items-center space-x-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={fuzzyMatching}
+                        onChange={(e) => setFuzzyMatching(e.target.checked)}
+                        className="rounded text-amber-500 focus:ring-amber-500"
+                      />
+                      <span className="text-[11px] font-mono text-stone-500">
+                        {lang === 'fr' ? 'Correspondance floue du texte' : 'Fuzzy text matching'}
+                      </span>
+                    </label>
+                    {fuzzyMatching && (
+                      <label className="flex items-center gap-2 text-[11px] font-mono text-stone-500">
+                        <span>{lang === 'fr' ? 'Seuil minimum' : 'Minimum similarity'}</span>
+                        <input
+                          type="range"
+                          min="0.6"
+                          max="1"
+                          step="0.01"
+                          value={fuzzyThreshold}
+                          onChange={(e) => setFuzzyThreshold(Number(e.target.value))}
+                          className="w-24 accent-amber-500"
+                          aria-label={lang === 'fr' ? 'Seuil de correspondance floue' : 'Fuzzy match threshold'}
+                        />
+                        <span className="w-9 text-right text-amber-600 dark:text-amber-400">
+                          {Math.round(fuzzyThreshold * 100)}%
+                        </span>
+                      </label>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -695,6 +741,11 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                     {previewSummary.matchedCount.toLocaleString()} {lang === 'fr' ? 'appariées' : 'matched'} ({previewSummary.matchPercentage}%)
                   </span>
+                  {previewSummary.fuzzyMatchedCount > 0 && (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      {previewSummary.fuzzyMatchedCount.toLocaleString()} {lang === 'fr' ? 'floues' : 'fuzzy'}
+                    </span>
+                  )}
                   <span>·</span>
                   <span className="text-stone-400">
                     {previewSummary.dataset.featureCount.toLocaleString()} {lang === 'fr' ? 'entités générées' : 'output features'}

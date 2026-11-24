@@ -3,7 +3,8 @@ import { getCRSByCode } from './crsDefinitions';
 import { computeGeoJSONBounds, detectGeometryType, validateDatasetGeometries } from './geometryValidation';
 import { extractSchemaFields } from './formatParsers';
 import { getSqlJs } from './sqlJs';
-import { SpatialDataset, ValidationIssue } from '../types/gis';
+import { CRSInfo, SpatialDataset, ValidationIssue } from '../types/gis';
+import { detectCRSFromPRJRobust } from './crsDetection';
 
 interface WkbGeometry {
   type: string;
@@ -130,7 +131,12 @@ function quoteIdentifier(identifier: string): string {
 function createDataset(
   fileName: string,
   fileSize: number,
-  layer: { tableName: string; identifier: string; geometryColumn: string; srsId: number },
+  layer: {
+    tableName: string;
+    identifier: string;
+    geometryColumn: string;
+    detectedCRS: CRSInfo | null;
+  },
   rows: Record<string, unknown>[],
   propertyNames: string[],
   issues: ValidationIssue[],
@@ -143,7 +149,7 @@ function createDataset(
       properties: Object.fromEntries(propertyNames.map(name => [name, row[name] ?? null])),
     })),
   };
-  const srs = getCRSByCode(`EPSG:${layer.srsId}`);
+  const srs = layer.detectedCRS;
   const validationIssues = [
     ...issues,
     ...validateDatasetGeometries(geojson, srs?.code),
@@ -214,15 +220,8 @@ export async function inspectGeoPackageLayers(content: ArrayBuffer): Promise<Geo
 
     return layers.map(layer => {
       const tableName = String(layer.table_name);
-      let count = 0;
-      try {
-        const countRes = readRows(db, `SELECT COUNT(*) as cnt FROM ${quoteIdentifier(tableName)}`);
-        if (countRes.length > 0 && countRes[0].cnt !== undefined) {
-          count = Number(countRes[0].cnt) || 0;
-        }
-      } catch {
-        count = 0;
-      }
+      const countRes = readRows(db, `SELECT COUNT(*) as cnt FROM ${quoteIdentifier(tableName)}`);
+      const count = countRes.length > 0 ? Number(countRes[0].cnt) || 0 : 0;
 
       return {
         tableName,
@@ -256,9 +255,11 @@ export async function parseGeoPackage(
 
     let layers = readRows(
       db,
-      `SELECT c.table_name, c.identifier, g.column_name, g.srs_id
+      `SELECT c.table_name, c.identifier, g.column_name, g.srs_id,
+              s.organization, s.organization_coordsys_id, s.definition
        FROM gpkg_contents c
        JOIN gpkg_geometry_columns g ON g.table_name = c.table_name
+       LEFT JOIN gpkg_spatial_ref_sys s ON s.srs_id = g.srs_id
        WHERE c.data_type = 'features'`,
     );
     if (layers.length === 0) {
@@ -292,12 +293,19 @@ export async function parseGeoPackage(
         `SELECT * FROM ${quoteIdentifier(tableName)}`,
       );
       const srsId = Number(layer.srs_id);
+      const organization = String(layer.organization || '').toUpperCase();
+      const organizationCode = Number(layer.organization_coordsys_id);
+      const registeredCRS = organization === 'EPSG' && Number.isFinite(organizationCode)
+        ? getCRSByCode(`EPSG:${organizationCode}`)
+        : null;
+      const detectedCRS = registeredCRS
+        || detectCRSFromPRJRobust(typeof layer.definition === 'string' ? layer.definition : '');
       const issues: ValidationIssue[] = [];
-      if (!getCRSByCode(`EPSG:${srsId}`)) {
+      if (!detectedCRS) {
         issues.push({
           severity: 'warning',
           code: 'UNKNOWN_GPKG_CRS',
-          message: `The GeoPackage layer uses SRS ${srsId}, which is not in the built-in CRS registry.`,
+          message: `The GeoPackage layer uses ${organization || 'an unknown organization'} SRS ${organizationCode || srsId}, which could not be matched to a known CRS.`,
         });
       }
 
@@ -308,7 +316,7 @@ export async function parseGeoPackage(
           tableName,
           identifier: String(layer.identifier || ''),
           geometryColumn,
-          srsId,
+          detectedCRS,
         },
         rows,
         propertyNames,

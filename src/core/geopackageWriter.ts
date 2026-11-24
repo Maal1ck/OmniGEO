@@ -2,80 +2,15 @@ import { Database } from 'sql.js';
 import { getCRSByCode } from './crsDefinitions';
 import { getWKTForCRS } from './shapefileBundle';
 import { getSqlJs } from './sqlJs';
-
-/**
- * Converts a GeoJSON geometry into GeoPackage Binary (GPB) header + WKB
- */
-function geometryToGeoPackageBlob(geom: any, srsId: number): Uint8Array {
-  if (!geom || !geom.coordinates) {
-    return new Uint8Array(0);
-  }
-
-  // WKB generator for basic geometries
-  const wkbParts: number[] = [];
-
-  // GeoPackage Binary Header:
-  // Byte 0-1: Magic 'GP' (0x47, 0x50)
-  // Byte 2: Version (0)
-  // Byte 3: Flags (Bit 0: Little Endian 1, Bits 1-3: Envelope Indicator 0 = no envelope)
-  // Byte 4-7: srs_id (32-bit int, little-endian)
-  const gpbHeader = [0x47, 0x50, 0x00, 0x01];
-  // srsId 4 bytes little endian
-  gpbHeader.push(srsId & 0xff);
-  gpbHeader.push((srsId >> 8) & 0xff);
-  gpbHeader.push((srsId >> 16) & 0xff);
-  gpbHeader.push((srsId >> 24) & 0xff);
-
-  // WKB Body: Byte Order (1 = little endian)
-  wkbParts.push(1);
-
-  function writeDouble(val: number) {
-    const buf = new ArrayBuffer(8);
-    new DataView(buf).setFloat64(0, val, true);
-    const u8 = new Uint8Array(buf);
-    for (let i = 0; i < 8; i++) wkbParts.push(u8[i]);
-  }
-
-  function writeInt32(val: number) {
-    wkbParts.push(val & 0xff);
-    wkbParts.push((val >> 8) & 0xff);
-    wkbParts.push((val >> 16) & 0xff);
-    wkbParts.push((val >> 24) & 0xff);
-  }
-
-  if (geom.type === 'Point') {
-    writeInt32(1); // WKBPoint
-    writeDouble(Number(geom.coordinates[0]) || 0);
-    writeDouble(Number(geom.coordinates[1]) || 0);
-  } else if (geom.type === 'LineString') {
-    writeInt32(2); // WKBLineString
-    writeInt32(geom.coordinates.length);
-    for (const pt of geom.coordinates) {
-      writeDouble(Number(pt[0]) || 0);
-      writeDouble(Number(pt[1]) || 0);
-    }
-  } else if (geom.type === 'Polygon') {
-    writeInt32(3); // WKBPolygon
-    writeInt32(geom.coordinates.length);
-    for (const ring of geom.coordinates) {
-      writeInt32(ring.length);
-      for (const pt of ring) {
-        writeDouble(Number(pt[0]) || 0);
-        writeDouble(Number(pt[1]) || 0);
-      }
-    }
-  } else {
-    // Default fallback Point
-    writeInt32(1);
-    writeDouble(0);
-    writeDouble(0);
-  }
-
-  const result = new Uint8Array(gpbHeader.length + wkbParts.length);
-  result.set(gpbHeader, 0);
-  result.set(wkbParts, gpbHeader.length);
-  return result;
-}
+import {
+  encodeGeoPackageGeometry,
+  getGeoPackageBounds,
+  getGeoPackageGeometryTypeName,
+  getGeoPackagePropertyColumns,
+  getUniqueGeoPackageLayerNames,
+  quoteSqliteIdentifier,
+  toGeoPackageValue,
+} from './geoPackageUtils';
 
 /**
  * Creates an OGC GeoPackage database file
@@ -88,17 +23,15 @@ export async function createGeoPackageFile(
   const SQL = await getSqlJs();
   const db: Database = new SQL.Database();
 
-  const sanitizedLayer = (layerName || 'features').replace(/[^a-zA-Z0-9_]/g, '_');
+  const [sanitizedLayer] = getUniqueGeoPackageLayerNames([layerName || 'features']);
   const srsIdMatch = crsCode.match(/\d+/);
   const srsId = srsIdMatch ? parseInt(srsIdMatch[0], 10) : 4326;
   const crsInfo = getCRSByCode(crsCode);
   const wkt = getWKTForCRS(crsCode);
 
   const features = geojson.features || (geojson.type === 'Feature' ? [geojson] : []);
-  let geomType = 'POINT';
-  const first = features.find((f: any) => f?.geometry)?.geometry?.type;
-  if (first === 'Polygon' || first === 'MultiPolygon') geomType = 'POLYGON';
-  else if (first === 'LineString' || first === 'MultiLineString') geomType = 'LINESTRING';
+  const geomType = getGeoPackageGeometryTypeName(features);
+  const bounds = getGeoPackageBounds(features);
 
   // 1. Set PRAGMAs for GeoPackage
   db.run(`PRAGMA application_id = 0x47504B47;`); // 'GPKG'
@@ -162,33 +95,15 @@ export async function createGeoPackageFile(
   `);
 
   // Discover property columns across all rows so floats widen INTEGER->REAL and dirty strings stay TEXT
-  const colTypeMap = new Map<string, 'TEXT' | 'REAL' | 'INTEGER' | null>();
-
-  for (const f of features) {
-    const props = f?.properties || {};
-    for (const [k, v] of Object.entries(props)) {
-      const colName = k.replace(/[^a-zA-Z0-9_]/g, '_');
-      if (!colTypeMap.has(colName)) colTypeMap.set(colName, null);
-      if (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) continue;
-      const current = colTypeMap.get(colName);
-      if (current === 'TEXT') continue;
-      if (typeof v === 'number' && Number.isFinite(v)) {
-        const numKind = Number.isInteger(v) ? 'INTEGER' : 'REAL';
-        colTypeMap.set(colName, current === 'REAL' || numKind === 'REAL' ? 'REAL' : 'INTEGER');
-      } else {
-        colTypeMap.set(colName, 'TEXT');
-      }
-    }
-  }
-
-  const columnDefs: { name: string; type: 'TEXT' | 'REAL' | 'INTEGER' }[] = Array.from(colTypeMap.entries()).map(
-    ([name, inferred]) => ({ name, type: inferred || 'TEXT' })
-  );
+  const columns = getGeoPackagePropertyColumns(features);
 
   // 5. Create vector feature table
-  const colSql = columnDefs.map(c => `"${c.name}" ${c.type}`).join(', ');
+  const colSql = columns
+    .map(column => `${quoteSqliteIdentifier(column.name)} ${column.type || 'TEXT'}`)
+    .join(', ');
+  const tableIdentifier = quoteSqliteIdentifier(sanitizedLayer);
   const createTableSql = `
-    CREATE TABLE "${sanitizedLayer}" (
+    CREATE TABLE ${tableIdentifier} (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       geom BLOB
       ${colSql ? `, ${colSql}` : ''}
@@ -197,15 +112,10 @@ export async function createGeoPackageFile(
   db.run(createTableSql);
 
   // 6. Register layer in gpkg_contents and gpkg_geometry_columns
-  let minX = 0, minY = 0, maxX = 0, maxY = 0;
-  if (geojson.bbox) {
-    [minX, minY, maxX, maxY] = geojson.bbox;
-  }
-
   db.run(`
     INSERT INTO gpkg_contents (table_name, data_type, identifier, description, min_x, min_y, max_x, max_y, srs_id)
     VALUES (?, 'features', ?, ?, ?, ?, ?, ?, ?);
-  `, [sanitizedLayer, sanitizedLayer, `OmniGeo export layer: ${sanitizedLayer}`, minX, minY, maxX, maxY, srsId]);
+  `, [sanitizedLayer, sanitizedLayer, `OmniGeo export layer: ${sanitizedLayer}`, ...(bounds || [null, null, null, null]), srsId]);
 
   db.run(`
     INSERT INTO gpkg_geometry_columns (table_name, column_name, geometry_type_name, srs_id, z, m)
@@ -213,21 +123,24 @@ export async function createGeoPackageFile(
   `, [sanitizedLayer, geomType, srsId]);
 
   // 7. Insert features
-  const insertCols = ['geom', ...columnDefs.map(c => `"${c.name}"`)].join(', ');
-  const placeholders = ['?', ...columnDefs.map(() => '?')].join(', ');
-  const insertSql = `INSERT INTO "${sanitizedLayer}" (${insertCols}) VALUES (${placeholders});`;
+  const insertCols = [quoteSqliteIdentifier('geom'), ...columns.map(column => quoteSqliteIdentifier(column.name))].join(', ');
+  const placeholders = ['?', ...columns.map(() => '?')].join(', ');
+  const insertSql = `INSERT INTO ${tableIdentifier} (${insertCols}) VALUES (${placeholders});`;
   const stmt = db.prepare(insertSql);
 
-  for (const f of features) {
-    const geomBlob = geometryToGeoPackageBlob(f.geometry, srsId);
-    const values: any[] = [geomBlob];
-    const props = f.properties || {};
-    for (const col of columnDefs) {
-      values.push(props[col.name] ?? null);
+  try {
+    for (const feature of features) {
+      const geomBlob = encodeGeoPackageGeometry(feature?.geometry, srsId);
+      const values: (string | number | Uint8Array | null)[] = [geomBlob];
+      const properties = feature?.properties || {};
+      for (const column of columns) {
+        values.push(toGeoPackageValue(properties[column.sourceName]));
+      }
+      stmt.run(values);
     }
-    stmt.run(values);
+  } finally {
+    stmt.free();
   }
-  stmt.free();
 
   const binaryArray = db.export();
   db.close();

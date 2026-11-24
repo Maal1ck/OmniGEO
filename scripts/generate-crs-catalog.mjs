@@ -10,9 +10,9 @@ const catalog = Object.fromEntries(
       typeof entry.proj4 === 'string' &&
       entry.proj4.length > 0,
     )
-    .map(({ code, kind, name, proj4, unit, area }) => [
+    .map(({ code, kind, name, proj4, wkt, unit, area }) => [
       code,
-      { code, kind, name, proj4, unit, area },
+      { code, kind, name, proj4, wkt, unit, area },
     ]),
 );
 

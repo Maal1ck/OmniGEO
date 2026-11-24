@@ -26,6 +26,16 @@ import { exportDatasetsToFileGdbZip } from '../core/fileGdbEngine';
 import { useI18n } from '../core/i18n';
 import { useTheme } from '../core/theme';
 
+const getCellText = (value: unknown): string =>
+  value === null || value === undefined ? '' : String(value);
+
+const matchesFindValue = (cellValue: unknown, findValue: string): boolean => {
+  const cellText = getCellText(cellValue);
+  return findValue === ''
+    ? cellText === ''
+    : cellText.toLowerCase().includes(findValue.toLowerCase());
+};
+
 interface GdbEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -68,6 +78,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
   const [replaceColumn, setReplaceColumn] = useState('');
   const [findValue, setFindValue] = useState('');
   const [replaceWith, setReplaceWith] = useState('');
+  const [replaceResult, setReplaceResult] = useState('');
 
   // Schema add column
   const [newColName, setNewColName] = useState('');
@@ -107,10 +118,20 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
       }))
     );
     setReplaceColumn(currentSource.fields[0]?.name || '');
+    setReplaceResult('');
     setPage(0);
     setRowSearch('');
     setSavedNotice(null);
   }, [currentSource]);
+
+  const matchingReplaceCells = useMemo(() => {
+    if (!replaceColumn) return 0;
+    return draftFeatures.reduce(
+      (count, feature) =>
+        matchesFindValue(feature?.properties?.[replaceColumn], findValue) ? count + 1 : count,
+      0
+    );
+  }, [draftFeatures, findValue, replaceColumn]);
 
   const filteredRowIndices = useMemo(() => {
     const q = rowSearch.trim().toLowerCase();
@@ -278,19 +299,56 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
   };
 
   const handleBulkReplace = () => {
-    if (!replaceColumn) return;
-    setDraftFeatures((prev) =>
-      prev.map((feat) => {
-        const props = { ...(feat.properties || {}) };
-        const cur = props[replaceColumn];
-        const curStr = cur === null || cur === undefined ? '' : String(cur);
-        if (findValue === '' && curStr === '') {
-          props[replaceColumn] = replaceWith;
-        } else if (findValue !== '' && curStr.includes(findValue)) {
-          props[replaceColumn] = curStr.split(findValue).join(replaceWith);
-        }
-        return { ...feat, properties: props };
-      })
+    const field = draftFields.find((item) => item.name === replaceColumn);
+    if (!field) {
+      setReplaceResult(isFr ? 'Sélectionnez une colonne cible.' : 'Select a target column.');
+      return;
+    }
+
+    const escapedFindValue = findValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const findPattern = findValue === '' ? null : new RegExp(escapedFindValue, 'gi');
+    let matchedCells = 0;
+    let changedCells = 0;
+
+    const updatedFeatures = draftFeatures.map((feature) => {
+      const currentValue = feature?.properties?.[replaceColumn];
+      if (!matchesFindValue(currentValue, findValue)) return feature;
+      matchedCells++;
+
+      const currentText = getCellText(currentValue);
+      const replacedText = findPattern
+        ? currentText.replace(findPattern, () => replaceWith)
+        : replaceWith;
+      let nextValue: unknown = replacedText === '' ? null : replacedText;
+
+      if (replacedText !== '' && field.type === 'number') {
+        const parsed = Number(replacedText);
+        nextValue = Number.isFinite(parsed) ? parsed : replacedText;
+      } else if (replacedText !== '' && field.type === 'boolean') {
+        nextValue = replacedText.toLowerCase() === 'true' || replacedText === '1';
+      }
+
+      if (Object.is(currentValue, nextValue)) return feature;
+      changedCells++;
+      return {
+        ...feature,
+        properties: { ...(feature.properties || {}), [replaceColumn]: nextValue },
+      };
+    });
+
+    if (changedCells > 0) setDraftFeatures(updatedFeatures);
+    setReplaceResult(
+      changedCells > 0
+        ? isFr
+          ? `${changedCells} cellule(s) remplacée(s).`
+          : `Replaced ${changedCells} cell${changedCells === 1 ? '' : 's'}.`
+        : matchedCells > 0
+          ? isFr
+            ? 'Correspondances trouvées, mais aucune valeur n’a changé.'
+            : 'Matches found, but no values changed.'
+          : isFr
+            ? 'Aucune correspondance trouvée dans cette colonne.'
+            : 'No matches found in this column.'
     );
   };
 
@@ -540,7 +598,11 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     </label>
                     <select
                       value={replaceColumn}
-                      onChange={(e) => setReplaceColumn(e.target.value)}
+                      aria-label={isFr ? 'Colonne cible' : 'Target column'}
+                      onChange={(e) => {
+                        setReplaceColumn(e.target.value);
+                        setReplaceResult('');
+                      }}
                       className="rounded-lg px-2.5 py-1.5 bg-stone-900 border border-stone-700 text-stone-100 font-mono"
                     >
                       {draftFields.map((f) => (
@@ -555,7 +617,11 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     <input
                       type="text"
                       value={findValue}
-                      onChange={(e) => setFindValue(e.target.value)}
+                      aria-label={isFr ? 'Texte à chercher' : 'Find text'}
+                      onChange={(e) => {
+                        setFindValue(e.target.value);
+                        setReplaceResult('');
+                      }}
                       className="rounded-lg px-2.5 py-1.5 bg-stone-900 border border-stone-700 text-stone-100 font-mono"
                     />
                   </div>
@@ -566,7 +632,11 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     <input
                       type="text"
                       value={replaceWith}
-                      onChange={(e) => setReplaceWith(e.target.value)}
+                      aria-label={isFr ? 'Remplacer par' : 'Replace with'}
+                      onChange={(e) => {
+                        setReplaceWith(e.target.value);
+                        setReplaceResult('');
+                      }}
                       className="rounded-lg px-2.5 py-1.5 bg-stone-900 border border-stone-700 text-stone-100 font-mono"
                     />
                   </div>
@@ -577,6 +647,18 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                   >
                     {isFr ? 'Remplacer Tout' : 'Replace All'}
                   </button>
+                  <div className="w-full flex flex-wrap items-center justify-between gap-2 text-[11px] text-stone-400" aria-live="polite">
+                    <span>
+                      {isFr
+                        ? `${matchingReplaceCells} cellule(s) correspondante(s) dans cette colonne.`
+                        : `${matchingReplaceCells} matching cell${matchingReplaceCells === 1 ? '' : 's'} in this column.`}
+                    </span>
+                    {replaceResult && (
+                      <span role="status" className="font-semibold text-amber-300">
+                        {replaceResult}
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
 

@@ -78,12 +78,13 @@ export async function executeConversionJob(
     onProgress?.(15, 'Inspecting source dataset');
 
     // 1. Verify CRS
-    const sourceCRSCode = dataset.detectedCRS?.code || 'EPSG:4326';
     const targetCRSCode = job.targetCRS;
-
     if (!dataset.detectedCRS && job.crsMode === 'reproject') {
-      addLog('crs_transform', 'warn', `Source dataset has missing or ambiguous CRS. Falling back to EPSG:4326.`);
+      throw new Error(
+        `Cannot reproject "${dataset.name}" because its source CRS is missing. Assign the correct CRS in the Workspace first.`
+      );
     }
+    const sourceCRSCode = dataset.detectedCRS?.code || targetCRSCode;
 
     addLog('crs_transform', 'info', `CRS Operation: ${job.crsMode === 'reproject' ? `Reprojecting from ${sourceCRSCode} to ${targetCRSCode}` : `Assigning CRS ${targetCRSCode}`}`);
     onProgress?.(30, 'Performing CRS transformation');
@@ -93,6 +94,10 @@ export async function executeConversionJob(
 
     if (job.crsMode === 'reproject' && sourceCRSCode !== targetCRSCode) {
       const transformRes = reprojectGeoJSON(workingGeoJSON, sourceCRSCode, targetCRSCode);
+      const coordinateError = transformRes.warnings.find(warning =>
+        warning.startsWith('Coordinate transform error:')
+      );
+      if (coordinateError) throw new Error(coordinateError);
       workingGeoJSON = transformRes.geojson;
       if (transformRes.warnings.length > 0) {
         transformRes.warnings.forEach(w => addLog('crs_transform', 'warn', w));

@@ -85,6 +85,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const multiGeojsonLayersRef = useRef<Map<string, L.GeoJSON>>(new Map());
+  const multiGeojsonSourceRefs = useRef<Map<string, { geojson: any; crsCode: string }>>(new Map());
   const outputGeojsonLayerRef = useRef<L.GeoJSON | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
@@ -212,10 +213,14 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
   const [isDraggingSwipe, setIsDraggingSwipe] = useState(false);
   const [selectedFeatureProps, setSelectedFeatureProps] = useState<Record<string, any> | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<'attributes' | 'metadata' | 'validation'>('attributes');
+  const [attributeTableHeight, setAttributeTableHeight] = useState(256);
+  const [isResizingAttributeTable, setIsResizingAttributeTable] = useState(false);
   const [attributeSearch, setAttributeSearch] = useState('');
   const [mapProjectionError, setMapProjectionError] = useState<string | null>(null);
   const [mapProjectionWarning, setMapProjectionWarning] = useState<string | null>(null);
   const [outputProjectionError, setOutputProjectionError] = useState<string | null>(null);
+  const attributeTableResizeRef = useRef<{ pointerId: number; startY: number; startHeight: number } | null>(null);
+  const maxAttributeTableHeight = Math.max(160, Math.floor(window.innerHeight * 0.75));
 
   // Cartographic Legend & Symbology States (Rendered outside the map frame to eliminate glitches)
   const [isLegendOpen, setIsLegendOpen] = useState(true);
@@ -243,6 +248,13 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
     }
   }, [isOverlayOpen]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      mapInstanceRef.current?.invalidateSize();
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [attributeTableHeight]);
+
   // Close surface menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -267,6 +279,41 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
 
   const handleMouseUp = () => {
     setIsDraggingSwipe(false);
+  };
+
+  const handleAttributeTableResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    attributeTableResizeRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startHeight: attributeTableHeight,
+    };
+    setIsResizingAttributeTable(true);
+  };
+
+  const handleAttributeTableResizeMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = attributeTableResizeRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    setAttributeTableHeight(
+      Math.round(Math.max(120, Math.min(maxAttributeTableHeight, drag.startHeight + drag.startY - event.clientY)))
+    );
+  };
+
+  const handleAttributeTableResizeEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (attributeTableResizeRef.current?.pointerId !== event.pointerId) return;
+    attributeTableResizeRef.current = null;
+    setIsResizingAttributeTable(false);
+  };
+
+  const handleAttributeTableResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const direction = event.key === 'ArrowUp' ? 1 : -1;
+    setAttributeTableHeight(height =>
+      Math.max(120, Math.min(maxAttributeTableHeight, height + direction * 16))
+    );
   };
 
   // Africa Continental Geodetic Extent
@@ -377,20 +424,44 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
       if (!visibleLayerIds.has(id) || !currentDatasetIds.has(id)) {
         map.removeLayer(layer);
         multiGeojsonLayersRef.current.delete(id);
+        multiGeojsonSourceRefs.current.delete(id);
       }
     });
 
     // 2. Add or update layers for each visible dataset
     datasets.forEach((d, idx) => {
       if (!visibleLayerIds.has(d.id) || !d.geojson) return;
+      const existingLayer = multiGeojsonLayersRef.current.get(d.id);
+      if (d.isNonSpatial) {
+        if (existingLayer) map.removeLayer(existingLayer);
+        multiGeojsonLayersRef.current.delete(d.id);
+        multiGeojsonSourceRefs.current.delete(d.id);
+        return;
+      }
+      if (!d.detectedCRS) {
+        if (existingLayer) map.removeLayer(existingLayer);
+        multiGeojsonLayersRef.current.delete(d.id);
+        multiGeojsonSourceRefs.current.delete(d.id);
+        if (d.id === dataset?.id) {
+          setMapProjectionError(
+            `${d.name} has no assigned CRS. Calibrate or assign its CRS in the Workspace before mapping.`
+          );
+        }
+        return;
+      }
 
       const style = layerStyles[d.id] || {
         color: LAYER_PALETTE[idx % LAYER_PALETTE.length].hex,
         opacity: 0.85,
       };
 
-      const existingLayer = multiGeojsonLayersRef.current.get(d.id);
-      if (existingLayer) {
+      const existingSource = multiGeojsonSourceRefs.current.get(d.id);
+      if (
+        existingLayer &&
+        existingSource &&
+        existingSource.geojson === d.geojson &&
+        existingSource.crsCode === d.detectedCRS.code
+      ) {
         // Just update symbology properties
         existingLayer.setStyle({
           color: style.color,
@@ -411,17 +482,27 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
         });
         return;
       }
+      if (existingLayer) map.removeLayer(existingLayer);
+      multiGeojsonLayersRef.current.delete(d.id);
+      multiGeojsonSourceRefs.current.delete(d.id);
 
       // Create new Leaflet GeoJSON layer
       try {
-        const sourceCRS = d.detectedCRS?.code || 'EPSG:4326';
+        const sourceCRS = d.detectedCRS.code;
         if (!getCRSByCode(sourceCRS)) {
-          console.warn(`Source CRS ${sourceCRS} not available for ${d.name}`);
+          throw new Error(`Source CRS ${sourceCRS} is not available in the projection registry.`);
         }
 
         const reprojection = sourceCRS === 'EPSG:4326'
           ? { geojson: d.geojson, warnings: [] as string[] }
           : reprojectGeoJSON(d.geojson, sourceCRS, 'EPSG:4326');
+        const coordinateError = reprojection.warnings.find(warning =>
+          warning.startsWith('Coordinate transform error:')
+        );
+        if (coordinateError) throw new Error(coordinateError);
+        if (d.id === dataset?.id && reprojection.warnings.length > 0) {
+          setMapProjectionWarning(reprojection.warnings[0]);
+        }
 
         const newLayer = L.geoJSON(reprojection.geojson, {
           style: () => ({
@@ -452,6 +533,10 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
         }).addTo(map);
 
         multiGeojsonLayersRef.current.set(d.id, newLayer);
+        multiGeojsonSourceRefs.current.set(d.id, {
+          geojson: d.geojson,
+          crsCode: d.detectedCRS.code,
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error(`Layer render error for ${d.name}:`, err);
@@ -735,7 +820,7 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
                   ? 'bg-amber-100 text-amber-900 border-amber-300 font-semibold'
                   : 'bg-amber-950/80 text-amber-300 border-amber-700/50'
               }`}>
-                {dataset.detectedCRS?.code || 'EPSG:4326'}
+                {dataset.detectedCRS?.code || (dataset.isNonSpatial ? 'Non-spatial' : 'CRS required')}
               </span>
               <span className="font-mono text-stone-400 hidden sm:inline">
                 {dataset.featureCount} {t.common.features}
@@ -1525,9 +1610,33 @@ export const MapPreview: React.FC<MapPreviewProps> = ({
           </div>
 
           {/* Bottom Drawer: Attribute Table, Metadata & Validation */}
-          <div className={`h-64 border-t flex flex-col flex-shrink-0 transition-colors ${
+          <div
+            role="separator"
+            aria-label="Resize attribute table height"
+            aria-orientation="horizontal"
+            aria-valuemin={120}
+            aria-valuemax={maxAttributeTableHeight}
+            aria-valuenow={attributeTableHeight}
+            aria-valuetext={`${attributeTableHeight}px`}
+            tabIndex={0}
+            onPointerDown={handleAttributeTableResizeStart}
+            onPointerMove={handleAttributeTableResizeMove}
+            onPointerUp={handleAttributeTableResizeEnd}
+            onPointerCancel={handleAttributeTableResizeEnd}
+            onKeyDown={handleAttributeTableResizeKeyDown}
+            className={`group relative h-2 flex-shrink-0 cursor-row-resize touch-none border-t transition-colors focus:outline-none focus-visible:bg-amber-500/20 ${
+              isResizingAttributeTable ? 'bg-amber-500/20' : 'bg-stone-900/20 hover:bg-amber-500/10'
+            }`}
+            title="Drag to resize the attribute table. Use arrow keys when focused."
+          >
+            <div className="absolute left-1/2 top-1/2 h-1 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-stone-500/60 group-hover:bg-amber-500" />
+          </div>
+          <div
+            style={{ height: `${attributeTableHeight}px` }}
+            className={`border-t flex flex-col flex-shrink-0 transition-colors ${
             theme === 'light' ? 'border-[#D4DFD3] bg-[#F7FAF5]' : 'border-stone-800 bg-[#0F1716]'
-          }`}>
+          }`}
+          >
             {/* Tabs header */}
             <div className={`flex items-center justify-between px-4 h-10 border-b transition-colors ${
               theme === 'light' ? 'border-[#D4DFD3] bg-[#E9EEE7]' : 'border-stone-800 bg-[#0B1210]'

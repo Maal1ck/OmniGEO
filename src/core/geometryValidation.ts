@@ -31,11 +31,17 @@ export function computeGeoJSONBounds(geojson: any): [number, number, number, num
     }
   }
 
+  function processGeometry(geometry: any): void {
+    if (geometry?.type === 'GeometryCollection') {
+      geometry.geometries?.forEach(processGeometry);
+    } else {
+      processCoords(geometry?.coordinates);
+    }
+  }
+
   const features = geojson?.features || (geojson?.type === 'Feature' ? [geojson] : []);
   for (const f of features) {
-    if (f.geometry && f.geometry.coordinates) {
-      processCoords(f.geometry.coordinates);
-    }
+    processGeometry(f?.geometry);
   }
 
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
@@ -105,13 +111,22 @@ export function validateDatasetGeometries(
     return { hasNan };
   }
 
-  features.forEach((feature: any, idx: number) => {
-    if (!feature || !feature.geometry) {
+  const checkGeometry = (geometry: any): void => {
+    if (!geometry) {
       emptyGeometryCount++;
       return;
     }
 
-    const { type, coordinates } = feature.geometry;
+    if (geometry.type === 'GeometryCollection') {
+      if (!Array.isArray(geometry.geometries) || geometry.geometries.length === 0) {
+        emptyGeometryCount++;
+        return;
+      }
+      geometry.geometries.forEach(checkGeometry);
+      return;
+    }
+
+    const { type, coordinates } = geometry;
     if (!coordinates || !Array.isArray(coordinates) || coordinates.length === 0) {
       emptyGeometryCount++;
       return;
@@ -147,6 +162,10 @@ export function validateDatasetGeometries(
         }
       }
     }
+  };
+
+  features.forEach((feature: any) => {
+    checkGeometry(feature?.geometry);
   });
 
   if (emptyGeometryCount > 0) {

@@ -396,58 +396,74 @@ export async function parseShapefileZipOrBuffers(
   zipBuffer: ArrayBuffer,
   fileName: string,
   fileSize: number
-): Promise<SpatialDataset> {
+): Promise<SpatialDataset[]> {
   const zip = await JSZip.loadAsync(zipBuffer);
-  const prjFile = Object.values(zip.files).find(f => !f.dir && f.name.toLowerCase().endsWith('.prj'));
-  let prjCRS: CRSInfo | null = null;
+  const prjFiles = Object.values(zip.files).filter(f => !f.dir && f.name.toLowerCase().endsWith('.prj'));
+  const prjCRSByLayer = new Map<string, CRSInfo | null>();
 
-  if (prjFile) {
+  for (const prjFile of prjFiles) {
     const prjText = await prjFile.async('text');
-    prjCRS = detectCRSFromPRJRobust(prjText);
-    // Always remove PRJ so shpjs outputs raw coordinate numbers without incomplete proj4 transforms
+    const layerName = (prjFile.name.replace(/\\/g, '/').split('/').pop() || '')
+      .replace(/\.prj$/i, '')
+      .toLowerCase();
+    prjCRSByLayer.set(layerName, detectCRSFromPRJRobust(prjText));
+    // Let the reader preserve raw coordinates; CRS assignment is handled per layer below.
     zip.remove(prjFile.name);
   }
 
   const shapefileBuffer = await zip.generateAsync({ type: 'arraybuffer' });
   const parsed = await (shp as any)(shapefileBuffer);
-  const geojson = Array.isArray(parsed) ? parsed[0] : parsed;
-  const bounds = computeGeoJSONBounds(geojson);
-
-  const coordResult = detectCRSFromCoordinates(bounds, prjCRS);
-  const detectedCRS = coordResult.detectedCRS;
-  const crsStatus = prjCRS ? 'verified' : coordResult.crsStatus;
-
-  const geometryType = detectGeometryType(geojson);
-  const fields = extractSchemaFields(geojson);
-  const validationIssues = validateDatasetGeometries(geojson, detectedCRS?.code);
-
-  if (crsStatus === 'missing') {
-    validationIssues.push({
-      severity: 'warning',
-      code: 'UNVERIFIED_PROJECTED_CRS',
-      message: prjFile
-        ? `PRJ file present but CRS was ambiguous. ${coordResult.confidenceReason}`
-        : `No .prj sidecar found. ${coordResult.confidenceReason}`,
-    });
+  const layers = Array.isArray(parsed) ? parsed : [parsed];
+  if (layers.length === 0 || !layers[0]) {
+    throw new Error(`No readable Shapefile layers were found in "${fileName}".`);
   }
 
-  return {
-    id: `ds-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    name: fileName.replace(/\.[^/.]+$/, ''),
-    originalFileName: fileName,
-    format: 'shapefile',
-    sizeBytes: fileSize,
-    featureCount: geojson.features ? geojson.features.length : 0,
-    geometryType,
-    detectedCRS,
-    crsStatus,
-    bounds,
-    fields,
-    geojson,
-    validationIssues,
-    status: validationIssues.some(i => i.severity === 'error') ? 'invalid' : validationIssues.length > 0 ? 'warning' : 'ready',
-    addedAt: Date.now(),
-  };
+  return layers.map((geojson: any) => {
+    const layerName = String(geojson.fileName || '').replace(/\\/g, '/').split('/').pop() || '';
+    const layerKey = layerName.toLowerCase();
+    const prjCRS = prjCRSByLayer.get(layerKey) ?? null;
+    const prjMatched = prjCRSByLayer.has(layerKey);
+    const bounds = computeGeoJSONBounds(geojson);
+    const coordResult = detectCRSFromCoordinates(bounds, prjCRS);
+    const detectedCRS = coordResult.detectedCRS;
+    const crsStatus = prjCRS ? 'verified' : coordResult.crsStatus;
+    const geometryType = detectGeometryType(geojson);
+    const fields = extractSchemaFields(geojson);
+    const validationIssues = validateDatasetGeometries(geojson, detectedCRS?.code);
+
+    if (crsStatus === 'missing') {
+      validationIssues.push({
+        severity: 'warning',
+        code: 'UNVERIFIED_PROJECTED_CRS',
+        message: prjMatched
+          ? `PRJ file present but CRS was ambiguous. ${coordResult.confidenceReason}`
+          : `No matching .prj sidecar found. ${coordResult.confidenceReason}`,
+      });
+    }
+
+    const archiveName = fileName.replace(/\.[^/.]+$/, '');
+    const name = layers.length > 1 && layerName
+      ? `${archiveName} - ${layerName}`
+      : archiveName;
+
+    return {
+      id: `ds-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      originalFileName: fileName,
+      format: 'shapefile',
+      sizeBytes: fileSize,
+      featureCount: geojson.features ? geojson.features.length : 0,
+      geometryType,
+      detectedCRS,
+      crsStatus,
+      bounds,
+      fields,
+      geojson,
+      validationIssues,
+      status: validationIssues.some(i => i.severity === 'error') ? 'invalid' : validationIssues.length > 0 ? 'warning' : 'ready',
+      addedAt: Date.now(),
+    };
+  });
 }
 
 /**

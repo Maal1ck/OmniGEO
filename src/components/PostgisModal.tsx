@@ -29,6 +29,8 @@ import {
   generatePsqlCommand, 
   generateOgr2ogrCommand, 
   generatePythonScript, 
+  generateArcPyScript,
+  generatePyQgisScript,
   extractSRID,
   PostgisExportOptions 
 } from '../core/postgisExporter';
@@ -61,7 +63,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
   const activeDataset = datasets.find(d => d.id === selectedDatasetId) || datasets[0];
 
-  const [activeTab, setActiveTab] = useState<'pgadmin' | 'sql' | 'cli' | 'python'>('pgadmin');
+  const [activeTab, setActiveTab] = useState<'pgadmin' | 'sql' | 'cli' | 'python' | 'arcpy' | 'qgis'>('pgadmin');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   // Configuration options
@@ -126,12 +128,23 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
 
   const ogr2ogrSnippet = useMemo(() => {
     const fileName = activeDataset ? activeDataset.originalFileName : 'features.geojson';
-    return generateOgr2ogrCommand(tableName, options, fileName);
+    const isSpatial = !!activeDataset && !activeDataset.isNonSpatial && activeDataset.geometryType !== 'Unknown';
+    return generateOgr2ogrCommand(tableName, options, fileName, isSpatial);
   }, [activeDataset, options, tableName]);
 
   const pythonSnippet = useMemo(() => {
     if (!activeDataset) return '';
     return generatePythonScript(activeDataset, options);
+  }, [activeDataset, options]);
+
+  const arcpySnippet = useMemo(() => {
+    if (!activeDataset) return '';
+    return generateArcPyScript(activeDataset, options);
+  }, [activeDataset, options]);
+
+  const qgisSnippet = useMemo(() => {
+    if (!activeDataset) return '';
+    return generatePyQgisScript(activeDataset, options);
   }, [activeDataset, options]);
 
   if (!isOpen) return null;
@@ -402,7 +415,29 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
               }`}
             >
               <Sparkles className="w-4 h-4 text-emerald-500" />
-              <span>Python (GeoPandas & SQLAlchemy)</span>
+              <span>Python (GeoPandas / Pandas)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('arcpy')}
+              className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'arcpy'
+                  ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                  : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-300'
+              }`}
+            >
+              <Code2 className="w-4 h-4 text-sky-500" />
+              <span>ArcPy</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('qgis')}
+              className={`flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'qgis'
+                  ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                  : 'border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-300'
+              }`}
+            >
+              <Globe className="w-4 h-4 text-emerald-500" />
+              <span>PyQGIS</span>
             </button>
           </div>
 
@@ -701,9 +736,9 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
           )}
 
           {/* Tab 3: Python GeoPandas Script */}
-          {activeTab === 'python' && (
+          {['python', 'arcpy', 'qgis'].includes(activeTab) && (
             <div className="space-y-4">
-              {/* Optional connection bar in python tab as well */}
+              {/* Shared connection settings for generated database scripts */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 rounded-xl border bg-stone-500/5 border-stone-500/20 text-xs">
                 <div>
                   <span className="text-stone-500 font-mono text-[10px] uppercase block">Host</span>
@@ -763,10 +798,11 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                 </div>
               </div>
 
+              {activeTab === 'python' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-mono text-stone-500">
-                    Ready-to-run Python automated script using GeoPandas & SQLAlchemy:
+                    Python export using GeoPandas for spatial layers or Pandas for tables:
                   </span>
                   <button
                     onClick={() => copyToClipboard(pythonSnippet, 'python')}
@@ -789,6 +825,69 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
                   {pythonSnippet}
                 </div>
               </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'arcpy' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono text-stone-500">
+                  ArcGIS Pro script for a {activeDataset?.isNonSpatial || activeDataset?.geometryType === 'Unknown' ? 'non-spatial PostgreSQL table' : 'spatial PostgreSQL feature class'}:
+                </span>
+                <button
+                  onClick={() => copyToClipboard(arcpySnippet, 'arcpy')}
+                  className={`flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                    copiedSection === 'arcpy'
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : theme === 'light' ? 'bg-white border-[#C2D2C2] text-stone-800 hover:bg-stone-100' : 'bg-[#15211F] border-stone-700 text-stone-200 hover:bg-stone-800'
+                  }`}
+                >
+                  {copiedSection === 'arcpy' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedSection === 'arcpy' ? 'Copied ArcPy Script!' : 'Copy ArcPy Code'}</span>
+                </button>
+              </div>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] text-stone-500">
+                Requires ArcGIS Pro and PostgreSQL. Use the password above or set <code>PGPASSWORD</code>; scripts with embedded passwords should not be shared.
+              </div>
+              <div className={`p-4 rounded-xl font-mono text-xs max-h-72 overflow-y-auto border whitespace-pre select-all ${
+                theme === 'light'
+                  ? 'bg-white border-[#D4DFD3] text-stone-800'
+                  : 'bg-[#0B100F] border-stone-800 text-stone-300'
+              }`}>
+                {arcpySnippet}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'qgis' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono text-stone-500">
+                  PyQGIS script for a {activeDataset?.isNonSpatial || activeDataset?.geometryType === 'Unknown' ? 'non-spatial PostgreSQL table' : 'spatial PostgreSQL layer'}:
+                </span>
+                <button
+                  onClick={() => copyToClipboard(qgisSnippet, 'qgis')}
+                  className={`flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                    copiedSection === 'qgis'
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : theme === 'light' ? 'bg-white border-[#C2D2C2] text-stone-800 hover:bg-stone-100' : 'bg-[#15211F] border-stone-700 text-stone-200 hover:bg-stone-800'
+                  }`}
+                >
+                  {copiedSection === 'qgis' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedSection === 'qgis' ? 'Copied PyQGIS Script!' : 'Copy PyQGIS Code'}</span>
+                </button>
+              </div>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] text-stone-500">
+                Run in QGIS or an initialized PyQGIS environment. Use the password above or set <code>PGPASSWORD</code>; scripts with embedded passwords should not be shared.
+              </div>
+              <div className={`p-4 rounded-xl font-mono text-xs max-h-72 overflow-y-auto border whitespace-pre select-all ${
+                theme === 'light'
+                  ? 'bg-white border-[#D4DFD3] text-stone-800'
+                  : 'bg-[#0B100F] border-stone-800 text-stone-300'
+              }`}>
+                {qgisSnippet}
+              </div>
             </div>
           )}
         </div>
@@ -798,7 +897,7 @@ export const PostgisModal: React.FC<PostgisModalProps> = ({
           theme === 'light' ? 'border-[#E1E8DF] bg-[#F7FAF5]' : 'border-stone-800 bg-[#111B19]'
         }`}>
           <div className="text-xs font-mono text-stone-500">
-            Exporting <strong>{tableName}</strong> to PostGIS ({activeDataset?.featureCount || 0} features)
+            Exporting <strong>{tableName}</strong> to PostGIS ({activeDataset?.featureCount || 0} {activeDataset?.isNonSpatial || activeDataset?.geometryType === 'Unknown' ? 'records' : 'features'})
           </div>
 
           <button
