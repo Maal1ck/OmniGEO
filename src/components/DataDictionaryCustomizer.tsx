@@ -33,10 +33,22 @@ import {
   CustomProfileRubrique,
   CustomReportSection,
   createDefaultHtmlReportConfig,
+  DATA_DICTIONARY_SERVICES,
+  getColumnMetadataKey,
+  getRelationshipMetadataKey,
+  getTableMetadataKey,
+  classifyTableFamily,
+  HtmlColumnMetadata,
+  HtmlRelationshipMetadata,
+  HtmlTableMetadata,
+  PostgresDatabaseSchema,
+  PostgresRelationship,
+  isBusinessTable,
 } from '../core/postgresReportEngine';
 
 interface DataDictionaryCustomizerProps {
   config: HtmlReportConfig;
+  schema: PostgresDatabaseSchema;
   onChange: (next: HtmlReportConfig) => void;
   htmlPreview: string;
   databaseName: string;
@@ -71,6 +83,7 @@ const QUICK_CUSTOM_RUBRIQUES_EN = [
 
 export const DataDictionaryCustomizer: React.FC<DataDictionaryCustomizerProps> = ({
   config,
+  schema,
   onChange,
   htmlPreview,
   databaseName,
@@ -82,7 +95,14 @@ export const DataDictionaryCustomizer: React.FC<DataDictionaryCustomizerProps> =
   const isFr = lang === 'fr';
   const isLight = theme === 'light';
 
-  const [subTab, setSubTab] = useState<'header' | 'rubriques' | 'typography'>('rubriques');
+  const [subTab, setSubTab] = useState<'header' | 'rubriques' | 'typography' | 'business'>('rubriques');
+  const [selectedTableKey, setSelectedTableKey] = useState('');
+  const [relationSource, setRelationSource] = useState('');
+  const [relationTarget, setRelationTarget] = useState('');
+  const [relationSourceColumn, setRelationSourceColumn] = useState('');
+  const [relationTargetColumn, setRelationTargetColumn] = useState('');
+  const [relationNature, setRelationNature] = useState('');
+  const [relationCardinality, setRelationCardinality] = useState('1:N');
   const [logoError, setLogoError] = useState<string | null>(null);
   const [newRubriqueLabel, setNewRubriqueLabel] = useState('');
   const [newRubriqueValue, setNewRubriqueValue] = useState('');
@@ -92,6 +112,127 @@ export const DataDictionaryCustomizer: React.FC<DataDictionaryCustomizerProps> =
 
   const logoLeftInputRef = useRef<HTMLInputElement>(null);
   const logoRightInputRef = useRef<HTMLInputElement>(null);
+
+  const tables = schema.tables || [];
+  const selectedTable = tables.find(table => getTableMetadataKey(table) === selectedTableKey) || tables[0];
+  const tableKey = selectedTable ? getTableMetadataKey(selectedTable) : '';
+  const savedTableMetadata = config.tableMetadata[tableKey];
+  const tableMetadata: HtmlTableMetadata = {
+    service: savedTableMetadata?.service || (selectedTable ? classifyTableFamily(selectedTable, tables, lang) : ''),
+    description: savedTableMetadata?.description || '',
+    purpose: savedTableMetadata?.purpose || '',
+    nature: savedTableMetadata?.nature || '',
+    technicalIdentifier: savedTableMetadata?.technicalIdentifier || '',
+    businessIdentifier: savedTableMetadata?.businessIdentifier || '',
+    transversal: savedTableMetadata?.transversal || false,
+  };
+  const tableOptions = tables.map(table => ({
+    key: getTableMetadataKey(table),
+    table,
+    label: `${getTableMetadataKey(table)} — ${config.tableMetadata[getTableMetadataKey(table)]?.service || classifyTableFamily(table, tables, lang)}`,
+  }));
+  const includedTables = tables.filter(table =>
+    !config.excludedTables.includes(getTableMetadataKey(table)) &&
+    !(config.excludeTechnicalTables && !isBusinessTable(table))
+  );
+  const relationships = [
+    ...(schema.relationships || []),
+    ...config.manualRelationships,
+  ].filter(rel => {
+    const source = rel.sourceTable.toLowerCase();
+    const target = rel.targetTable.toLowerCase();
+    const names = new Set(includedTables.flatMap(table => [
+      table.name.toLowerCase(),
+      getTableMetadataKey(table).toLowerCase(),
+    ]));
+    return names.has(source) && names.has(target);
+  });
+
+  const updateTableMetadata = (patch: Partial<HtmlTableMetadata>) => {
+    if (!tableKey) return;
+    onChange({
+      ...config,
+      tableMetadata: {
+        ...config.tableMetadata,
+        [tableKey]: { ...tableMetadata, ...patch },
+      },
+    });
+  };
+
+  const updateColumnMetadata = (columnName: string, patch: Partial<HtmlColumnMetadata>) => {
+    if (!selectedTable) return;
+    const key = getColumnMetadataKey(selectedTable, columnName);
+    onChange({
+      ...config,
+      columnMetadata: {
+        ...config.columnMetadata,
+        [key]: {
+          description: patch.description ?? config.columnMetadata[key]?.description ?? '',
+          unit: patch.unit ?? config.columnMetadata[key]?.unit ?? '',
+          valueDomain: patch.valueDomain ?? config.columnMetadata[key]?.valueDomain ?? '',
+          businessRule: patch.businessRule ?? config.columnMetadata[key]?.businessRule ?? '',
+          relatedTable: patch.relatedTable ?? config.columnMetadata[key]?.relatedTable ?? '',
+          relatedField: patch.relatedField ?? config.columnMetadata[key]?.relatedField ?? '',
+        },
+      },
+    });
+  };
+
+  const updateRelationshipMetadata = (rel: PostgresRelationship, patch: Partial<HtmlRelationshipMetadata>) => {
+    const key = getRelationshipMetadataKey(rel);
+    onChange({
+      ...config,
+      relationshipMetadata: {
+        ...config.relationshipMetadata,
+        [key]: {
+          nature: patch.nature ?? config.relationshipMetadata[key]?.nature ?? '',
+          cardinality: patch.cardinality ?? config.relationshipMetadata[key]?.cardinality ?? rel.cardinality ?? '1:N',
+          sourceCardinality: patch.sourceCardinality ?? config.relationshipMetadata[key]?.sourceCardinality ?? rel.sourceCardinality ?? '',
+          targetCardinality: patch.targetCardinality ?? config.relationshipMetadata[key]?.targetCardinality ?? rel.targetCardinality ?? '',
+          mandatory: patch.mandatory !== undefined
+            ? patch.mandatory
+            : config.relationshipMetadata[key]
+              ? config.relationshipMetadata[key].mandatory
+              : rel.mandatory ?? null,
+          management: patch.management ?? config.relationshipMetadata[key]?.management ?? rel.management ?? 'application',
+        },
+      },
+    });
+  };
+
+  const addManualRelationship = () => {
+    const sourceTable = tables.find(table => getTableMetadataKey(table) === relationSource);
+    const targetTable = tables.find(table => getTableMetadataKey(table) === relationTarget);
+    if (!sourceTable || !targetTable || !relationSourceColumn || !relationTargetColumn) return;
+    const relation: PostgresRelationship = {
+      id: `manual_${Date.now()}`,
+      constraintName: `manual_${sourceTable.name}_${relationSourceColumn}_${targetTable.name}`,
+      sourceTable: getTableMetadataKey(sourceTable),
+      sourceColumn: relationSourceColumn,
+      targetTable: getTableMetadataKey(targetTable),
+      targetColumn: relationTargetColumn,
+      cardinality: relationCardinality as PostgresRelationship['cardinality'],
+      nature: relationNature.trim(),
+      management: 'application',
+    };
+    const key = getRelationshipMetadataKey(relation);
+    onChange({
+      ...config,
+      manualRelationships: [...config.manualRelationships, relation],
+      relationshipMetadata: {
+        ...config.relationshipMetadata,
+        [key]: {
+          nature: relationNature.trim(),
+          cardinality: relationCardinality,
+          sourceCardinality: '',
+          targetCardinality: '',
+          mandatory: null,
+          management: 'application',
+        },
+      },
+    });
+    setRelationNature('');
+  };
 
   const updateHeader = (patch: Partial<HtmlReportConfig['header']>) => {
     onChange({
@@ -261,7 +402,7 @@ export const DataDictionaryCustomizer: React.FC<DataDictionaryCustomizerProps> =
       {/* LEFT COLUMN: CUSTOMIZATION CONTROLS */}
       <div className="lg:col-span-5 flex flex-col space-y-4">
         {/* Sub-tab Switcher */}
-        <div className={`p-1 rounded-xl border grid grid-cols-3 gap-1 ${
+        <div className={`p-1 rounded-xl border grid grid-cols-4 gap-1 ${
           isLight ? 'bg-[#EBF3E8] border-[#C2D2C2]' : 'bg-stone-900 border-stone-800'
         }`}>
           <button
@@ -277,6 +418,21 @@ export const DataDictionaryCustomizer: React.FC<DataDictionaryCustomizerProps> =
           >
             <LayoutList className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{isFr ? 'Rubriques' : 'Sections'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSubTab('business')}
+            className={`flex items-center justify-center space-x-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              subTab === 'business'
+                ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
+                : isLight
+                ? 'text-stone-600 hover:text-stone-900'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{isFr ? 'Métier' : 'Business data'}</span>
           </button>
 
           <button
@@ -659,6 +815,201 @@ export const DataDictionaryCustomizer: React.FC<DataDictionaryCustomizerProps> =
             </>
           )}
 
+          {subTab === 'business' && (
+            <div className="space-y-3">
+              <div className={`p-4 rounded-xl border space-y-3 ${surfaceCard}`}>
+                <div>
+                  <h4 className="text-xs font-display font-bold uppercase tracking-wider">
+                    {isFr ? 'Périmètre métier et exclusions' : 'Business scope and exclusions'}
+                  </h4>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {isFr
+                      ? 'Les exclusions sont appliquées aux fiches, indicateurs, inventaires et relations du document.'
+                      : 'Exclusions apply to profiles, metrics, inventories, and relationships in the report.'}
+                  </p>
+                </div>
+                <label className="flex items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={config.excludeTechnicalTables}
+                    onChange={e => onChange({ ...config, excludeTechnicalTables: e.target.checked })}
+                    className="mt-0.5 accent-amber-600"
+                  />
+                  <span>{isFr ? 'Exclure les tables système, ArcGIS/SDE, internes et techniques détectées automatiquement' : 'Exclude detected system, ArcGIS/SDE, internal, and technical tables'}</span>
+                </label>
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {tableOptions.map(({ key, table }) => {
+                    const checked = config.excludedTables.includes(key);
+                    return (
+                      <label key={key} className="flex items-center gap-2 text-[11px]">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => onChange({
+                            ...config,
+                            excludedTables: checked
+                              ? config.excludedTables.filter(item => item !== key)
+                              : [...config.excludedTables, key],
+                          })}
+                          className="accent-amber-600"
+                        />
+                        <span className="font-mono">{key}</span>
+                        {!isBusinessTable(table) && <span className="text-stone-500">{isFr ? '(technique)' : '(technical)'}</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-stone-500">
+                  {includedTables.length} / {tables.length} {isFr ? 'tables dans le périmètre actuel' : 'tables in current report scope'}
+                </p>
+              </div>
+
+              <div className={`p-4 rounded-xl border space-y-3 ${surfaceCard}`}>
+                <h4 className="text-xs font-display font-bold uppercase tracking-wider">
+                  {isFr ? 'Fiche métier et attributs' : 'Business profile and attributes'}
+                </h4>
+                <select
+                  value={tableKey}
+                  onChange={e => setSelectedTableKey(e.target.value)}
+                  className={inputClass}
+                >
+                  {tableOptions.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+                </select>
+                {selectedTable && (
+                  <>
+                    <label className="block text-[10px] text-stone-500">{isFr ? 'Domaine / service fonctionnel' : 'Functional domain / service'}</label>
+                    <select
+                      value={tableMetadata.service || 'Autres Tables Métiers'}
+                      onChange={e => updateTableMetadata({ service: e.target.value })}
+                      className={inputClass}
+                    >
+                      {!DATA_DICTIONARY_SERVICES.includes(tableMetadata.service) && tableMetadata.service && (
+                        <option value={tableMetadata.service}>{tableMetadata.service}</option>
+                      )}
+                      {DATA_DICTIONARY_SERVICES.map(service => <option key={service} value={service}>{service}</option>)}
+                      <option value="Autres Tables Métiers">{isFr ? 'Autres Tables Métiers (à reclasser)' : 'Other business tables (to classify)'}</option>
+                    </select>
+                    <textarea
+                      value={tableMetadata.description}
+                      onChange={e => updateTableMetadata({ description: e.target.value })}
+                      placeholder={isFr ? 'Description fonctionnelle' : 'Functional description'}
+                      className={inputClass}
+                      rows={2}
+                    />
+                    <textarea
+                      value={tableMetadata.purpose}
+                      onChange={e => updateTableMetadata({ purpose: e.target.value })}
+                      placeholder={isFr ? 'Finalité et rôle de la donnée' : 'Purpose and role of the data'}
+                      className={inputClass}
+                      rows={2}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={tableMetadata.nature} onChange={e => updateTableMetadata({ nature: e.target.value })} placeholder={isFr ? 'Nature géographique / tabulaire' : 'Spatial / tabular nature'} className={inputClass} />
+                      <input value={tableMetadata.technicalIdentifier} onChange={e => updateTableMetadata({ technicalIdentifier: e.target.value })} placeholder={isFr ? 'Identifiant technique' : 'Technical identifier'} className={inputClass} />
+                      <input value={tableMetadata.businessIdentifier} onChange={e => updateTableMetadata({ businessIdentifier: e.target.value })} placeholder={isFr ? 'Identifiant métier (à valider)' : 'Business identifier (validate)'} className={inputClass} />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input type="checkbox" checked={tableMetadata.transversal} onChange={e => updateTableMetadata({ transversal: e.target.checked, ...(e.target.checked ? { service: DATA_DICTIONARY_SERVICES[0] } : {}) })} className="accent-amber-600" />
+                      {isFr ? 'Donnée transversale partagée, sans duplication de fiche' : 'Shared cross-service data; do not duplicate its profile'}
+                    </label>
+                    <div className="pt-2 border-t border-stone-800/50 space-y-2">
+                      <p className="text-[11px] font-semibold text-amber-500">{isFr ? 'Dictionnaire des attributs' : 'Attribute dictionary'}</p>
+                      {selectedTable.columns.map(column => {
+                        const key = getColumnMetadataKey(selectedTable, column.name);
+                        const meta = config.columnMetadata[key] || { description: '', unit: '', valueDomain: '', businessRule: '', relatedTable: '', relatedField: '' };
+                        return (
+                          <details key={column.name} className={`rounded-lg border p-2 ${isLight ? 'border-[#D4DFD3]' : 'border-stone-800'}`}>
+                            <summary className="cursor-pointer text-xs font-mono">{column.name} <span className="text-stone-500">· {column.dataType}</span></summary>
+                            <div className="grid grid-cols-2 gap-2 pt-2">
+                              <input value={meta.description} onChange={e => updateColumnMetadata(column.name, { description: e.target.value })} placeholder={isFr ? 'Description / signification' : 'Description / meaning'} className={inputClass} />
+                              <input value={meta.unit} onChange={e => updateColumnMetadata(column.name, { unit: e.target.value })} placeholder={isFr ? 'Unité de mesure' : 'Measurement unit'} className={inputClass} />
+                              <input value={meta.valueDomain} onChange={e => updateColumnMetadata(column.name, { valueDomain: e.target.value })} placeholder={isFr ? 'Domaine / référentiel' : 'Value domain / reference'} className={inputClass} />
+                              <input value={meta.businessRule} onChange={e => updateColumnMetadata(column.name, { businessRule: e.target.value })} placeholder={isFr ? 'Règle de gestion validée' : 'Validated business rule'} className={inputClass} />
+                              <input value={meta.relatedTable} onChange={e => updateColumnMetadata(column.name, { relatedTable: e.target.value })} placeholder={isFr ? 'Table de rattachement' : 'Related table'} className={inputClass} />
+                              <input value={meta.relatedField} onChange={e => updateColumnMetadata(column.name, { relatedField: e.target.value })} placeholder={isFr ? 'Champ de rattachement' : 'Related field'} className={inputClass} />
+                            </div>
+                          </details>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className={`p-4 rounded-xl border space-y-3 ${surfaceCard}`}>
+                <div>
+                  <h4 className="text-xs font-display font-bold uppercase tracking-wider">{isFr ? 'Relations métier' : 'Business relationships'}</h4>
+                  <p className="text-[11px] text-stone-500 mt-1">{isFr ? 'Renseignez aussi les liens applicatifs/ArcGIS non matérialisés par une FK SQL.' : 'Document application/ArcGIS links that are not backed by SQL foreign keys.'}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={relationSource} onChange={e => { setRelationSource(e.target.value); setRelationSourceColumn(''); }} className={inputClass}>
+                    <option value="">{isFr ? 'Table d’origine' : 'Source table'}</option>
+                    {tables.map(table => <option key={getTableMetadataKey(table)} value={getTableMetadataKey(table)}>{getTableMetadataKey(table)}</option>)}
+                  </select>
+                  <select value={relationSourceColumn} onChange={e => setRelationSourceColumn(e.target.value)} className={inputClass}>
+                    <option value="">{isFr ? 'Champ source' : 'Source field'}</option>
+                    {(tables.find(table => getTableMetadataKey(table) === relationSource)?.columns || []).map(column => <option key={column.name} value={column.name}>{column.name}</option>)}
+                  </select>
+                  <select value={relationTarget} onChange={e => { setRelationTarget(e.target.value); setRelationTargetColumn(''); }} className={inputClass}>
+                    <option value="">{isFr ? 'Table de destination' : 'Target table'}</option>
+                    {tables.map(table => <option key={getTableMetadataKey(table)} value={getTableMetadataKey(table)}>{getTableMetadataKey(table)}</option>)}
+                  </select>
+                  <select value={relationTargetColumn} onChange={e => setRelationTargetColumn(e.target.value)} className={inputClass}>
+                    <option value="">{isFr ? 'Champ destination' : 'Target field'}</option>
+                    {(tables.find(table => getTableMetadataKey(table) === relationTarget)?.columns || []).map(column => <option key={column.name} value={column.name}>{column.name}</option>)}
+                  </select>
+                  <input value={relationNature} onChange={e => setRelationNature(e.target.value)} placeholder={isFr ? 'Nature de la relation' : 'Relationship nature'} className={inputClass} />
+                  <select value={relationCardinality} onChange={e => setRelationCardinality(e.target.value)} className={inputClass}>
+                    {['1:1', '1:N', 'N:1', 'N:M', '0:1', '0:N'].map(value => <option key={value}>{value}</option>)}
+                  </select>
+                </div>
+                <button type="button" onClick={addManualRelationship} disabled={!relationSourceColumn || !relationTargetColumn} className="px-3 py-1.5 rounded-lg bg-amber-600 text-stone-950 text-xs font-bold disabled:opacity-40">
+                  {isFr ? 'Ajouter la relation métier' : 'Add business relationship'}
+                </button>
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {relationships.map(rel => {
+                    const key = getRelationshipMetadataKey(rel);
+                    const meta = config.relationshipMetadata[key] || {
+                      nature: rel.nature || '',
+                      cardinality: rel.cardinality || '',
+                      sourceCardinality: rel.sourceCardinality || '',
+                      targetCardinality: rel.targetCardinality || '',
+                      mandatory: rel.mandatory ?? null,
+                      management: rel.management || 'application',
+                    };
+                    return (
+                      <div key={`${key}:${rel.id}`} className={`p-2 rounded-lg border space-y-2 ${isLight ? 'border-[#D4DFD3]' : 'border-stone-800'}`}>
+                        <div className="text-[10px] font-mono break-all">{rel.sourceTable}.{rel.sourceColumn} → {rel.targetTable}.{rel.targetColumn}</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input value={meta.nature} onChange={e => updateRelationshipMetadata(rel, { nature: e.target.value })} placeholder={isFr ? 'Nature' : 'Nature'} className={inputClass} />
+                          <select value={meta.cardinality} onChange={e => updateRelationshipMetadata(rel, { cardinality: e.target.value })} className={inputClass}>
+                            <option value="">{isFr ? 'Cardinalité métier à valider' : 'Validate business cardinality'}</option>
+                            {['1:1', '1:N', 'N:1', 'N:M', '0:1', '0:N'].map(value => <option key={value}>{value}</option>)}
+                          </select>
+                          <input value={meta.sourceCardinality} onChange={e => updateRelationshipMetadata(rel, { sourceCardinality: e.target.value })} placeholder={isFr ? 'Cardinalité côté origine (ex. 0..n)' : 'Source-side cardinality (e.g. 0..n)'} className={inputClass} />
+                          <input value={meta.targetCardinality} onChange={e => updateRelationshipMetadata(rel, { targetCardinality: e.target.value })} placeholder={isFr ? 'Cardinalité côté destination (ex. 1..1)' : 'Target-side cardinality (e.g. 1..1)'} className={inputClass} />
+                          <select value={meta.mandatory === null ? '' : String(meta.mandatory)} onChange={e => updateRelationshipMetadata(rel, { mandatory: e.target.value === '' ? null : e.target.value === 'true' })} className={inputClass}>
+                            <option value="">{isFr ? 'Obligation à valider' : 'Mandatory status to validate'}</option>
+                            <option value="true">{isFr ? 'Obligatoire' : 'Required'}</option>
+                            <option value="false">{isFr ? 'Facultatif' : 'Optional'}</option>
+                          </select>
+                          <select value={meta.management} onChange={e => updateRelationshipMetadata(rel, { management: e.target.value as HtmlRelationshipMetadata['management'] })} className={inputClass}>
+                            <option value="sql">Contrainte SQL</option><option value="arcgis">ArcGIS</option><option value="application">{isFr ? 'Logique applicative' : 'Application logic'}</option>
+                          </select>
+                        </div>
+                        {rel.constraintName.startsWith('manual_') && (
+                          <button type="button" onClick={() => onChange({ ...config, manualRelationships: config.manualRelationships.filter(item => item.id !== rel.id) })} className="text-[10px] text-rose-400">
+                            {isFr ? 'Supprimer cette relation' : 'Remove relationship'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* SUB-TAB 2: HEADER & LOGOS */}
           {subTab === 'header' && (
             <>
@@ -678,6 +1029,15 @@ export const DataDictionaryCustomizer: React.FC<DataDictionaryCustomizerProps> =
                     <span>{isFr ? 'Afficher' : 'Show'}</span>
                   </label>
                 </div>
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={config.showCoverPage}
+                    onChange={e => onChange({ ...config, showCoverPage: e.target.checked })}
+                    className="accent-amber-600"
+                  />
+                  {isFr ? 'Ajouter une page de garde imprimable (modèle ajustable après réception de votre exemple)' : 'Add a printable cover page (layout can be matched after you share your sample)'}
+                </label>
 
                 <div className="grid grid-cols-3 gap-2">
                   {[

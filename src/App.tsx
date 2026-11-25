@@ -59,6 +59,7 @@ export default function App() {
     targetFormat: 'geopackage',
     targetCRS: 'EPSG:4326',
     crsMode: 'reproject',
+    excelDateFormat: 'yyyy-mm-dd',
     namingPattern: '{name}_{crs}',
     collisionPolicy: 'rename',
     maxConcurrentWorkers: 4,
@@ -250,11 +251,15 @@ export default function App() {
       : datasets;
 
     return targetDatasets.map((d) => {
+      const datasetCrsMode = d.isNonSpatial || d.geometryType === 'Unknown'
+        ? 'preserve'
+        : settings.crsMode;
       const outputFileName = resolveOutputFileName(
         d.name,
         settings.targetFormat,
         settings.targetCRS,
-        settings.namingPattern
+        settings.namingPattern,
+        datasetCrsMode
       );
 
       return {
@@ -262,10 +267,10 @@ export default function App() {
         datasetId: d.id,
         inputDatasetName: d.originalFileName,
         inputFormat: d.format,
-        sourceCRS: d.detectedCRS?.code || 'EPSG:4326',
+        sourceCRS: d.detectedCRS?.code || (datasetCrsMode === 'preserve' ? 'Not applicable' : 'EPSG:4326'),
         targetFormat: settings.targetFormat,
         targetCRS: settings.targetCRS,
-        crsMode: settings.crsMode,
+        crsMode: datasetCrsMode,
         outputFileName,
         layerName: d.name,
         status: 'queued',

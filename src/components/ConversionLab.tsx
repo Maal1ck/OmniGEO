@@ -313,7 +313,7 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
             <span className="text-[10px] text-stone-400 uppercase font-semibold tracking-wider block">
               Coordinate Operation Mode
             </span>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div
                 onClick={() => setSettings(s => ({ ...s, crsMode: 'reproject' }))}
                 className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
@@ -353,8 +353,53 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
                   Only tags metadata without modifying coordinate numbers. Use ONLY when the dataset already contains coordinates for the target CRS but was missing its .prj header.
                 </p>
               </div>
+
+              <div
+                onClick={() => setSettings(s => ({ ...s, crsMode: 'preserve' }))}
+                className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  settings.crsMode === 'preserve'
+                    ? 'bg-sky-950/40 border-sky-500/80 ring-1 ring-sky-500/40'
+                    : 'bg-stone-900/40 border-stone-800 hover:border-stone-700'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 rounded-full bg-sky-400" />
+                    <span className="text-xs font-display font-bold text-[#F4F8F2]">Preserve Coordinates</span>
+                  </div>
+                  {settings.crsMode === 'preserve' && <Check className="w-4 h-4 text-sky-400" />}
+                </div>
+                <p className="text-xs text-stone-400 leading-relaxed pl-4">
+                  Export or convert the file without reprojection or assigning a new CRS. Non-spatial tables never require a CRS.
+                </p>
+              </div>
             </div>
           </div>
+
+          {settings.targetFormat === 'excel' && (
+            <div className="p-4 rounded-xl bg-stone-900/80 border border-stone-800 space-y-2">
+              <label htmlFor="excel-date-format" className="block text-xs text-stone-200 font-semibold">
+                Excel date display format
+              </label>
+              <select
+                id="excel-date-format"
+                value={settings.excelDateFormat || 'yyyy-mm-dd'}
+                onChange={e => setSettings(s => ({ ...s, excelDateFormat: e.target.value }))}
+                className="w-full md:w-80 bg-[#0D1413] border border-stone-700 rounded-xl px-3 py-2 text-xs text-stone-100 focus:border-amber-500 focus:outline-none"
+              >
+                <option value="yyyy-mm-dd">2026-11-25 (ISO)</option>
+                <option value="dd/mm/yyyy">25/11/2026</option>
+                <option value="mm/dd/yyyy">11/25/2026</option>
+                <option value="dd-mm-yyyy">25-11-2026</option>
+                <option value="dd-mmm-yyyy">25-Nov-2026</option>
+                <option value="yyyy-mm-dd hh:mm:ss">2026-11-25 14:30:00</option>
+                <option value="dd/mm/yyyy hh:mm">25/11/2026 14:30</option>
+              </select>
+              <p className="text-[11px] text-stone-500">
+                Applies to date-typed attributes in the exported .xlsx workbook.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Section 3: File Naming, Collision, and Concurrency */}

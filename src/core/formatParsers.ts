@@ -217,7 +217,6 @@ export function parseCSV(
   }
 
   if (isNonSpatial) {
-    const defaultCrs = getCRSByCode('EPSG:4326')!;
     return {
       id: `ds-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name: fileName.replace(/\.[^/.]+$/, ''),
@@ -226,8 +225,8 @@ export function parseCSV(
       sizeBytes: fileSize,
       featureCount: features.length,
       geometryType: 'Unknown',
-      detectedCRS: defaultCrs,
-      crsStatus: 'verified',
+      detectedCRS: null,
+      crsStatus: 'missing',
       bounds: [0, 0, 0, 0],
       fields,
       geojson,

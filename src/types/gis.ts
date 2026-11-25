@@ -141,7 +141,7 @@ export interface ConversionJob {
   sourceCRS: string;
   targetFormat: SupportedFormat;
   targetCRS: string;
-  crsMode: 'reproject' | 'assign';
+  crsMode: 'reproject' | 'assign' | 'preserve';
   outputFileName: string;
   layerName: string;
   status: JobStatus;
@@ -161,7 +161,8 @@ export interface ConversionJob {
 export interface BatchSettings {
   targetFormat: SupportedFormat;
   targetCRS: string;
-  crsMode: 'reproject' | 'assign';
+  crsMode: 'reproject' | 'assign' | 'preserve';
+  excelDateFormat?: string;
   namingPattern: string; // e.g. "{name}_{crs}" or "{name}_converted"
   collisionPolicy: 'rename' | 'overwrite' | 'skip';
   maxConcurrentWorkers: number;
@@ -206,7 +207,7 @@ export interface PresetProfile {
   description: string;
   targetFormat: SupportedFormat;
   targetCRS: string;
-  crsMode: 'reproject' | 'assign';
+  crsMode: 'reproject' | 'assign' | 'preserve';
   namingPattern: string;
   badge: string;
 }

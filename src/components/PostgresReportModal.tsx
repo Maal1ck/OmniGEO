@@ -47,6 +47,9 @@ import {
   generateProfileSheetCsv,
   isBusinessTable,
   classifyTableFamily,
+  getTableMetadataKey,
+  getColumnMetadataKey,
+  getRelationshipMetadataKey,
   HtmlReportConfig,
   HTML_REPORT_FONTS,
   createDefaultHtmlReportConfig
@@ -72,10 +75,65 @@ function loadSavedHtmlConfig(): HtmlReportConfig {
       physicalColumns: { ...defaults.physicalColumns, ...(parsed?.physicalColumns || {}) },
       customProfileRubriques: Array.isArray(parsed?.customProfileRubriques) ? parsed.customProfileRubriques : [],
       customSections: Array.isArray(parsed?.customSections) ? parsed.customSections : [],
+      showCoverPage: parsed?.showCoverPage ?? defaults.showCoverPage,
+      excludeTechnicalTables: parsed?.excludeTechnicalTables ?? defaults.excludeTechnicalTables,
+      excludedTables: Array.isArray(parsed?.excludedTables) ? parsed.excludedTables : [],
+      tableMetadata: parsed?.tableMetadata || {},
+      columnMetadata: parsed?.columnMetadata || {},
+      relationshipMetadata: parsed?.relationshipMetadata || {},
+      manualRelationships: Array.isArray(parsed?.manualRelationships) ? parsed.manualRelationships : [],
     };
   } catch {
     return defaults;
   }
+}
+
+function findPostgresReportEnvelope(value: unknown): any | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('{') || trimmed.startsWith('['))) {
+      try {
+        return findPostgresReportEnvelope(JSON.parse(trimmed));
+      } catch {
+        return null;
+      }
+    }
+  }
+  if (!value || typeof value !== 'object') return null;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const report = findPostgresReportEnvelope(item);
+      if (report) return report;
+    }
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record.tables) && record.tables.length > 0) {
+    return record;
+  }
+
+  for (const key of [
+    'omnigeo_db_report',
+    'data',
+    'result',
+    'results',
+    'report',
+    'schema',
+  ]) {
+    if (record[key] !== undefined) {
+      const report = findPostgresReportEnvelope(record[key]);
+      if (report) return report;
+    }
+  }
+
+  for (const nested of Object.values(record)) {
+    const report = findPostgresReportEnvelope(nested);
+    if (report) return report;
+  }
+
+  return null;
 }
 
 interface PostgresReportModalProps {
@@ -182,6 +240,49 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     return generateStandaloneHtmlReport(schema, reportLang, htmlConfig);
   }, [schema, reportLang, htmlConfig]);
 
+  const dictionaryScope = useMemo(() => {
+    const excluded = new Set(htmlConfig.excludedTables);
+    const tables = (schema.tables || []).filter(table =>
+      !excluded.has(`${table.schema || 'public'}.${table.name}`) &&
+      !(htmlConfig.excludeTechnicalTables && !isBusinessTable(table))
+    );
+    const tableNames = new Set(tables.flatMap(table => [
+      table.name.toLowerCase(),
+      `${table.schema || 'public'}.${table.name}`.toLowerCase(),
+    ]));
+    const relationshipMap = new Map<string, PostgresRelationship>();
+    for (const rel of [...(schema.relationships || []), ...htmlConfig.manualRelationships]) {
+      if (!tableNames.has(rel.sourceTable.toLowerCase()) || !tableNames.has(rel.targetTable.toLowerCase())) continue;
+      relationshipMap.set(`${rel.sourceTable}.${rel.sourceColumn}->${rel.targetTable}.${rel.targetColumn}`, rel);
+    }
+    const dataTypesDistribution: Record<string, number> = {};
+    for (const table of tables) {
+      for (const column of table.columns || []) {
+        const category = categorizeDataType(normalizeToPostgresType(column.dataType || 'text'), column.name);
+        dataTypesDistribution[category] = (dataTypesDistribution[category] || 0) + 1;
+      }
+    }
+    return {
+      tables,
+      relationships: Array.from(relationshipMap.values()).map(rel => {
+        const metadata = htmlConfig.relationshipMetadata[getRelationshipMetadataKey(rel)];
+        return metadata ? {
+          ...rel,
+          nature: metadata.nature || rel.nature,
+          cardinality: (metadata.cardinality || rel.cardinality) as PostgresRelationship['cardinality'],
+          sourceCardinality: metadata.sourceCardinality || rel.sourceCardinality,
+          targetCardinality: metadata.targetCardinality || rel.targetCardinality,
+          mandatory: metadata.mandatory,
+          management: metadata.management || rel.management,
+        } : rel;
+      }),
+      totalRecords: tables.reduce((sum, table) => sum + Math.max(0, table.estimatedRows || 0), 0),
+      totalColumns: tables.reduce((sum, table) => sum + (table.columns || []).length, 0),
+      totalSpatialTables: tables.filter(table => table.isSpatial || table.columns.some(column => column.isGeometry)).length,
+      dataTypesDistribution,
+    };
+  }, [schema, htmlConfig.excludeTechnicalTables, htmlConfig.excludedTables, htmlConfig.manualRelationships, htmlConfig.relationshipMetadata]);
+
   // Generate HTML Physical Data Model (MPD / MCD) report string in chosen language
   const standaloneMpdHtml = useMemo(() => {
     return generatePhysicalDataModelHtml(schema, reportLang, { businessOnly: mpdBusinessOnly });
@@ -280,13 +381,12 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
     }
     try {
       let parsed = JSON.parse(jsonInput.trim());
-      if (parsed.omnigeo_db_report) {
-        parsed = parsed.omnigeo_db_report;
-      } else if (Array.isArray(parsed) && parsed[0]?.omnigeo_db_report) {
-        parsed = parsed[0].omnigeo_db_report;
+      if (typeof parsed === 'string') {
+        parsed = JSON.parse(parsed);
       }
+      parsed = findPostgresReportEnvelope(parsed);
 
-      if (!parsed.tables || !Array.isArray(parsed.tables)) {
+      if (!parsed?.tables || !Array.isArray(parsed.tables) || parsed.tables.length === 0) {
         throw new Error(reportLang === 'fr' ? "Le JSON doit comporter un tableau de 'tables'." : "JSON must contain an array of 'tables'.");
       }
 
@@ -304,6 +404,11 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
         targetCardinality: r.targetCardinality || undefined,
         updateRule: r.updateRule,
         deleteRule: r.deleteRule,
+        nature: r.nature || undefined,
+        mandatory: typeof r.mandatory === 'boolean' ? r.mandatory : undefined,
+        management: r.management === 'arcgis' || r.management === 'sql' || r.management === 'application'
+          ? r.management
+          : 'application',
       }));
 
       // Compute summary and normalize tables/columns
@@ -582,7 +687,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-stone-500 font-mono mt-0.5">
-                {(schema.tables || []).length} {isFr ? 'tables' : 'tables'} &bull; {(schema.summary?.totalRecords || 0).toLocaleString()} {isFr ? 'enregistrements' : 'records'} &bull; {(schema.relationships || []).length} {isFr ? 'relations clés étrangères' : 'foreign key links'}
+                {dictionaryScope.tables.length} {isFr ? 'tables métier' : 'business tables'} &bull; {dictionaryScope.totalRecords.toLocaleString()} {isFr ? 'enregistrements' : 'records'} &bull; {dictionaryScope.relationships.length} {isFr ? 'relations' : 'relationships'}
               </p>
             </div>
           </div>
@@ -791,7 +896,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Tables Métier' : 'Total Tables'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-amber-500 mt-0.5">{(schema.tables || []).length}</div>
+                  <div className="text-2xl font-bold font-mono text-amber-500 mt-0.5">{dictionaryScope.tables.length}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Tables relationnelles' : 'Relational tables'}
                   </span>
@@ -803,7 +908,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Couches PostGIS' : 'PostGIS Layers'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-emerald-500 mt-0.5">{schema.summary?.totalSpatialTables || 0}</div>
+                  <div className="text-2xl font-bold font-mono text-emerald-500 mt-0.5">{dictionaryScope.totalSpatialTables}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Colonnes géométriques' : 'Spatial geometries'}
                   </span>
@@ -815,7 +920,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Enregistrements' : 'Data Records'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-stone-200 mt-0.5">{(schema.summary?.totalRecords || 0).toLocaleString()}</div>
+                  <div className="text-2xl font-bold font-mono text-stone-200 mt-0.5">{dictionaryScope.totalRecords.toLocaleString()}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Volume estimé' : 'Estimated row count'}
                   </span>
@@ -827,7 +932,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Total Champs' : 'Total Fields'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-stone-200 mt-0.5">{schema.summary?.totalColumns || 0}</div>
+                  <div className="text-2xl font-bold font-mono text-stone-200 mt-0.5">{dictionaryScope.totalColumns}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Attributs typés PostgreSQL' : 'Canonical attributes'}
                   </span>
@@ -839,7 +944,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                   <span className="text-[10px] font-mono uppercase text-stone-500 font-semibold block">
                     {isFr ? 'Relations (FK)' : 'Foreign Keys'}
                   </span>
-                  <div className="text-2xl font-bold font-mono text-purple-400 mt-0.5">{(schema.relationships || []).length}</div>
+                  <div className="text-2xl font-bold font-mono text-purple-400 mt-0.5">{dictionaryScope.relationships.length}</div>
                   <span className="text-[10px] text-stone-400 mt-1 block">
                     {isFr ? 'Liaisons d’intégrité' : 'Referential links'}
                   </span>
@@ -853,7 +958,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                 <span className="font-mono text-[11px] font-bold text-stone-500 uppercase mr-2">
                   {isFr ? 'Distribution des Types Canoniques :' : 'Canonical Types Distribution:'}
                 </span>
-                {Object.entries(schema.summary?.dataTypesDistribution || {}).map(([category, count], idx) => (
+                {Object.entries(dictionaryScope.dataTypesDistribution).map(([category, count], idx) => (
                   <span key={`dtype-pill-${category}-${idx}`} className={`px-2.5 py-1 rounded-lg border font-mono text-[11px] flex items-center space-x-1.5 ${
                     category.includes('Spatial') 
                       ? 'bg-emerald-950/40 border-emerald-600/40 text-emerald-300 font-bold'
@@ -870,7 +975,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
               </div>
 
               {/* Foreign Keys & Relationships Matrix Card */}
-              {(schema.relationships || []).length > 0 && (
+              {dictionaryScope.relationships.length > 0 && (
                 <div className={`rounded-xl border overflow-hidden ${
                   theme === 'light' ? 'bg-white border-[#D4DFD3]' : 'bg-[#101817] border-stone-800'
                 }`}>
@@ -884,7 +989,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       </h3>
                     </div>
                     <span className="text-[10px] font-mono text-stone-500">
-                      {(schema.relationships || []).length} {isFr ? 'liaisons actives' : 'active links'}
+                      {dictionaryScope.relationships.length} {isFr ? 'relations documentées' : 'documented relationships'}
                     </span>
                   </div>
                   <div className="overflow-x-auto">
@@ -893,38 +998,31 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                         theme === 'light' ? 'bg-[#F7FAF5] text-stone-600 border-[#D4DFD3]' : 'bg-stone-900/60 text-stone-400 border-stone-800'
                       }`}>
                         <tr>
-                          <th className="py-2.5 px-4">{isFr ? 'Contrainte FK' : 'FK Constraint'}</th>
-                          <th className="py-2.5 px-4">{isFr ? 'Table & Champ Source (FK)' : 'Source Table & Column (FK)'}</th>
+                          <th className="py-2.5 px-4">{isFr ? 'Mode de gestion / Référence' : 'Management / Reference'}</th>
+                          <th className="py-2.5 px-4">{isFr ? 'Table et champ d’origine' : 'Source table and field'}</th>
                           <th className="py-2.5 px-4 text-center">{isFr ? 'Cardinalité' : 'Cardinality'}</th>
-                          <th className="py-2.5 px-4">{isFr ? 'Table & Champ Cible (PK)' : 'Target Table & Column (PK)'}</th>
-                          <th className="py-2.5 px-4">{isFr ? "Règle d'Intégrité" : 'Integrity Rule'}</th>
+                          <th className="py-2.5 px-4">{isFr ? 'Table et champ de destination' : 'Target table and field'}</th>
+                          <th className="py-2.5 px-4">{isFr ? "Règle d'intégrité SQL" : 'SQL integrity rule'}</th>
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${theme === 'light' ? 'divide-[#E8EDE7]' : 'divide-stone-800/60'}`}>
-                        {(schema.relationships || []).map((rel, idx) => (
+                        {dictionaryScope.relationships.map((rel, idx) => (
                           <tr key={`rel-row-${rel.id || ''}-${rel.constraintName || ''}-${rel.sourceTable}-${rel.sourceColumn}-${rel.targetTable}-${idx}`} className="hover:bg-amber-500/5 transition-colors">
-                            <td className="py-2 px-4 text-stone-500 text-[11px]">{rel.constraintName}</td>
+                            <td className="py-2 px-4 text-stone-500 text-[11px]">{rel.management === 'sql' ? rel.constraintName : isFr ? 'Relation métier documentée' : 'Documented business relationship'}</td>
                             <td className="py-2 px-4 font-bold text-amber-500">
                               {rel.sourceTable}.<span className="underline">{rel.sourceColumn}</span>
                             </td>
                             <td className="py-2 px-4 text-center">
-                              {(rel.cardinality || rel.sourceCardinality || rel.targetCardinality) ? (
-                                <span className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/30 text-[10px] font-bold">
-                                  {rel.sourceCardinality ? `${rel.sourceCardinality} ` : ''}
-                                  {rel.sourceCardinality && rel.cardinality ? '→ ' : ''}
-                                  {rel.cardinality || ''}
-                                  {rel.cardinality && rel.targetCardinality ? ' → ' : ''}
-                                  {rel.targetCardinality || ''}
-                                </span>
-                              ) : (
-                                <span className="text-stone-500 text-[10px]">—</span>
-                              )}
+                              <span className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/30 text-[10px] font-bold">
+                                {rel.sourceCardinality || (isFr ? 'À valider' : 'Validate')} → {rel.cardinality || (isFr ? 'À valider' : 'Validate')} → {rel.targetCardinality || (isFr ? 'À valider' : 'Validate')}
+                              </span>
                             </td>
                             <td className="py-2 px-4 font-bold text-emerald-400">
                               {rel.targetTable}.<span className="underline">{rel.targetColumn}</span>
                             </td>
                             <td className="py-2 px-4 text-stone-500 text-[11px]">
-                              {rel.deleteRule ? `ON DELETE ${rel.deleteRule}` : 'CASCADE'}
+                              {rel.mandatory == null ? (isFr ? 'Obligation à valider' : 'Obligation to validate') : rel.mandatory ? (isFr ? 'Obligatoire' : 'Required') : (isFr ? 'Facultatif' : 'Optional')}
+                              {rel.deleteRule ? ` · ON DELETE ${rel.deleteRule}` : rel.management === 'sql' ? '' : ` · ${isFr ? 'Hors contrainte SQL' : 'No SQL constraint'}`}
                             </td>
                           </tr>
                         ))}
@@ -1183,12 +1281,21 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       {!isCollapsed && (
                         <div>
                           {dictionaryViewMode === 'profile' && htmlConfig.sections.tableProfile && (() => {
-                            const profile = computeTableProfile(table, schema, reportLang);
+                            const profile = computeTableProfile(
+                              table,
+                              { ...schema, relationships: dictionaryScope.relationships },
+                              reportLang,
+                              htmlConfig.tableMetadata[getTableMetadataKey(table)]
+                            );
                             const builtInRows = [
                               { key: 'service' as const, label: isFr ? 'Service' : 'Service', value: profile.service, cls: 'font-sans' },
                               { key: 'tableName' as const, label: isFr ? 'Table' : 'Table', value: profile.tableName, cls: theme === 'light' ? 'font-bold text-stone-900' : 'font-bold text-amber-400' },
                               { key: 'nature' as const, label: isFr ? 'Nature' : 'Nature', value: profile.nature, cls: 'font-sans' },
-                              { key: 'identifiantMetier' as const, label: isFr ? 'Identifiant métier' : 'Business Identifier', value: profile.identifiantMetier, cls: theme === 'light' ? 'font-bold text-amber-800' : 'font-bold text-amber-300' },
+                              { key: 'description' as const, label: isFr ? 'Description fonctionnelle' : 'Functional description', value: profile.description, cls: 'font-sans' },
+                              { key: 'purpose' as const, label: isFr ? 'Finalité / rôle' : 'Purpose / role', value: profile.purpose, cls: 'font-sans' },
+                              { key: 'technicalIdentifier' as const, label: isFr ? 'Identifiant technique' : 'Technical identifier', value: profile.technicalIdentifier, cls: 'font-mono' },
+                              { key: 'identifiantMetier' as const, label: isFr ? 'Identifiant métier' : 'Business identifier', value: profile.identifiantMetier, cls: theme === 'light' ? 'font-bold text-amber-800' : 'font-bold text-amber-300' },
+                              { key: 'transversal' as const, label: isFr ? 'Caractère transversal' : 'Cross-service data', value: profile.transversal, cls: 'font-sans' },
                               { key: 'rattachement' as const, label: isFr ? 'Rattachement' : 'Foreign Key Links', value: profile.rattachement, cls: '' },
                               { key: 'champsTemporels' as const, label: isFr ? 'Champs temporels' : 'Temporal Fields', value: profile.champsTemporels, cls: '' },
                               { key: 'champsQuantitatifs' as const, label: isFr ? 'Champs quantitatifs' : 'Quantitative Fields', value: profile.champsQuantitatifs, cls: '' },
@@ -1258,11 +1365,20 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                                 <th className="py-2.5 px-4 w-[12%] text-center truncate">{isFr ? 'Nullabilité' : 'Nullability'}</th>
                                 <th className="py-2.5 px-4 w-[22%] truncate">{isFr ? 'Contrainte / Clé' : 'Key / Constraint'}</th>
                                 <th className="py-2.5 px-4 w-[15%] truncate">{isFr ? 'Valeur par Défaut' : 'Default Value'}</th>
+                                {htmlConfig.physicalColumns.comment && <th className="py-2.5 px-4 min-w-56">{isFr ? 'Description / Domaine / Unité / Règle' : 'Description / Domain / Unit / Rule'}</th>}
                               </tr>
                             </thead>
                             <tbody className={`divide-y ${theme === 'light' ? 'divide-slate-100' : 'divide-slate-800/60'}`}>
                               {(table.columns || []).map((col, colIdx) => {
                                 const canonicalType = normalizeToPostgresType(col.dataType || 'text');
+                                const columnMetadata = htmlConfig.columnMetadata[getColumnMetadataKey(table, col.name)];
+                                const description = [
+                                  columnMetadata?.description || col.comment || '',
+                                  columnMetadata?.unit ? `${isFr ? 'Unité' : 'Unit'}: ${columnMetadata.unit}` : '',
+                                  columnMetadata?.valueDomain ? `${isFr ? 'Domaine' : 'Domain'}: ${columnMetadata.valueDomain}` : '',
+                                  columnMetadata?.businessRule ? `${isFr ? 'Règle' : 'Rule'}: ${columnMetadata.businessRule}` : '',
+                                  columnMetadata?.relatedTable ? `${isFr ? 'Rattachement' : 'Reference'}: ${columnMetadata.relatedTable}${columnMetadata.relatedField ? `.${columnMetadata.relatedField}` : ''}` : '',
+                                ].filter(Boolean).join(' · ');
 
                                 return (
                                   <tr key={`col-row-${table.name}-${col.name}-${colIdx}`} className="hover:bg-blue-500/5 transition-colors">
@@ -1311,6 +1427,9 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                                     <td className="py-2 px-4 font-mono text-[11px] text-slate-400 truncate" title={col.defaultValue || ''}>
                                       {col.defaultValue || '—'}
                                     </td>
+                                    {htmlConfig.physicalColumns.comment && (
+                                      <td className="py-2 px-4 text-[11px] text-slate-400 whitespace-normal break-words">{description || '—'}</td>
+                                    )}
                                   </tr>
                                 );
                               })}
@@ -1348,6 +1467,7 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
           {activeTab === 'customize' && (
             <DataDictionaryCustomizer
               config={htmlConfig}
+              schema={schema}
               onChange={handleUpdateHtmlConfig}
               htmlPreview={standaloneDataDictHtml}
               databaseName={schema.databaseName}
@@ -1858,6 +1978,11 @@ export const PostgresReportModal: React.FC<PostgresReportModalProps> = ({
                       <li>{isFr ? 'Copiez le résultat JSON retourné et collez-le ci-dessous.' : 'Copy the resulting JSON output and paste it below.'}</li>
                       <li>{isFr ? 'OmniGeo génère instantanément le dictionnaire et le modèle physique (MPD) !' : 'OmniGeo immediately generates the dictionary and physical model (MPD)!'}</li>
                     </ol>
+                  </div>
+                  <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-xs text-sky-200 leading-relaxed">
+                    {isFr
+                      ? 'Un fichier PostgreSQL .backup (format pg_dump) est une archive binaire, pas un export de métadonnées lisible directement dans le navigateur. Restaurez-le dans une base temporaire avec pg_restore, puis exécutez la requête d’extraction ci-dessous. Pour le schéma seulement, un export SQL/DDL est aussi accepté; les relations applicatives non déclarées en FK restent à documenter dans l’onglet Métier.'
+                      : 'A PostgreSQL .backup (pg_dump) file is a binary archive, not metadata the browser can read directly. Restore it to a temporary database with pg_restore, then run the extractor below. For schema-only input, SQL/DDL is also supported; application relationships without SQL FKs can be documented in the Business tab.'}
                   </div>
 
                   <div className="relative">

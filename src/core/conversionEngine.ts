@@ -12,16 +12,21 @@ export function resolveOutputFileName(
   inputName: string,
   targetFormat: SupportedFormat,
   targetCRS: string,
-  pattern: string
+  pattern: string,
+  crsMode: 'reproject' | 'assign' | 'preserve' = 'reproject'
 ): string {
-  const crsClean = targetCRS.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+  const crsClean = crsMode === 'preserve'
+    ? 'original_crs'
+    : targetCRS.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+  const knownExtensionsPattern = /(?:\.(?:xlsx?|xlsm|geojson|json|csv|gpkg|zip|kml|gpx|dxf|dwg|fgb))+$/i;
+  const inputBaseName = inputName.replace(knownExtensionsPattern, '');
   let base = pattern
-    .replace('{name}', inputName)
+    .replace('{name}', inputBaseName)
     .replace('{crs}', crsClean)
     .replace('{format}', targetFormat);
 
   if (!base || base.trim() === '') {
-    base = `${inputName}_${crsClean}`;
+    base = `${inputBaseName}_${crsClean}`;
   }
 
   // Extensions
@@ -38,7 +43,12 @@ export function resolveOutputFileName(
     flatgeobuf: '.fgb'
   };
 
-  return `${base}${extMap[targetFormat] || '.geojson'}`;
+  const outputExtension = extMap[targetFormat] || '.geojson';
+  const knownExtensions = targetFormat === 'excel' ? /(?:\.(?:xlsx?|xlsm))+$/i : new RegExp(
+    `${outputExtension.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+    'i'
+  );
+  return `${base.replace(knownExtensions, '')}${outputExtension}`;
 }
 
 /**
@@ -79,20 +89,28 @@ export async function executeConversionJob(
 
     // 1. Verify CRS
     const targetCRSCode = job.targetCRS;
-    if (!dataset.detectedCRS && job.crsMode === 'reproject') {
+    const hasSpatialGeometry = !dataset.isNonSpatial &&
+      dataset.geometryType !== 'Unknown' &&
+      (dataset.geojson?.features || []).some((feature: any) => Boolean(feature?.geometry));
+    if (hasSpatialGeometry && !dataset.detectedCRS && job.crsMode === 'reproject') {
       throw new Error(
         `Cannot reproject "${dataset.name}" because its source CRS is missing. Assign the correct CRS in the Workspace first.`
       );
     }
     const sourceCRSCode = dataset.detectedCRS?.code || targetCRSCode;
 
-    addLog('crs_transform', 'info', `CRS Operation: ${job.crsMode === 'reproject' ? `Reprojecting from ${sourceCRSCode} to ${targetCRSCode}` : `Assigning CRS ${targetCRSCode}`}`);
-    onProgress?.(30, 'Performing CRS transformation');
+    const crsOperation = !hasSpatialGeometry || job.crsMode === 'preserve'
+      ? 'Preserving source coordinates; no CRS operation required'
+      : job.crsMode === 'reproject'
+        ? `Reprojecting from ${sourceCRSCode} to ${targetCRSCode}`
+        : `Assigning CRS ${targetCRSCode}`;
+    addLog('crs_transform', 'info', `CRS Operation: ${crsOperation}`);
+    onProgress?.(30, hasSpatialGeometry && job.crsMode !== 'preserve' ? 'Performing CRS transformation' : 'Preserving source data');
 
     let workingGeoJSON = dataset.geojson;
     let featuresCount = dataset.featureCount;
 
-    if (job.crsMode === 'reproject' && sourceCRSCode !== targetCRSCode) {
+    if (hasSpatialGeometry && job.crsMode === 'reproject' && sourceCRSCode !== targetCRSCode) {
       const transformRes = reprojectGeoJSON(workingGeoJSON, sourceCRSCode, targetCRSCode);
       const coordinateError = transformRes.warnings.find(warning =>
         warning.startsWith('Coordinate transform error:')
@@ -106,6 +124,9 @@ export async function executeConversionJob(
     } else {
       addLog('crs_transform', 'info', 'No coordinate math required; coordinate values preserved.');
     }
+    const outputCRSCode = hasSpatialGeometry
+      ? (job.crsMode === 'preserve' ? sourceCRSCode : targetCRSCode)
+      : dataset.detectedCRS?.code || targetCRSCode || 'EPSG:4326';
 
     // 2. Validate Geometries
     onProgress?.(50, 'Validating output geometries');
@@ -145,11 +166,11 @@ export async function executeConversionJob(
 
     switch (job.targetFormat) {
       case 'geopackage': {
-        outputBlob = await createGeoPackageFile(workingGeoJSON, job.layerName || dataset.name, targetCRSCode);
+        outputBlob = await createGeoPackageFile(workingGeoJSON, job.layerName || dataset.name, outputCRSCode);
         break;
       }
       case 'shapefile': {
-        outputBlob = await createShapefileZip(workingGeoJSON, dataset.name, targetCRSCode);
+        outputBlob = await createShapefileZip(workingGeoJSON, dataset.name, outputCRSCode);
         break;
       }
       case 'kml': {
@@ -173,12 +194,17 @@ export async function executeConversionJob(
         break;
       }
       case 'excel': {
-        const excelBuf = geojsonToExcelBuffer(workingGeoJSON);
-        outputBlob = new Blob([excelBuf.buffer as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const excelBuf = geojsonToExcelBuffer(
+          workingGeoJSON,
+          job.layerName || dataset.name,
+          settings.excelDateFormat || 'yyyy-mm-dd',
+          dataset.fields.filter(field => field.type === 'date').map(field => field.name)
+        );
+        outputBlob = new Blob([excelBuf.slice().buffer as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         break;
       }
       case 'filegdb': {
-        const targetCrsObj = getCRSByCode(job.targetCRS) || dataset.detectedCRS;
+        const targetCrsObj = getCRSByCode(outputCRSCode) || dataset.detectedCRS;
         const convertedDataset: SpatialDataset = {
           ...dataset,
           name: job.layerName || dataset.name,

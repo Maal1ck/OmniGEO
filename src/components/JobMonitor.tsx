@@ -92,7 +92,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   // Download All as ZIP
@@ -119,7 +119,7 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const copyLogText = (job: ConversionJob) => {

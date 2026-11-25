@@ -37,6 +37,9 @@ export interface PostgresRelationship {
   cardinality?: '1:1' | '1:N' | 'N:1' | 'N:M' | '0:1' | '0:N';
   sourceCardinality?: string; // e.g. "0..n" or "1..n"
   targetCardinality?: string; // e.g. "1..1" or "0..1"
+  nature?: string;
+  mandatory?: boolean | null;
+  management?: 'sql' | 'arcgis' | 'application';
 }
 
 export interface PostgresTableSchema {
@@ -330,6 +333,7 @@ SELECT json_build_object(
       json_build_object(
         'id', 'rel_' || fk.constraint_name || '_' || fk.source_table || '_' || fk.source_column || '_' || fk.target_table,
         'constraintName', fk.constraint_name,
+        'management', 'sql',
         'sourceTable', fk.source_table,
         'sourceColumn', fk.source_column,
         'targetTable', fk.target_table,
@@ -337,6 +341,7 @@ SELECT json_build_object(
         'updateRule', fk.update_rule,
         'deleteRule', fk.delete_rule,
         'cardinality', CASE WHEN fk.source_is_unique THEN '1:1' ELSE '1:N' END,
+        'mandatory', NOT fk.source_nullable,
         'sourceCardinality', CASE
           WHEN fk.source_is_unique AND fk.source_nullable THEN '0..1'
           WHEN fk.source_is_unique THEN '1..1'
@@ -579,6 +584,7 @@ export function parsePostgresDDL(sqlContent: string, dbName = 'imported_postgres
           cardinality: '1:N',
           sourceCardinality: '0..n',
           targetCardinality: '1..1',
+          management: 'sql',
         });
         continue;
       }
@@ -619,6 +625,7 @@ export function parsePostgresDDL(sqlContent: string, dbName = 'imported_postgres
             cardinality: '1:N',
             sourceCardinality: '0..n',
             targetCardinality: '1..1',
+            management: 'sql',
           });
         }
 
@@ -682,6 +689,7 @@ export function parsePostgresDDL(sqlContent: string, dbName = 'imported_postgres
         cardinality: '1:N',
         sourceCardinality: '0..n',
         targetCardinality: '1..1',
+        management: 'sql',
       };
       relationships.push(rel);
 
@@ -897,6 +905,7 @@ export function buildSchemaFromDatasets(
       cardinality: relDef.cardinality,
       sourceCardinality: relDef.sourceCardinality,
       targetCardinality: relDef.targetCardinality,
+      management: 'application',
     };
     relationships.push(pgRel);
     sourceTable.foreignKeys.push(pgRel);
@@ -926,6 +935,7 @@ export function buildSchemaFromDatasets(
             sourceColumn: c.name,
             targetTable: target.name,
             targetColumn: targetPk,
+            management: 'application',
           };
           relationships.push(rel);
           t.foreignKeys.push(rel);
@@ -1210,7 +1220,11 @@ export interface TableProfileSheetData {
   service: string;
   tableName: string;
   nature: string;
+  description: string;
+  purpose: string;
+  technicalIdentifier: string;
   identifiantMetier: string;
+  transversal: string;
   rattachement: string;
   champsTemporels: string;
   champsQuantitatifs: string;
@@ -1240,7 +1254,9 @@ export function isBusinessTable(table: PostgresTableSchema): boolean {
     name.startsWith('sql_') ||
     name.startsWith('keyset_') ||
     name.startsWith('tmp_') ||
-    name.startsWith('temp_')
+    name.startsWith('temp_') ||
+    name.endsWith('_tmp') ||
+    name.endsWith('_temp')
   ) {
     return false;
   }
@@ -1258,6 +1274,18 @@ export function isBusinessTable(table: PostgresTableSchema): boolean {
     'raster_overviews',
     'layer',
     'topology',
+    'sde_metadata',
+    'sde_table_registry',
+    'sde_column_registry',
+    'sde_geometry_columns',
+    'sde_layers',
+    'sde_states',
+    'sde_versions',
+    'sde_version',
+    'sde_version_history',
+    'sde_process_information',
+    'sde_server_config',
+    'sde_dbtune',
     'schema_migrations',
     'flyway_schema_history',
     'spatial_index',
@@ -1339,10 +1367,12 @@ export function extractGroupFromComment(
 export function classifyTableFamily(
   table: PostgresTableSchema,
   allTables: PostgresTableSchema[] = [],
-  lang: 'fr' | 'en' = 'fr'
+  lang: 'fr' | 'en' = 'fr',
+  serviceOverride?: string
 ): string {
   const isFr = lang === 'fr';
 
+  if (serviceOverride?.trim()) return serviceOverride.trim();
   if (!isBusinessTable(table)) {
     return isFr ? 'Tables Système & Techniques' : 'System & Technical Tables';
   }
@@ -1381,6 +1411,32 @@ export function classifyTableFamily(
   return isFr ? 'Autres Tables Métiers' : 'Other Business Tables';
 }
 
+export const DATA_DICTIONARY_SERVICES = [
+  'Socle transversal et référentiels communs',
+  'Domaine Public Hydraulique – Aides et Redevances',
+  "Qualité de l'eau",
+  'Affaires juridiques et contentieux',
+  'Suivi et Évaluation',
+  'Gestion et Développement des Ressources en Eau',
+  'Planification',
+  'STAH – Travaux et Ouvrages Hydrauliques',
+];
+
+export function getTableMetadataKey(table: Pick<PostgresTableSchema, 'name' | 'schema'>): string {
+  return `${table.schema || 'public'}.${table.name}`;
+}
+
+export function getColumnMetadataKey(
+  table: Pick<PostgresTableSchema, 'name' | 'schema'>,
+  columnName: string
+): string {
+  return `${getTableMetadataKey(table)}.${columnName}`;
+}
+
+export function getRelationshipMetadataKey(rel: PostgresRelationship): string {
+  return `${rel.sourceTable}.${rel.sourceColumn}->${rel.targetTable}.${rel.targetColumn}`;
+}
+
 function sanitizeArchiveName(name: string): string {
   return name
     .normalize('NFD')
@@ -1410,13 +1466,14 @@ function buildUniqueSheetName(rawName: string, usedNames: Set<string>): string {
 export function computeTableProfile(
   table: PostgresTableSchema,
   schema: PostgresDatabaseSchema,
-  lang: 'fr' | 'en' = 'fr'
+  lang: 'fr' | 'en' = 'fr',
+  metadata?: HtmlTableMetadata
 ): TableProfileSheetData {
   const isFr = lang === 'fr';
 
   // 1. Service / Groupe extrait du commentaire en priorité, sinon schéma PostgreSQL
   const extractedService = extractGroupFromComment(table.comment, schema.tables || []);
-  const service = extractedService || (table.schema || 'public');
+  const service = metadata?.service.trim() || extractedService || (table.schema || 'public');
 
   // 2. Table name
   const tableName = `${table.schema ? table.schema + '.' : ''}${table.name}`;
@@ -1440,22 +1497,26 @@ export function computeTableProfile(
         : `Spatial layer ArcGIS / GIS (${colLabelEn})`;
     }
   }
+  if (metadata?.nature.trim()) nature = metadata.nature.trim();
 
-  // 4. Identifiant métier (Primary Key)
+  // 4. Keep technical primary keys separate from business identifiers.
   const pkCols = table.primaryKeys && table.primaryKeys.length > 0
     ? table.primaryKeys.join(', ')
     : (table.columns || []).find(c => c.isPrimaryKey)?.name
-    || (table.columns || []).find(c => /^(id|gid|ogc_fid|code|num|objectid)/i.test(c.name))?.name
-    || (isFr ? 'Non défini (Aucune PK explicite)' : 'Not defined (No explicit PK)');
-  const identifiantMetier = pkCols;
+    || (isFr ? 'Non défini (Aucune clé primaire explicite)' : 'Not defined (no explicit primary key)');
+  const technicalIdentifier = metadata?.technicalIdentifier.trim() || pkCols;
+  const identifiantMetier = metadata?.businessIdentifier.trim() || (isFr ? 'Non renseigné' : 'Not documented');
 
   // 5. Rattachement (Clés étrangères)
-  const rels = (schema.relationships || []).filter(
-    r => r.sourceTable === table.name || r.sourceTable === tableName
+  const rels = (schema.relationships || []).filter(r =>
+    r.sourceTable === table.name || r.sourceTable === tableName ||
+    r.targetTable === table.name || r.targetTable === tableName
   );
-  let rattachement = isFr ? 'Aucun (Table racine / primaire)' : 'None (Root / primary table)';
+  let rattachement = isFr ? 'Aucune relation documentée' : 'No relationship documented';
   if (rels.length > 0) {
-    rattachement = rels.map(r => `${r.sourceColumn} -> ${r.targetTable}.${r.targetColumn}`).join(' ; ');
+    rattachement = rels.map(r =>
+      `${r.sourceTable}.${r.sourceColumn} → ${r.targetTable}.${r.targetColumn}`
+    ).join(' ; ');
   } else {
     const fkCols = (table.columns || []).filter(c => c.isForeignKey);
     if (fkCols.length > 0) {
@@ -1507,7 +1568,13 @@ export function computeTableProfile(
     service,
     tableName,
     nature,
+    description: metadata?.description.trim() || table.comment || '',
+    purpose: metadata?.purpose.trim() || '',
+    technicalIdentifier,
     identifiantMetier,
+    transversal: metadata?.transversal
+      ? (isFr ? 'Oui — donnée partagée entre plusieurs services' : 'Yes — shared across services')
+      : (isFr ? 'Non' : 'No'),
     rattachement,
     champsTemporels,
     champsQuantitatifs,
@@ -1567,7 +1634,10 @@ export function buildFamilyExcelWorkbook(
     targetRows.push([isFr ? 'Service' : 'Service', profile.service]);
     targetRows.push([isFr ? 'Table' : 'Table', profile.tableName]);
     targetRows.push([isFr ? 'Nature' : 'Nature', profile.nature]);
-    targetRows.push([isFr ? 'Identifiant métier' : 'Business Identifier (PK)', profile.identifiantMetier]);
+    targetRows.push([isFr ? 'Description fonctionnelle' : 'Functional description', profile.description]);
+    targetRows.push([isFr ? 'Identifiant technique' : 'Technical identifier', profile.technicalIdentifier]);
+    targetRows.push([isFr ? 'Identifiant métier' : 'Business identifier', profile.identifiantMetier]);
+    targetRows.push([isFr ? 'Caractère transversal' : 'Cross-service data', profile.transversal]);
     targetRows.push([isFr ? 'Rattachement' : 'Foreign Key Links', profile.rattachement]);
     targetRows.push([isFr ? 'Champs temporels' : 'Temporal Fields', profile.champsTemporels]);
     targetRows.push([isFr ? 'Champs quantitatifs' : 'Quantitative Fields', profile.champsQuantitatifs]);
@@ -1794,7 +1864,8 @@ export function generateProfileSheetCsv(schema: PostgresDatabaseSchema, lang: 'f
     lines.push(`${escapeCsv(isFr ? 'Service' : 'Service')}${sep}${escapeCsv(profile.service)}`);
     lines.push(`${escapeCsv(isFr ? 'Table' : 'Table')}${sep}${escapeCsv(profile.tableName)}`);
     lines.push(`${escapeCsv(isFr ? 'Nature' : 'Nature')}${sep}${escapeCsv(profile.nature)}`);
-    lines.push(`${escapeCsv(isFr ? 'Identifiant métier' : 'Business Identifier (PK)')}${sep}${escapeCsv(profile.identifiantMetier)}`);
+    lines.push(`${escapeCsv(isFr ? 'Identifiant technique' : 'Technical identifier')}${sep}${escapeCsv(profile.technicalIdentifier)}`);
+    lines.push(`${escapeCsv(isFr ? 'Identifiant métier' : 'Business identifier')}${sep}${escapeCsv(profile.identifiantMetier)}`);
     lines.push(`${escapeCsv(isFr ? 'Rattachement' : 'Foreign Key Links')}${sep}${escapeCsv(profile.rattachement)}`);
     lines.push(`${escapeCsv(isFr ? 'Champs temporels' : 'Temporal Fields')}${sep}${escapeCsv(profile.champsTemporels)}`);
     lines.push(`${escapeCsv(isFr ? 'Champs quantitatifs' : 'Quantitative Fields')}${sep}${escapeCsv(profile.champsQuantitatifs)}`);
@@ -1854,7 +1925,11 @@ export type ProfileRubriqueKey =
   | 'service'
   | 'tableName'
   | 'nature'
+  | 'description'
+  | 'purpose'
+  | 'technicalIdentifier'
   | 'identifiantMetier'
+  | 'transversal'
   | 'rattachement'
   | 'champsTemporels'
   | 'champsQuantitatifs'
@@ -1925,6 +2000,41 @@ export interface HtmlReportConfig {
   customProfileRubriques: CustomProfileRubrique[];
   physicalColumns: Record<PhysicalColumnKey, boolean>;
   customSections: CustomReportSection[];
+  showCoverPage: boolean;
+  excludeTechnicalTables: boolean;
+  excludedTables: string[];
+  tableMetadata: Record<string, HtmlTableMetadata>;
+  columnMetadata: Record<string, HtmlColumnMetadata>;
+  relationshipMetadata: Record<string, HtmlRelationshipMetadata>;
+  manualRelationships: PostgresRelationship[];
+}
+
+export interface HtmlTableMetadata {
+  service: string;
+  description: string;
+  purpose: string;
+  nature: string;
+  technicalIdentifier: string;
+  businessIdentifier: string;
+  transversal: boolean;
+}
+
+export interface HtmlColumnMetadata {
+  description: string;
+  unit: string;
+  valueDomain: string;
+  businessRule: string;
+  relatedTable: string;
+  relatedField: string;
+}
+
+export interface HtmlRelationshipMetadata {
+  nature: string;
+  cardinality: string;
+  sourceCardinality: string;
+  targetCardinality: string;
+  mandatory: boolean | null;
+  management: 'sql' | 'arcgis' | 'application';
 }
 
 export interface McdRelationshipOverride {
@@ -2089,7 +2199,11 @@ export const PROFILE_RUBRIQUES_META: Array<{ key: ProfileRubriqueKey; labelFr: s
   { key: 'service', labelFr: 'Service', labelEn: 'Service' },
   { key: 'tableName', labelFr: 'Table', labelEn: 'Table' },
   { key: 'nature', labelFr: 'Nature', labelEn: 'Nature' },
-  { key: 'identifiantMetier', labelFr: 'Identifiant métier', labelEn: 'Business Identifier (PK)' },
+  { key: 'description', labelFr: 'Description fonctionnelle', labelEn: 'Functional description' },
+  { key: 'purpose', labelFr: 'Finalité / rôle', labelEn: 'Purpose / role' },
+  { key: 'technicalIdentifier', labelFr: 'Identifiant technique', labelEn: 'Technical identifier' },
+  { key: 'identifiantMetier', labelFr: 'Identifiant métier', labelEn: 'Business identifier' },
+  { key: 'transversal', labelFr: 'Caractère transversal', labelEn: 'Cross-service data' },
   { key: 'rattachement', labelFr: 'Rattachement', labelEn: 'Foreign Key Links' },
   { key: 'champsTemporels', labelFr: 'Champs temporels', labelEn: 'Temporal Fields' },
   { key: 'champsQuantitatifs', labelFr: 'Champs quantitatifs', labelEn: 'Quantitative Fields' },
@@ -2146,7 +2260,11 @@ export function createDefaultHtmlReportConfig(): HtmlReportConfig {
       service: true,
       tableName: true,
       nature: true,
+      description: true,
+      purpose: true,
+      technicalIdentifier: true,
       identifiantMetier: true,
+      transversal: true,
       rattachement: true,
       champsTemporels: true,
       champsQuantitatifs: true,
@@ -2164,6 +2282,13 @@ export function createDefaultHtmlReportConfig(): HtmlReportConfig {
       comment: true,
     },
     customSections: [],
+    showCoverPage: true,
+    excludeTechnicalTables: true,
+    excludedTables: [],
+    tableMetadata: {},
+    columnMetadata: {},
+    relationshipMetadata: {},
+    manualRelationships: [],
   };
 }
 
@@ -2204,6 +2329,12 @@ export function generateStandaloneHtmlReport(
     physicalColumns: { ...defaults.physicalColumns, ...(userConfig?.physicalColumns || {}) },
     customProfileRubriques: userConfig?.customProfileRubriques ?? defaults.customProfileRubriques,
     customSections: userConfig?.customSections ?? defaults.customSections,
+    excludeTechnicalTables: userConfig?.excludeTechnicalTables ?? defaults.excludeTechnicalTables,
+    excludedTables: userConfig?.excludedTables ?? defaults.excludedTables,
+    tableMetadata: userConfig?.tableMetadata ?? defaults.tableMetadata,
+    columnMetadata: userConfig?.columnMetadata ?? defaults.columnMetadata,
+    relationshipMetadata: userConfig?.relationshipMetadata ?? defaults.relationshipMetadata,
+    manualRelationships: userConfig?.manualRelationships ?? defaults.manualRelationships,
   };
 
   const isFr = lang === 'fr';
@@ -2236,9 +2367,63 @@ export function generateStandaloneHtmlReport(
     ? `'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`
     : fontOption.cssStack;
 
-  const allTables = schema.tables || [];
+  const allInputTables = schema.tables || [];
+  const excludedTables = new Set(cfg.excludedTables);
+  const allTables = allInputTables.filter(table =>
+    !excludedTables.has(getTableMetadataKey(table)) &&
+    !(cfg.excludeTechnicalTables && !isBusinessTable(table))
+  );
+  const includedTableNames = new Set(allTables.flatMap(table => [
+    table.name.toLowerCase(),
+    getTableMetadataKey(table).toLowerCase(),
+  ]));
+  const relationshipMap = new Map<string, PostgresRelationship>();
+  for (const relationship of [...(schema.relationships || []), ...cfg.manualRelationships]) {
+    relationshipMap.set(getRelationshipMetadataKey(relationship), relationship);
+  }
+  const allRelationships = Array.from(relationshipMap.values())
+    .filter(rel =>
+      includedTableNames.has(rel.sourceTable.toLowerCase()) &&
+      includedTableNames.has(rel.targetTable.toLowerCase())
+    )
+    .map(rel => {
+      const metadata = cfg.relationshipMetadata[getRelationshipMetadataKey(rel)];
+      return metadata ? {
+        ...rel,
+        nature: metadata.nature ?? rel.nature,
+        cardinality: (metadata.cardinality || undefined) as PostgresRelationship['cardinality'],
+        sourceCardinality: metadata.sourceCardinality || undefined,
+        targetCardinality: metadata.targetCardinality || undefined,
+        mandatory: metadata.mandatory,
+        management: metadata.management || rel.management,
+      } : rel;
+    });
+  const reportSummary = {
+    totalTables: allTables.length,
+    totalRecords: allTables.reduce((sum, table) => sum + Math.max(0, table.estimatedRows || 0), 0),
+    totalColumns: allTables.reduce((sum, table) => sum + (table.columns || []).length, 0),
+    totalRelationships: allRelationships.length,
+    totalSpatialTables: allTables.filter(isTableSpatial).length,
+    dataTypesDistribution: allTables.reduce((distribution, table) => {
+      for (const column of table.columns || []) {
+        const category = categorizeDataType(normalizeToPostgresType(column.dataType || 'text'), column.name);
+        distribution[category] = (distribution[category] || 0) + 1;
+      }
+      return distribution;
+    }, {} as Record<string, number>),
+  };
+  const reportSchema: PostgresDatabaseSchema = {
+    ...schema,
+    tables: allTables,
+    relationships: allRelationships,
+    summary: reportSummary,
+  };
+  const tableAnchorId = (table: PostgresTableSchema) =>
+    `tbl-${getTableMetadataKey(table).toLowerCase().replace(/[^a-z0-9_-]+/g, '-')}`;
   const uniqueSchemas = Array.from(new Set(allTables.map(t => t.schema || 'public'))).sort();
-  const uniqueFamilies = Array.from(new Set(allTables.map(t => classifyTableFamily(t, allTables, lang)))).sort();
+  const uniqueFamilies = Array.from(new Set(allTables.map(t =>
+    classifyTableFamily(t, allTables, lang, cfg.tableMetadata[getTableMetadataKey(t)]?.service)
+  ))).sort();
 
   const spatialTableCount = allTables.filter(t => isTableSpatial(t)).length;
 
@@ -2268,12 +2453,12 @@ export function generateStandaloneHtmlReport(
     relSectionTitle: isFr ? 'Matrice des Relations & Clés Étrangères' : 'Relational Model & Foreign Keys Matrix',
     relSectionSub: isFr ? 'Liaisons référentielles et intégrité entre les tables' : 'Referential integrity links and constraint mapping',
     activeLinks: isFr ? 'liaisons actives' : 'active relationships',
-    thConstraint: isFr ? 'Contrainte FK' : 'FK Constraint',
-    thSource: isFr ? 'Table & Champ Source (FK)' : 'Source Table & Column (FK)',
+    thConstraint: isFr ? 'Mode de gestion / Référence' : 'Management / Reference',
+    thSource: isFr ? 'Table et champ d’origine' : 'Source table and field',
     thCard: isFr ? 'Cardinalité' : 'Cardinality',
-    thTarget: isFr ? 'Table & Champ Cible (PK)' : 'Target Table & Column (PK)',
+    thTarget: isFr ? 'Table et champ de destination' : 'Target table and field',
     thRule: isFr ? "Règle d'Intégrité" : 'Integrity Rule',
-    noRels: isFr ? 'Aucune contrainte de clé étrangère explicite détectée.' : 'No explicit foreign key constraints detected.',
+    noRels: isFr ? 'Aucune relation métier documentée.' : 'No business relationships documented.',
     catSectionTitle: isFr ? 'Catalogue & Dictionnaire des Tables' : 'Tables & Columns Data Dictionary',
     catSectionSub: isFr ? 'Recherche avancée et fiches détaillées par table' : 'Advanced filtering and detailed specifications per table',
     docTables: isFr ? 'tables documentées' : 'documented tables',
@@ -2314,7 +2499,8 @@ export function generateStandaloneHtmlReport(
 
   // Tables catalog rows
   const tablesHtml = allTables.map(table => {
-    const tableFamily = classifyTableFamily(table, allTables, lang);
+    const tableMetadata = cfg.tableMetadata[getTableMetadataKey(table)];
+    const tableFamily = classifyTableFamily(table, allTables, lang, tableMetadata?.service);
     const isBiz = isBusinessTable(table);
     const spatialEngine = detectSpatialProvider(table);
     const tableIsSpatial = spatialEngine !== null;
@@ -2337,6 +2523,14 @@ export function generateStandaloneHtmlReport(
         : `<span class="nullable-tag tag-notnull">NOT NULL</span>`;
 
       const fkText = col.foreignKeyTarget ? `${col.foreignKeyTarget.table}.${col.foreignKeyTarget.column}` : '';
+      const columnMetadata = cfg.columnMetadata[getColumnMetadataKey(table, col.name)];
+      const columnDescription = [
+        columnMetadata?.description || col.comment || '',
+        columnMetadata?.unit ? `${isFr ? 'Unité' : 'Unit'}: ${columnMetadata.unit}` : '',
+        columnMetadata?.valueDomain ? `${isFr ? 'Domaine' : 'Domain'}: ${columnMetadata.valueDomain}` : '',
+        columnMetadata?.businessRule ? `${isFr ? 'Règle métier' : 'Business rule'}: ${columnMetadata.businessRule}` : '',
+        columnMetadata?.relatedTable ? `${isFr ? 'Rattachement' : 'Reference'}: ${columnMetadata.relatedTable}${columnMetadata.relatedField ? `.${columnMetadata.relatedField}` : ''}` : '',
+      ].filter(Boolean).join(' — ');
 
       const cellMap: Record<PhysicalColumnKey, string> = {
         name: `<td class="col-name font-mono font-bold" title="${escapeHtml(col.name)}">${escapeHtml(col.name)}</td>`,
@@ -2344,7 +2538,7 @@ export function generateStandaloneHtmlReport(
         isNullable: `<td class="text-center">${nullBadge}</td>`,
         keys: `<td><div class="badges-row">${pkBadge}${fkBadge}${geomBadge}</div></td>`,
         defaultValue: `<td class="col-default font-mono" title="${col.defaultValue ? escapeHtml(col.defaultValue) : ''}">${col.defaultValue ? escapeHtml(col.defaultValue) : '<span class="text-subtle">&mdash;</span>'}</td>`,
-        comment: `<td class="col-comment" title="${col.comment ? escapeHtml(col.comment) : ''}">${col.comment ? escapeHtml(col.comment) : '<span class="text-subtle">&mdash;</span>'}</td>`,
+        comment: `<td class="col-comment" title="${columnDescription ? escapeHtml(columnDescription) : ''}">${columnDescription ? escapeHtml(columnDescription) : '<span class="text-subtle">&mdash;</span>'}</td>`,
       };
 
       return `
@@ -2362,14 +2556,18 @@ export function generateStandaloneHtmlReport(
       `;
     }).join('\n');
 
-    const profile = computeTableProfile(table, schema, lang);
+    const profile = computeTableProfile(table, reportSchema, lang, tableMetadata);
 
     // Build profile rubriques rows based on config
     const builtInProfileRows: Array<{ key: ProfileRubriqueKey; label: string; value: string; valueClass?: string }> = [
       { key: 'service', label: isFr ? 'Service' : 'Service', value: profile.service },
       { key: 'tableName', label: isFr ? 'Table' : 'Table', value: profile.tableName, valueClass: 'font-mono font-bold' },
       { key: 'nature', label: isFr ? 'Nature' : 'Nature', value: profile.nature },
-      { key: 'identifiantMetier', label: isFr ? 'Identifiant métier' : 'Business Identifier (PK)', value: profile.identifiantMetier, valueClass: 'font-mono font-bold text-accent' },
+      { key: 'description', label: isFr ? 'Description fonctionnelle' : 'Functional description', value: profile.description },
+      { key: 'purpose', label: isFr ? 'Finalité / rôle' : 'Purpose / role', value: profile.purpose },
+      { key: 'technicalIdentifier', label: isFr ? 'Identifiant technique' : 'Technical identifier', value: profile.technicalIdentifier, valueClass: 'font-mono' },
+      { key: 'identifiantMetier', label: isFr ? 'Identifiant métier' : 'Business identifier', value: profile.identifiantMetier, valueClass: 'font-mono font-bold text-accent' },
+      { key: 'transversal', label: isFr ? 'Caractère transversal' : 'Cross-service data', value: profile.transversal },
       { key: 'rattachement', label: isFr ? 'Rattachement' : 'Foreign Key Links', value: profile.rattachement, valueClass: 'font-mono' },
       { key: 'champsTemporels', label: isFr ? 'Champs temporels' : 'Temporal Fields', value: profile.champsTemporels, valueClass: 'font-mono' },
       { key: 'champsQuantitatifs', label: isFr ? 'Champs quantitatifs' : 'Quantitative Fields', value: profile.champsQuantitatifs, valueClass: 'font-mono' },
@@ -2464,7 +2662,7 @@ export function generateStandaloneHtmlReport(
 
     return `
       <section class="table-card"
-               id="tbl-${escapeHtml(table.name)}"
+               id="${escapeHtml(tableAnchorId(table))}"
                data-schema="${escapeHtml((table.schema || 'public').toLowerCase())}"
                data-family="${escapeHtml(tableFamily)}"
                data-spatial="${tableIsSpatial ? '1' : '0'}"
@@ -2498,24 +2696,24 @@ export function generateStandaloneHtmlReport(
   }).join('\n');
 
   // Relationships table
-  const relsHtml = (schema.relationships && schema.relationships.length > 0) ? schema.relationships.map(rel => `
+  const relsHtml = allRelationships.length > 0 ? allRelationships.map(rel => `
     <tr>
-      <td class="font-mono text-muted text-truncate" title="${escapeHtml(rel.constraintName)}">${escapeHtml(rel.constraintName)}</td>
-      <td class="font-mono font-bold text-truncate" title="${escapeHtml(rel.sourceTable)}.${escapeHtml(rel.sourceColumn)}">
+      <td class="font-mono text-muted" title="${escapeHtml(rel.constraintName)}">${escapeHtml(rel.constraintName)}<br><span class="text-subtle">${escapeHtml(rel.management === 'application' ? (isFr ? 'Logique applicative' : 'Application logic') : rel.management === 'arcgis' ? 'ArcGIS' : rel.constraintName.startsWith('manual_') ? (isFr ? 'Relation documentée' : 'Documented relationship') : 'SQL FK')}</span></td>
+      <td class="font-mono font-bold" title="${escapeHtml(rel.sourceTable)}.${escapeHtml(rel.sourceColumn)}">
         ${escapeHtml(rel.sourceTable)}.<span class="text-accent">${escapeHtml(rel.sourceColumn)}</span>
       </td>
       <td class="text-center">
-        <span class="cardinality-chip font-mono">${rel.sourceCardinality || '0..n'} &rarr; ${rel.cardinality || '1:N'} &rarr; ${rel.targetCardinality || '1..1'}</span>
+        <span class="cardinality-chip font-mono">${escapeHtml(rel.sourceCardinality || (isFr ? 'À valider' : 'Validate'))} &rarr; ${escapeHtml(rel.cardinality || (isFr ? 'À valider' : 'Validate'))} &rarr; ${escapeHtml(rel.targetCardinality || (isFr ? 'À valider' : 'Validate'))}</span><br><span class="text-subtle">${rel.mandatory == null ? (isFr ? 'Obligation à valider' : 'Obligation to validate') : rel.mandatory ? (isFr ? 'Obligatoire' : 'Required') : (isFr ? 'Facultatif' : 'Optional')}${rel.nature ? ` · ${escapeHtml(rel.nature)}` : ''}</span>
       </td>
-      <td class="font-mono font-bold text-truncate" title="${escapeHtml(rel.targetTable)}.${escapeHtml(rel.targetColumn)}">
+      <td class="font-mono font-bold" title="${escapeHtml(rel.targetTable)}.${escapeHtml(rel.targetColumn)}">
         ${escapeHtml(rel.targetTable)}.<span class="text-success">${escapeHtml(rel.targetColumn)}</span>
       </td>
-      <td class="font-mono text-muted">${rel.deleteRule ? `ON DELETE ${escapeHtml(rel.deleteRule)}` : 'CASCADE'}</td>
+      <td class="font-mono text-muted">${rel.deleteRule ? `ON DELETE ${escapeHtml(rel.deleteRule)}` : rel.management === 'application' || rel.management === 'arcgis' || rel.constraintName.startsWith('manual_') ? (isFr ? 'Hors contrainte SQL' : 'No SQL constraint') : '—'}</td>
     </tr>
   `).join('\n') : `<tr><td colspan="5" class="text-center text-muted" style="padding: 24px;">${i18n.noRels}</td></tr>`;
 
   // Type breakdown cards
-  const typeDistributionHtml = Object.entries(schema.summary?.dataTypesDistribution || {}).map(([category, count]) => `
+  const typeDistributionHtml = Object.entries(reportSummary.dataTypesDistribution).map(([category, count]) => `
     <div class="dist-item">
       <span class="dist-name font-mono">${escapeHtml(category)}</span>
       <span class="dist-count font-mono font-bold">${count}</span>
@@ -2546,6 +2744,18 @@ export function generateStandaloneHtmlReport(
     .filter(s => s.enabled && s.position === 'bottom' && s.title.trim())
     .map(renderCustomSection)
     .join('\n');
+
+  const tocHtml = allTables.length ? `
+    <nav class="report-toc" aria-label="${isFr ? 'Table des matières' : 'Table of contents'}">
+      <h2 class="section-title">${isFr ? 'Table des matières' : 'Table of contents'}</h2>
+      <ol>${allTables.map(table => `
+        <li><a href="#${escapeHtml(tableAnchorId(table))}">${escapeHtml(table.schema || 'public')}.${escapeHtml(table.name)}</a>
+          <span class="text-muted">${escapeHtml(classifyTableFamily(
+            table, allTables, lang, cfg.tableMetadata[getTableMetadataKey(table)]?.service
+          ))}</span>
+        </li>`).join('')}
+      </ol>
+    </nav>` : '';
 
   // Header metadata items
   const headerMetaItems: string[] = [];
@@ -2622,12 +2832,29 @@ export function generateStandaloneHtmlReport(
       </div>
     </header>` : '';
 
+  const coverPageHtml = cfg.showCoverPage ? `
+    <section class="cover-page">
+      <div class="cover-logos">${logoLeftImg}${logoRightImg}</div>
+      <div class="cover-content">
+        ${cfg.header.showBrandBadge ? `<span class="badge-brand">${escapeHtml(i18n.brand)}</span>` : ''}
+        <h1>${escapeHtml(displayTitle)}</h1>
+        <p class="cover-subtitle">${escapeHtml(i18n.desc)}</p>
+        <div class="cover-rule"></div>
+        <dl>
+          ${cfg.header.organization.trim() ? `<div><dt>${escapeHtml(i18n.orgLabel)}</dt><dd>${escapeHtml(cfg.header.organization)}</dd></div>` : ''}
+          ${cfg.header.author.trim() ? `<div><dt>${escapeHtml(i18n.authorLabel)}</dt><dd>${escapeHtml(cfg.header.author)}</dd></div>` : ''}
+          ${cfg.header.documentRef.trim() ? `<div><dt>${escapeHtml(i18n.refLabel)}</dt><dd>${escapeHtml(cfg.header.documentRef)}</dd></div>` : ''}
+          <div><dt>${escapeHtml(i18n.genAt)}</dt><dd>${escapeHtml(generatedTimeStr)}</dd></div>
+        </dl>
+      </div>
+    </section>` : '';
+
   const kpiHtml = cfg.sections.kpis ? `
     <!-- KPI Summary Grid -->
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="kpi-title">${escapeHtml(i18n.kpiTables)}</div>
-        <div class="kpi-val">${schema.summary.totalTables}</div>
+        <div class="kpi-val">${reportSummary.totalTables}</div>
         <div class="kpi-sub">${escapeHtml(i18n.kpiTablesSub)}</div>
       </div>
       <div class="kpi-card">
@@ -2637,17 +2864,17 @@ export function generateStandaloneHtmlReport(
       </div>
       <div class="kpi-card">
         <div class="kpi-title">${escapeHtml(i18n.kpiRecords)}</div>
-        <div class="kpi-val">${schema.summary.totalRecords.toLocaleString()}</div>
+        <div class="kpi-val">${reportSummary.totalRecords.toLocaleString()}</div>
         <div class="kpi-sub">${escapeHtml(i18n.kpiRecordsSub)}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-title">${escapeHtml(i18n.kpiCols)}</div>
-        <div class="kpi-val">${schema.summary.totalColumns}</div>
+        <div class="kpi-val">${reportSummary.totalColumns}</div>
         <div class="kpi-sub">${escapeHtml(i18n.kpiColsSub)}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-title">${escapeHtml(i18n.kpiRels)}</div>
-        <div class="kpi-val text-report-accent">${schema.summary.totalRelationships}</div>
+        <div class="kpi-val text-report-accent">${reportSummary.totalRelationships}</div>
         <div class="kpi-sub">${escapeHtml(i18n.kpiRelsSub)}</div>
       </div>
     </div>` : '';
@@ -2666,12 +2893,12 @@ export function generateStandaloneHtmlReport(
         <h2 class="section-title">${escapeHtml(i18n.relSectionTitle)}</h2>
         <p class="section-subtitle">${escapeHtml(i18n.relSectionSub)}</p>
       </div>
-      <span class="font-mono text-muted" style="font-size: 12px;">${schema.relationships.length} ${escapeHtml(i18n.activeLinks)}</span>
+      <span class="font-mono text-muted" style="font-size: 12px;">${allRelationships.length} ${escapeHtml(i18n.activeLinks)}</span>
     </div>
 
     <div class="table-card" style="margin-bottom: 36px;">
       <div class="table-responsive">
-        <table class="data-table">
+        <table class="data-table relationships-table" style="width:100%;table-layout:fixed;">
           <thead>
             <tr>
               <th>${escapeHtml(i18n.thConstraint)}</th>
@@ -3450,6 +3677,53 @@ ${googleFontsLink}
       color: var(--text);
     }
 
+    .relationships-table th, .relationships-table td {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      vertical-align: top;
+      line-height: 1.45;
+    }
+
+    .report-toc {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: ${sp.cardRadius};
+      padding: 18px 22px;
+      margin: 0 0 ${sp.blockGap};
+      break-after: page;
+    }
+    .report-toc ol {
+      columns: 2;
+      column-gap: 32px;
+      margin: 14px 0 0;
+      padding-left: 22px;
+    }
+    .report-toc li { break-inside: avoid; padding: 3px 4px; }
+    .report-toc a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+    .report-toc a:hover { text-decoration: underline; }
+    .cover-page {
+      min-height: 78vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 38px;
+      margin-bottom: ${sp.blockGap};
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-top: 6px solid var(--report-accent);
+      border-radius: ${sp.cardRadius};
+      break-after: page;
+    }
+    .cover-logos { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+    .cover-logos img { max-height: var(--logo-height); max-width: 180px; object-fit: contain; }
+    .cover-content { max-width: 850px; margin: auto; padding: 55px 0; }
+    .cover-content h1 { font-size: clamp(30px, 5vw, 52px); line-height: 1.12; margin: 18px 0; }
+    .cover-subtitle { color: var(--text-muted); font-size: 1.15em; max-width: 700px; }
+    .cover-rule { width: 90px; height: 4px; background: var(--report-accent); margin: 28px 0; }
+    .cover-content dl { display: grid; gap: 8px; }
+    .cover-content dl div { display: flex; gap: 8px; }
+    .cover-content dt { font-weight: 700; }
+
     .font-mono { font-family: var(--font-mono); }
     .font-bold { font-weight: 700; }
     .text-center { text-align: center; }
@@ -3496,11 +3770,13 @@ ${googleFontsLink}
       .fiche-table th.fiche-th-label, .fiche-label { width: 130px; }
       .fiche-table-2col .fiche-label-2col { width: 22%; }
       .fiche-table-2col .fiche-value-2col { width: 28%; }
+      .report-toc ol { columns: 1; }
     }
 
     @media print {
       body { background: #FFFFFF; padding: 0; font-size: ${Math.max(9, baseFontSize - 2)}px; }
       .container { max-width: 100%; }
+      .cover-page { min-height: 95vh; margin: 0; border-radius: 0; }
       .header-actions, .filter-panel, .empty-filter-state { display: none !important; }
       .table-card { break-inside: avoid; border-color: #CCCCCC; box-shadow: none; margin-bottom: 10px; }
       header.report-header, .custom-section-card { box-shadow: none; border-color: #CCCCCC; }
@@ -3509,9 +3785,11 @@ ${googleFontsLink}
 </head>
 <body>
   <div class="container">
+    ${coverPageHtml}
     ${headerHtml}
     ${topCustomSectionsHtml}
     ${kpiHtml}
+    ${tocHtml}
     ${typeDistHtml}
     ${relationshipsHtml}
 
@@ -3521,7 +3799,7 @@ ${googleFontsLink}
         <h2 class="section-title">${escapeHtml(i18n.catSectionTitle)}</h2>
         <p class="section-subtitle">${escapeHtml(i18n.catSectionSub)}</p>
       </div>
-      <span class="font-mono text-muted" style="font-size: 12px;">${schema.tables.length} ${escapeHtml(i18n.docTables)}</span>
+      <span class="font-mono text-muted" style="font-size: 12px;">${allTables.length} ${escapeHtml(i18n.docTables)}</span>
     </div>
 
     ${filterPanelHtml}

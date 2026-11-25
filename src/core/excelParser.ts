@@ -331,8 +331,8 @@ export function inspectExcelWorkbook(
       sizeBytes: buffer.byteLength,
       featureCount: features.length,
       geometryType: 'Unknown',
-      detectedCRS,
-      crsStatus: 'verified',
+      detectedCRS: null,
+      crsStatus: 'missing',
       bounds: [0, 0, 0, 0],
       fields,
       geojson,
@@ -508,9 +508,59 @@ export function inspectAllExcelSheets(buffer: ArrayBuffer): ExcelSheetSummary[] 
 /**
  * Exports a GeoJSON FeatureCollection to an Excel workbook binary (.xlsx)
  */
-export function geojsonToExcelBuffer(geojson: any, sheetName: string = 'Geospatial Data'): Uint8Array {
+function parseExcelExportDate(value: unknown): number | null {
+  let date: Date;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    date = value;
+  } else {
+    if (typeof value !== 'string') return null;
+    const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(.*))?$/);
+    if (!match) return null;
+
+    const [, yearText, monthText, dayText, hourText, minuteText, secondText, millisecondText, zoneText] = match;
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const hour = Number(hourText || 0);
+    const minute = Number(minuteText || 0);
+    const second = Number(secondText || 0);
+    const millisecond = Number((millisecondText || '').padEnd(3, '0') || 0);
+    const hasTimezone = Boolean(zoneText && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(zoneText.trim()));
+    const calendarDate = new Date(Date.UTC(year, month - 1, day));
+    if (
+      calendarDate.getUTCFullYear() !== year ||
+      calendarDate.getUTCMonth() !== month - 1 ||
+      calendarDate.getUTCDate() !== day
+    ) {
+      return null;
+    }
+    date = hasTimezone
+      ? new Date(value.trim().replace(' ', 'T'))
+      : new Date(year, month - 1, day, hour, minute, second, millisecond);
+    if (Number.isNaN(date.getTime())) return null;
+  }
+  const localDateAsUtc = Date.UTC(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    date.getHours(),
+    date.getMinutes(),
+    date.getSeconds(),
+    date.getMilliseconds()
+  );
+  return localDateAsUtc / 86400000 + 25569;
+}
+
+export function geojsonToExcelBuffer(
+  geojson: any,
+  sheetName: string = 'Geospatial Data',
+  dateFormat: string = 'yyyy-mm-dd',
+  dateColumns: string[] = []
+): Uint8Array {
   const features = geojson?.features || (geojson?.type === 'Feature' ? [geojson] : []);
   const rows: Record<string, any>[] = [];
+  const formattedDateColumns = new Set(dateColumns);
 
   for (const f of features) {
     const row: Record<string, any> = {};
@@ -525,13 +575,35 @@ export function geojsonToExcelBuffer(geojson: any, sheetName: string = 'Geospati
 
     if (f.properties) {
       Object.assign(row, f.properties);
+      for (const [columnName, value] of Object.entries(row)) {
+        const parsedDate = formattedDateColumns.has(columnName) || typeof value === 'string'
+          ? parseExcelExportDate(value)
+          : null;
+        if (parsedDate !== null) {
+          row[columnName] = parsedDate;
+          formattedDateColumns.add(columnName);
+        }
+      }
     }
     rows.push(row);
   }
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
+  const range = worksheet['!ref'] ? XLSX.utils.decode_range(worksheet['!ref']) : null;
+  if (range) {
+    for (let column = range.s.c; column <= range.e.c; column++) {
+      const header = worksheet[XLSX.utils.encode_cell({ r: range.s.r, c: column })]?.v;
+      if (!formattedDateColumns.has(String(header))) continue;
+      for (let row = range.s.r + 1; row <= range.e.r; row++) {
+        const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: column })];
+        if (cell && typeof cell.v === 'number') cell.z = dateFormat;
+      }
+    }
+  }
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31));
+  const safeSheetName = (sheetName || 'Data').replace(/[\\/?*[\]:]/g, '_').slice(0, 31) || 'Data';
+  XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
 
-  return XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+  const output = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+  return output instanceof Uint8Array ? output : new Uint8Array(output as ArrayBuffer);
 }

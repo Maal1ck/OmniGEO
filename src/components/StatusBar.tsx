@@ -10,7 +10,7 @@ import type { RailMeta } from './SideRail';
 
 interface StatusBarProps {
   meta: RailMeta;
-  crsMode: 'reproject' | 'assign';
+  crsMode: 'reproject' | 'assign' | 'preserve';
   isDryRun: boolean;
   workers: number;
 }
@@ -42,7 +42,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({ meta, crsMode, isDryRun, w
       </span>
       <span className="hidden lg:inline-flex items-center gap-3">
         <Sep />
-        <span>{s.mode}: <span className="text-[var(--og-fg-2)]">{crsMode === 'reproject' ? s.reproject : s.assign}</span></span>
+        <span>{s.mode}: <span className="text-[var(--og-fg-2)]">{crsMode === 'reproject' ? s.reproject : crsMode === 'assign' ? s.assign : 'Preserve'}</span></span>
       </span>
       {isDryRun && (
         <span className="flex items-center gap-1 rounded px-1.5 py-px bg-[var(--og-accent-soft)] text-[var(--og-accent)]">
