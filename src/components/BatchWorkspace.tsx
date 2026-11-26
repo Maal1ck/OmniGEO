@@ -870,43 +870,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
         </div>
 
         {/* Right: Actions & Ingestion Triggers */}
-        <div className="flex items-center space-x-2">
-          {warningCount > 0 && onOpenSpatialDoctor && (
-            <button
-              onClick={onOpenSpatialDoctor}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-950/70 hover:bg-amber-900/70 text-amber-300 border border-amber-600/60 transition-all shadow-sm cursor-pointer"
-            >
-              <Stethoscope className="w-3.5 h-3.5 text-amber-400" />
-              <span>{t.workspace.fixWarnings} ({warningCount})</span>
-            </button>
-          )}
-
-          {/* Subfolder Mode Toggle Button in Toolbar */}
-          <button
-            type="button"
-            onClick={() => setIncludeSubfolders(!includeSubfolders)}
-            title={includeSubfolders ? "Subfolders: Scanning ALL nested subdirectories. Click to scan root only." : "Subfolders: Scanning ROOT folder only. Click to include subfolders."}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-mono border transition-all ${
-              includeSubfolders
-                ? theme === 'light'
-                  ? 'bg-[#EBF7EE] text-emerald-800 border-emerald-300 font-bold shadow-xs'
-                  : 'bg-emerald-950/60 text-emerald-300 border-emerald-600/50 font-semibold shadow-xs'
-                : theme === 'light'
-                  ? 'bg-stone-100 text-stone-700 border-stone-300'
-                  : 'bg-stone-900 text-stone-400 border-stone-800 hover:text-stone-200'
-            }`}
-          >
-            <FolderTree className={`w-3.5 h-3.5 ${includeSubfolders ? (theme === 'light' ? 'text-emerald-700' : 'text-emerald-400') : 'text-stone-500'}`} />
-            <span>Subfolders:</span>
-            <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-              includeSubfolders 
-                ? 'bg-emerald-600 text-white' 
-                : 'bg-stone-700 text-stone-200'
-            }`}>
-              {includeSubfolders ? 'RECURSIVE' : 'ROOT ONLY'}
-            </span>
-          </button>
-
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {/* 3. Ingestion Filters & Data Types Dropdown */}
           <div className="relative z-50" ref={filterMenuRef}>
             <button
@@ -933,7 +897,7 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
             {isFilterMenuOpen && (
               <div
-                className={`absolute right-0 top-full mt-2 w-72 rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-100 ${
+                className={`absolute right-0 top-full mt-2 w-72 max-h-[calc(100dvh-8rem)] overflow-y-auto overscroll-contain rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-100 ${
                   theme === 'light'
                     ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-stone-400/25'
                     : 'bg-[#101917] border-stone-800 text-stone-200 shadow-stone-950/80'
@@ -1026,111 +990,6 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
 
           {datasets.length > 0 && (
             <>
-              {datasets.length >= 2 && onOpenConcatenationModal && (
-                <button
-                  type="button"
-                  onClick={() => onOpenConcatenationModal(selectedIds.size >= 2 ? Array.from(selectedIds) : undefined)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                    theme === 'light'
-                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
-                      : 'bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border-amber-700/50'
-                  }`}
-                  title="Concatenate and merge multiple layers into a single dataset by mapping attributes"
-                >
-                  <Layers className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Concatenate{selectedIds.size >= 2 ? ` (${selectedIds.size})` : ''}</span>
-                </button>
-              )}
-
-              {datasets.length >= 2 && onOpenJoinModal && (
-                <button
-                  type="button"
-                  onClick={() => onOpenJoinModal(selectedIds.size >= 1 ? Array.from(selectedIds)[0] : undefined)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                    theme === 'light'
-                      ? 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-300'
-                      : 'bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 border-purple-700/50'
-                  }`}
-                  title="Perform an attribute or spatial join between two layers"
-                >
-                  <GitMerge className="w-3.5 h-3.5 text-purple-500" />
-                  <span>{lang === 'fr' ? 'Jointures' : lang === 'ar' ? 'الربط' : 'Join Layers'}</span>
-                </button>
-              )}
-
-              {onOpenPostgisModal && (
-                <button
-                  type="button"
-                  onClick={() => onOpenPostgisModal(selectedIds.size === 1 ? Array.from(selectedIds)[0] : undefined)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                    theme === 'light'
-                      ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-300'
-                      : 'bg-indigo-950/40 hover:bg-indigo-900/50 text-indigo-300 border-indigo-700/50'
-                  }`}
-                  title="Export layer(s) to PostgreSQL / PostGIS database"
-                >
-                  <Database className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>PostGIS Export</span>
-                </button>
-              )}
-
-              {onOpenDataCleaning && (
-                <button
-                  type="button"
-                  onClick={() => onOpenDataCleaning(selectedIds.size === 1 ? Array.from(selectedIds)[0] : undefined)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    theme === 'light'
-                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
-                      : 'bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border-amber-700/50'
-                  }`}
-                  title={lang === 'fr' ? 'Auditer les nombres malformees (19,.7), la casse et les separateurs' : 'Audit malformed numbers (19,.7 -> Double/Float), text casing, and separators'}
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{lang === 'fr' ? 'Audit & Nettoyage' : 'Clean & Audit'}</span>
-                </button>
-              )}
-
-              {onOpenScriptStudio && (
-                <button
-                  type="button"
-                  onClick={() => onOpenScriptStudio(selectedIds.size === 1 ? Array.from(selectedIds)[0] : selectedDatasetId || undefined)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    theme === 'light'
-                      ? 'bg-[#F3F7F1] hover:bg-[#E3EAE1] text-amber-950 border-[#C2D2C2]'
-                      : 'bg-amber-950/35 hover:bg-amber-900/45 text-amber-200 border-amber-700/45'
-                  }`}
-                  title={
-                    lang === 'fr'
-                      ? 'Générer un script ArcPy ou SQL pour créer les colonnes manquantes dans une table cible'
-                      : 'Generate ArcPy or SQL script to add missing columns and populate a target table'
-                  }
-                >
-                  <FileCode2 className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{lang === 'fr' ? 'Scripts ArcPy / SQL' : 'ArcPy / SQL Script'}</span>
-                </button>
-              )}
-
-              {onOpenRelationshipMapper && (
-                <button
-                  type="button"
-                  onClick={() => onOpenRelationshipMapper()}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                    theme === 'light'
-                      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
-                      : 'bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border-emerald-700/50'
-                  }`}
-                  title={lang === 'fr' ? 'Definir les relations, generer les IDs (PK) et mapper les cles etrangeres (FK)' : 'Define relationships, generate PK IDs, and auto-map Foreign Keys'}
-                >
-                  <KeyRound className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>{lang === 'fr' ? 'IDs & Relations' : 'IDs & Relations'}</span>
-                  {definedRelationships.length > 0 && (
-                    <span className="px-1.5 py-0.2 rounded bg-emerald-600 text-white text-[10px] font-mono font-bold">
-                      {definedRelationships.length}
-                    </span>
-                  )}
-                </button>
-              )}
-
               <button
                 type="button"
                 disabled={isExportingGdbZip}
@@ -1171,24 +1030,19 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                 <span>Export .gdb{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}</span>
               </button>
 
-              {onOpenPostgresReport && (
-                <button
-                  type="button"
-                  onClick={() => onOpenPostgresReport()}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                    theme === 'light'
-                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
-                      : 'bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border-amber-700/50'
-                  }`}
-                  title="Generate global PostgreSQL database architecture & schema report (HTML)"
-                >
-                  <TableProperties className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{lang === 'fr' ? 'Rapport Base de Donnees' : 'DB Report'}</span>
-                </button>
-              )}
-
               {selectedIds.size > 0 && (
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-700/40 bg-emerald-950/20 p-1.5">
+                  {onStartBatch && (
+                    <button
+                      type="button"
+                      onClick={() => onStartBatch(Array.from(selectedIds))}
+                      className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-display font-bold text-white shadow-sm transition-colors hover:bg-emerald-500 active:scale-[0.98]"
+                      title="Run batch processing only on the checked datasets"
+                    >
+                      <Play className="h-3.5 w-3.5 fill-current" />
+                      <span>Process Selected ({selectedIds.size})</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setIsBatchCrsModalOpen(true)}
@@ -1203,17 +1057,8 @@ export const BatchWorkspace: React.FC<BatchWorkspaceProps> = ({
                     <span>Assign CRS ({selectedIds.size})</span>
                   </button>
 
-                  {onStartBatch && (
-                    <button
-                      onClick={() => onStartBatch(Array.from(selectedIds))}
-                      className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-display font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-950/30 transition-all active:scale-95"
-                      title="Run batch processing only on the checked datasets"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>Process Selected ({selectedIds.size})</span>
-                    </button>
-                  )}
                   <button
+                    type="button"
                     onClick={removeSelected}
                     className="flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-950/50 text-rose-300 border border-rose-800/60 hover:bg-rose-900/50 transition-colors"
                   >

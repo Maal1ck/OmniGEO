@@ -517,22 +517,37 @@ export const ConversionLab: React.FC<ConversionLabProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-stone-900/80 border border-stone-800 space-y-3">
-              <label className="flex items-start space-x-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={consolidationSettings.consolidateToSingleGeoPackage}
-                  onChange={(e) => setConsolidationSettings(s => ({ ...s, consolidateToSingleGeoPackage: e.target.checked }))}
-                  className="rounded border-stone-700 bg-[#0D1413] text-amber-500 focus:ring-0 mt-0.5"
-                />
-                <div>
-                  <span className="text-xs font-display font-bold text-[#F4F8F2] block">
-                    Consolidate Batch into Single Multi-Layer GeoPackage (.gpkg)
+              <fieldset className="space-y-2">
+                <legend className="text-xs font-display font-bold text-[#F4F8F2] mb-2">
+                  Batch export mode
+                </legend>
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="batch-export-mode"
+                    checked={!consolidationSettings.consolidateToSingleGeoPackage}
+                    onChange={() => setConsolidationSettings(s => ({ ...s, consolidateToSingleGeoPackage: false }))}
+                    className="mt-0.5 accent-amber-500"
+                  />
+                  <span>
+                    <span className="text-xs font-semibold text-stone-200 block">Export each vector separately</span>
+                    <span className="text-[11px] text-stone-400">Creates one output file per processed dataset.</span>
                   </span>
-                  <p className="text-[11px] text-stone-400 mt-0.5 leading-relaxed">
-                    Merges all input datasets into individual feature tables inside one single OGC GeoPackage container instead of exporting loose files.
-                  </p>
-                </div>
-              </label>
+                </label>
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="batch-export-mode"
+                    checked={consolidationSettings.consolidateToSingleGeoPackage}
+                    onChange={() => setConsolidationSettings(s => ({ ...s, consolidateToSingleGeoPackage: true }))}
+                    className="mt-0.5 accent-amber-500"
+                  />
+                  <span>
+                    <span className="text-xs font-semibold text-stone-200 block">Combine processed vectors into one GeoPackage</span>
+                    <span className="text-[11px] text-stone-400">Each dataset becomes a layer in one .gpkg. Download it directly from the Process Monitor.</span>
+                  </span>
+                </label>
+              </fieldset>
 
               {consolidationSettings.consolidateToSingleGeoPackage && (
                 <div className="pl-6 space-y-2 pt-2 border-t border-stone-800 font-mono text-xs">

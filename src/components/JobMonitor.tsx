@@ -19,7 +19,8 @@ import {
   Layers,
   Terminal,
   Cpu,
-  Loader2
+  Loader2,
+  Database,
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { ConversionJob, BatchManifest } from '../types/gis';
@@ -37,6 +38,9 @@ interface JobMonitorProps {
   hasCertificate?: boolean;
   onDownloadConsolidated?: () => void;
   hasConsolidated?: boolean;
+  onDownloadGeoPackage?: () => void;
+  hasGeoPackage?: boolean;
+  consolidationError?: string | null;
 }
 
 export const JobMonitor: React.FC<JobMonitorProps> = ({
@@ -51,6 +55,9 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
   hasCertificate,
   onDownloadConsolidated,
   hasConsolidated,
+  onDownloadGeoPackage,
+  hasGeoPackage,
+  consolidationError,
 }) => {
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
@@ -133,6 +140,11 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
     <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-y-auto bg-[#0D1413] p-6 space-y-6 text-[#EAEEE8]">
       {/* Top Batch Execution Overview */}
       <div className="glass-panel rounded-2xl p-6 space-y-5">
+        {consolidationError && (
+          <div role="alert" className="rounded-xl border border-rose-700/60 bg-rose-950/40 px-4 py-3 text-xs text-rose-200">
+            {consolidationError}
+          </div>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2">
@@ -197,13 +209,26 @@ export const JobMonitor: React.FC<JobMonitorProps> = ({
 
             {jobs.some(j => j.outputBlob) && (
               <>
-                <button
-                  onClick={handleDownloadAllZip}
-                  className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-stone-850 hover:bg-stone-800 text-amber-300 border border-stone-700 transition-all shadow-sm"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download ZIP Bundle</span>
-                </button>
+                {!hasGeoPackage && (
+                  <button
+                    onClick={handleDownloadAllZip}
+                    className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-stone-850 hover:bg-stone-800 text-amber-300 border border-stone-700 transition-all shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download ZIP Bundle</span>
+                  </button>
+                )}
+
+                {hasGeoPackage && onDownloadGeoPackage && (
+                  <button
+                    onClick={onDownloadGeoPackage}
+                    className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-600/60 transition-all shadow-sm"
+                    title="Download the processed layers in one standalone GeoPackage"
+                  >
+                    <Database className="w-3.5 h-3.5" />
+                    <span>Download Single GeoPackage</span>
+                  </button>
+                )}
 
                 {hasConsolidated && onDownloadConsolidated && (
                   <button

@@ -129,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
   const section = SECTIONS[activeTab];
 
   return (
-    <header className={`h-[60px] shrink-0 border-b select-none z-30 sticky top-0 flex items-center justify-between gap-4 px-5 backdrop-blur-md transition-colors ${
+    <header className={`h-[60px] shrink-0 border-b select-none z-[100] sticky top-0 flex items-center justify-between gap-4 px-5 backdrop-blur-md transition-colors ${
       theme === 'light'
         ? 'bg-[#F7FAF5]/95 border-[#D4DFD3] text-[#141F1D]'
         : 'bg-[#0D1413]/95 border-white/[0.06] text-stone-100'
@@ -293,7 +293,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Tools Menu Popover */}
           {isToolsOpen && (
-            <div className={`absolute right-0 mt-2 w-72 rounded-2xl border p-2 z-50 animate-in fade-in zoom-in-95 duration-100 text-xs font-sans shadow-2xl ${
+            <div className={`absolute right-0 mt-2 w-72 max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain rounded-2xl border p-2 z-50 animate-in fade-in zoom-in-95 duration-100 text-xs font-sans shadow-2xl ${
               theme === 'light'
                 ? 'bg-white border-[#D4DFD3] text-stone-900 shadow-stone-400/25'
                 : 'bg-[#131D1B] border-stone-700/80 text-stone-200 shadow-stone-950/80'

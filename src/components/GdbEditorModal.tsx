@@ -84,6 +84,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
   const [newColName, setNewColName] = useState('');
   const [newColType, setNewColType] = useState<'string' | 'number' | 'boolean' | 'date'>('string');
   const [newColDefault, setNewColDefault] = useState('');
+  const [newColAutoIncrement, setNewColAutoIncrement] = useState(false);
 
   const [isExportingGdb, setIsExportingGdb] = useState(false);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
@@ -119,6 +120,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
     );
     setReplaceColumn(currentSource.fields[0]?.name || '');
     setReplaceResult('');
+    setNewColAutoIncrement(false);
     setPage(0);
     setRowSearch('');
     setSavedNotice(null);
@@ -363,18 +365,23 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
     } else if (newColDefault !== '' && newColType === 'boolean') {
       typedDefault = newColDefault.toLowerCase() === 'true' || newColDefault === '1';
     }
+    const sampleValue = newColAutoIncrement ? (draftFeatures.length > 0 ? 1 : null) : typedDefault;
     setDraftFields((prev) => [
       ...prev,
-      { name: clean, type: newColType, sampleValues: typedDefault !== null ? [typedDefault] : [] },
+      { name: clean, type: newColType, sampleValues: sampleValue !== null ? [sampleValue] : [] },
     ]);
     setDraftFeatures((prev) =>
-      prev.map((f) => ({
+      prev.map((f, index) => ({
         ...f,
-        properties: { ...(f.properties || {}), [clean]: typedDefault },
+        properties: {
+          ...(f.properties || {}),
+          [clean]: newColAutoIncrement ? index + 1 : typedDefault,
+        },
       }))
     );
     setNewColName('');
     setNewColDefault('');
+    setNewColAutoIncrement(false);
   };
 
   const handleRenameColumn = (oldName: string, nextNameRaw: string) => {
@@ -814,7 +821,11 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                   </label>
                   <select
                     value={newColType}
-                    onChange={(e) => setNewColType(e.target.value as any)}
+                    onChange={(e) => {
+                      const nextType = e.target.value as typeof newColType;
+                      setNewColType(nextType);
+                      if (nextType !== 'number') setNewColAutoIncrement(false);
+                    }}
                     className="rounded-lg px-3 py-1.5 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                   >
                     <option value="string">string (varchar)</option>
@@ -823,6 +834,16 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     <option value="date">date / timestamp</option>
                   </select>
                 </div>
+                <label className="flex items-center gap-2 pb-1.5 text-stone-300">
+                  <input
+                    type="checkbox"
+                    checked={newColAutoIncrement}
+                    disabled={newColType !== 'number'}
+                    onChange={(e) => setNewColAutoIncrement(e.target.checked)}
+                    className="rounded border-stone-700 bg-[#0D1413] text-amber-500 disabled:opacity-40"
+                  />
+                  <span>{isFr ? 'Numérotation automatique (1, 2, 3...)' : 'Auto-increment (1, 2, 3...)'}</span>
+                </label>
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-stone-400 mb-1">
                     {isFr ? 'Valeur initiale (optionnel)' : 'Initial value (optional)'}
@@ -831,6 +852,7 @@ export const GdbEditorModal: React.FC<GdbEditorModalProps> = ({
                     type="text"
                     value={newColDefault}
                     onChange={(e) => setNewColDefault(e.target.value)}
+                    disabled={newColAutoIncrement}
                     className="rounded-lg px-3 py-1.5 bg-[#0D1413] border border-stone-700 text-stone-100 font-mono"
                   />
                 </div>

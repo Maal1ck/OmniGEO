@@ -1,7 +1,7 @@
 {
   "name": "omnigeo",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "OmniGeo desktop geospatial data processing workbench.",
   "author": "OmniGeo by Maodo",
   "type": "module",
@@ -46,6 +46,8 @@
     "@types/react-dom": "^19.3.0",
     "@types/shpjs": "^3.4.7",
     "@types/sql.js": "^1.4.11",
+    "electron": "^45.5.0",
+    "electron-builder": "^26.18.0",
     "epsg-index": "^2.0.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
@@ -68,7 +70,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -78,7 +82,9 @@
       "createDesktopShortcut": true
     },
     "mac": {
-      "target": ["dmg"]
+      "target": [
+        "dmg"
+      ]
     }
   }
 }

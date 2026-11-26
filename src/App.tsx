@@ -83,6 +83,8 @@ export default function App() {
 
   const [qaqcReport, setQaqcReport] = useState<QAQCReportData | null>(null);
   const [consolidatedHandoffBlob, setConsolidatedHandoffBlob] = useState<Blob | null>(null);
+  const [consolidatedGeoPackageBlob, setConsolidatedGeoPackageBlob] = useState<Blob | null>(null);
+  const [consolidationError, setConsolidationError] = useState<string | null>(null);
 
   // Batch execution & jobs
   const [jobs, setJobs] = useState<ConversionJob[]>([]);
@@ -316,6 +318,9 @@ export default function App() {
 
     if (initialJobs.length === 0) return;
 
+    setConsolidatedHandoffBlob(null);
+    setConsolidatedGeoPackageBlob(null);
+    setConsolidationError(null);
     setJobs(allCurrentJobs);
     setIsProcessing(true);
     setActiveTab('monitor');
@@ -396,18 +401,25 @@ export default function App() {
 
         if (layers.length > 0) {
           const multiGpkgBlob = await createMultiLayerGeoPackage(layers, settings.targetCRS);
-          const layerNames = layers.map(l => l.name);
-          const qgsXml = generateQgisProjectXml(consolidationSettings.packageFileName, layerNames, settings.targetCRS);
-          const bundleZip = await bundleConsolidatedHandoff(
-            multiGpkgBlob,
-            consolidationSettings.packageFileName,
-            qgsXml,
-            'OmniGeo_Project'
-          );
-          setConsolidatedHandoffBlob(bundleZip);
+          setConsolidatedGeoPackageBlob(multiGpkgBlob);
+          if (consolidationSettings.generateQgisProject) {
+            const layerNames = layers.map(l => l.name);
+            const qgsXml = generateQgisProjectXml(consolidationSettings.packageFileName, layerNames, settings.targetCRS);
+            const bundleZip = await bundleConsolidatedHandoff(
+              multiGpkgBlob,
+              consolidationSettings.packageFileName,
+              qgsXml,
+              'OmniGeo_Project'
+            );
+            setConsolidatedHandoffBlob(bundleZip);
+          }
+        } else {
+          setConsolidationError('No completed datasets were available to combine into a GeoPackage.');
         }
       } catch (err) {
-        console.warn('Consolidation bundle error:', err);
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('Could not complete the consolidated GeoPackage export:', err);
+        setConsolidationError(`Could not complete the consolidated GeoPackage export: ${message}`);
       }
     }
   };
@@ -419,6 +431,20 @@ export default function App() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `OmniGeo_Consolidated_Handoff_${Date.now()}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadConsolidatedGeoPackage = () => {
+    if (!consolidatedGeoPackageBlob) return;
+    const baseName = consolidationSettings.packageFileName.trim() || 'consolidated_delivery.gpkg';
+    const fileName = baseName.toLowerCase().endsWith('.gpkg') ? baseName : `${baseName}.gpkg`;
+    const url = URL.createObjectURL(consolidatedGeoPackageBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -643,6 +669,9 @@ export default function App() {
             hasCertificate={!!qaqcReport}
             onDownloadConsolidated={handleDownloadConsolidatedHandoff}
             hasConsolidated={!!consolidatedHandoffBlob}
+            onDownloadGeoPackage={handleDownloadConsolidatedGeoPackage}
+            hasGeoPackage={!!consolidatedGeoPackageBlob}
+            consolidationError={consolidationError}
           />
         )}
 

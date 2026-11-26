@@ -379,6 +379,90 @@ function signedRingArea(ring: number[][]): number {
   return area / 2;
 }
 
+function pointInRing(point: number[], ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const crosses = (yi > point[1]) !== (yj > point[1]) &&
+      point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function groupPolygonRings(rings: number[][][]): number[][][][] {
+  const ringAreas = rings.map((ring) => Math.abs(signedRingArea(ring)));
+  if (rings.length > 256) {
+    // Avoid quadratic containment checks for unusually high-part-count features.
+    let largestRingIndex = 0;
+    for (let index = 1; index < ringAreas.length; index++) {
+      if (ringAreas[index] > ringAreas[largestRingIndex]) largestRingIndex = index;
+    }
+    const exteriorOrientation = Math.sign(signedRingArea(rings[largestRingIndex])) || -1;
+    const polygons: number[][][][] = [];
+    for (const ring of rings) {
+      if (Math.sign(signedRingArea(ring)) === exteriorOrientation || polygons.length === 0) {
+        polygons.push([ring]);
+      } else {
+        polygons[polygons.length - 1].push(ring);
+      }
+    }
+    return polygons;
+  }
+
+  const parents = rings.map((_ring, index) => {
+    let parentIndex = -1;
+    let parentArea = Infinity;
+    for (let candidateIndex = 0; candidateIndex < rings.length; candidateIndex++) {
+      if (
+        candidateIndex === index ||
+        ringAreas[candidateIndex] <= ringAreas[index] ||
+        ringAreas[candidateIndex] >= parentArea
+      ) {
+        continue;
+      }
+      if (pointInRing(rings[index][0], rings[candidateIndex])) {
+        parentIndex = candidateIndex;
+        parentArea = ringAreas[candidateIndex];
+      }
+    }
+    return parentIndex;
+  });
+
+  const depths = rings.map((_ring, index) => {
+    let depth = 0;
+    let parentIndex = parents[index];
+    while (parentIndex !== -1) {
+      depth++;
+      parentIndex = parents[parentIndex];
+    }
+    return depth;
+  });
+
+  const polygons: number[][][][] = [];
+  const polygonByRingIndex = new Map<number, number[][][]>();
+  for (let index = 0; index < rings.length; index++) {
+    if (depths[index] % 2 === 0) {
+      const polygon = [rings[index]];
+      polygons.push(polygon);
+      polygonByRingIndex.set(index, polygon);
+    }
+  }
+
+  for (let index = 0; index < rings.length; index++) {
+    if (depths[index] % 2 === 0) continue;
+    let exteriorIndex = parents[index];
+    while (exteriorIndex !== -1 && depths[exteriorIndex] % 2 !== 0) {
+      exteriorIndex = parents[exteriorIndex];
+    }
+    const polygon = exteriorIndex === -1 ? undefined : polygonByRingIndex.get(exteriorIndex);
+    if (polygon) polygon.push(rings[index]);
+  }
+
+  return polygons;
+}
+
 function detectCrsFromWkt(wkt?: string): CRSInfo {
   const wgs84 = getCRSByCode('EPSG:4326') || COMMON_CRS_LIST[0];
   if (!wkt || !wkt.trim()) return wgs84;
@@ -853,11 +937,11 @@ function parseFieldDescriptions(tableBytes: Uint8Array, fieldDescOffset: number)
       if (r.pos + 5 > sectionEndOffset) break;
       const width = r.readU32();
       const flag = r.readU8();
-      if ((flag & 4) !== 0 && r.pos < sectionEndOffset) {
-        const defLen = r.readVarUInt();
-        if (defLen > 0 && r.pos + defLen <= sectionEndOffset) {
-          r.readBytes(defLen);
-        }
+      if (r.pos >= sectionEndOffset) break;
+      const defLen = r.readVarUInt();
+      if (defLen > sectionEndOffset - r.pos) break;
+      if (defLen > 0) {
+        r.readBytes(defLen);
       }
       fields.push({ name, alias, fieldType, width, flag, nullable: (flag & 1) !== 0 });
     } else if (fieldType === 6) {
@@ -965,22 +1049,22 @@ function parseFieldDescriptions(tableBytes: Uint8Array, fieldDescOffset: number)
         r.pos = sectionEndOffset;
       }
       fields.push({ name, alias, fieldType, width, flag, nullable: (flag & 1) !== 0 });
-    } else if (fieldType === 8 || fieldType === 12) {
-      // Binary or XML
+    } else if (fieldType === 8 || fieldType === 10 || fieldType === 11 || fieldType === 12) {
+      // Binary, GUID, GlobalID, or XML
       if (r.pos + 2 > sectionEndOffset) break;
       const width = r.readU8();
       const flag = r.readU8();
       fields.push({ name, alias, fieldType, width, flag, nullable: (flag & 1) !== 0 });
     } else {
-      // Fixed numeric / date / guid / globalid / int64 / ArcGIS Pro dateOnly(14)/timeOnly(15)/timestampOffset(16)
+      // Fixed numeric, date, int64, and ArcGIS Pro date/time types
       if (r.pos + 2 > sectionEndOffset) break;
       const width = r.readU8();
       const flag = r.readU8();
-      if ((flag & 4) !== 0 && r.pos < sectionEndOffset) {
-        const defLen = r.readU8();
-        if (defLen > 0 && r.pos + defLen <= sectionEndOffset) {
-          r.readBytes(defLen);
-        }
+      if (r.pos >= sectionEndOffset) break;
+      const defLen = r.readU8();
+      if (defLen > sectionEndOffset - r.pos) break;
+      if (defLen > 0) {
+        r.readBytes(defLen);
       }
       fields.push({ name, alias, fieldType, width, flag, nullable: (flag & 1) !== 0 });
     }
@@ -1095,23 +1179,11 @@ function decodeGdbGeometry(blob: Uint8Array, geomField: ParsedFieldDescriptor): 
     return ring;
   });
 
-  if (closedRings.length === 1) {
-    return { type: 'Polygon', coordinates: [closedRings[0]] };
+  const polygons = groupPolygonRings(closedRings);
+  if (polygons.length === 1) {
+    return { type: 'Polygon', coordinates: polygons[0] };
   }
-
-  // In FileGDB/Shapefile, negative signed area (clockwise in XY) denotes an exterior ring
-  const polys: number[][][][] = [];
-  for (const ring of closedRings) {
-    const area = signedRingArea(ring);
-    if (area <= 0 || polys.length === 0) {
-      polys.push([ring]);
-    } else {
-      polys[polys.length - 1].push(ring);
-    }
-  }
-  return polys.length === 1
-    ? { type: 'Polygon', coordinates: polys[0] }
-    : { type: 'MultiPolygon', coordinates: polys };
+  return { type: 'MultiPolygon', coordinates: polygons };
 }
 
 function isPlausibleFieldDescOffset(tableBytes: Uint8Array, offset: number): boolean {
